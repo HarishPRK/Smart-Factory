@@ -1,34 +1,399 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&family=Rajdhani:wght@300;400;500;600;700&display=swap');
-
-:root {
-  --color-bg-dark: #020617;
-  --color-card-bg: #0f172a;
-  --color-accent-cyan: #06b6d4;
-}
+@import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap');
 
 body {
-  background-color: #020617;
-  color: white;
-  font-family: 'Outfit', sans-serif;
-  
-  /* Complex background to match the design's depth and mesh look */
-  background-image: 
-    /* Top center cyan glow */
-    radial-gradient(circle at 50% -20%, rgba(6, 182, 212, 0.15) 0%, transparent 40%),
-    /* Right side blue glow */
-    radial-gradient(circle at 80% 20%, rgba(30, 58, 138, 0.2) 0%, transparent 40%),
-    /* Bottom left blue glow */
-    radial-gradient(circle at 20% 80%, rgba(30, 58, 138, 0.2) 0%, transparent 40%),
-    /* Grid pattern */
-    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-    
-  background-size: 100% 100%, 100% 100%, 100% 100%, 60px 60px, 60px 60px;
-  background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
+  background-color: #030b1a;
+  color: #e0eaf5;
+  font-family: 'Inter', system-ui, sans-serif;
+  margin: 0;
   min-height: 100vh;
+  background-image:
+    radial-gradient(ellipse 80% 60% at 8% 35%, rgba(56, 130, 248, 0.07), transparent 70%),
+    radial-gradient(ellipse 50% 50% at 92% 15%, rgba(99, 102, 241, 0.06), transparent 70%),
+    radial-gradient(ellipse 60% 40% at 50% 110%, rgba(56, 189, 248, 0.05), transparent 70%),
+    radial-gradient(ellipse 35% 35% at 50% 50%, rgba(30, 64, 175, 0.1), transparent 70%),
+    radial-gradient(ellipse 40% 30% at 75% 70%, rgba(16, 185, 129, 0.03), transparent 70%);
+  background-attachment: fixed;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-.font-tech {
-  font-family: 'Rajdhani', sans-serif;
+/* Full-page background image with isolated opacity */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    linear-gradient(rgba(3, 11, 26, 0.82), rgba(3, 11, 26, 0.9)),
+    url('/background.jpg') center center / cover no-repeat;
+  opacity: 0.32;
+  pointer-events: none;
+  z-index: 0;
+  transform: scale(1.02);
+}
+
+/* Animated background mesh overlay */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle 600px at 10% 30%, rgba(59, 130, 246, 0.04), transparent),
+    radial-gradient(circle 400px at 90% 70%, rgba(139, 92, 246, 0.03), transparent);
+  pointer-events: none;
+  z-index: 0;
+  animation: ambient-shift 20s ease-in-out infinite alternate;
+}
+
+@keyframes ambient-shift {
+  0% { opacity: 1; }
+  50% { opacity: 0.6; }
+  100% { opacity: 1; }
+}
+
+/* Subtle grid overlay for industrial feel */
+#root::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(100, 160, 255, 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(100, 160, 255, 0.015) 1px, transparent 1px);
+  background-size: 60px 60px;
+  pointer-events: none;
+  z-index: 0;
+  mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, black, transparent);
+  -webkit-mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, black, transparent);
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+/* Modern glass panel — blue tinted */
+.glass {
+  background: linear-gradient(135deg, rgba(15, 30, 60, 0.5), rgba(10, 22, 50, 0.4));
+  backdrop-filter: blur(28px) saturate(1.6);
+  -webkit-backdrop-filter: blur(28px) saturate(1.6);
+  border: 1px solid rgba(100, 160, 255, 0.09);
+  box-shadow:
+    0 0 0 0.5px rgba(100, 160, 255, 0.04) inset,
+    0 1px 0 0 rgba(255, 255, 255, 0.03) inset,
+    0 8px 40px rgba(0, 10, 40, 0.4),
+    0 2px 8px rgba(0, 5, 20, 0.2);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass:hover {
+  background: linear-gradient(135deg, rgba(20, 40, 80, 0.55), rgba(15, 30, 65, 0.45));
+  border-color: rgba(100, 160, 255, 0.18);
+  box-shadow:
+    0 0 0 0.5px rgba(100, 160, 255, 0.06) inset,
+    0 1px 0 0 rgba(255, 255, 255, 0.04) inset,
+    0 12px 48px rgba(0, 10, 40, 0.5),
+    0 4px 12px rgba(0, 5, 20, 0.25),
+    0 0 30px rgba(59, 130, 246, 0.04);
+}
+
+/* Card base style — blue glass with refined depth */
+.card {
+  background: linear-gradient(165deg, rgba(12, 28, 55, 0.55), rgba(8, 20, 45, 0.45));
+  backdrop-filter: blur(28px) saturate(1.5);
+  -webkit-backdrop-filter: blur(28px) saturate(1.5);
+  border: 1px solid rgba(80, 140, 255, 0.08);
+  border-radius: 20px;
+  box-shadow:
+    0 0 0 0.5px rgba(80, 140, 255, 0.04) inset,
+    0 1px 0 0 rgba(255, 255, 255, 0.02) inset,
+    0 4px 24px rgba(0, 8, 30, 0.3);
+  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  position: relative;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    180deg,
+    rgba(100, 180, 255, 0.08) 0%,
+    transparent 40%,
+    transparent 100%
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.6;
+  transition: opacity 0.4s ease;
+}
+
+.card:hover {
+  border-color: rgba(80, 140, 255, 0.16);
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 0 0.5px rgba(80, 140, 255, 0.06) inset,
+    0 1px 0 0 rgba(255, 255, 255, 0.03) inset,
+    0 8px 32px rgba(0, 8, 30, 0.4),
+    0 0 24px rgba(56, 152, 248, 0.05);
+}
+
+.card:hover::before {
+  opacity: 1;
+}
+
+/* Inner card — blue tinted with better depth */
+.card-inner {
+  background: linear-gradient(160deg, rgba(22, 44, 85, 0.4), rgba(16, 35, 70, 0.3));
+  border: 1px solid rgba(80, 140, 255, 0.07);
+  border-radius: 16px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.card-inner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.02) 0%,
+    transparent 50%
+  );
+  pointer-events: none;
+}
+
+.card-inner:hover {
+  background: linear-gradient(160deg, rgba(28, 55, 100, 0.5), rgba(20, 42, 80, 0.4));
+  border-color: rgba(80, 140, 255, 0.15);
+  box-shadow: 0 2px 12px rgba(0, 10, 40, 0.2);
+}
+
+/* Pulse animation for status dots */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; box-shadow: 0 0 4px currentColor; }
+  50% { opacity: 0.7; box-shadow: 0 0 12px currentColor; }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2.5s ease-in-out infinite;
+}
+
+/* Fade-in animation — smoother */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0px);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in-up 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+
+/* Staggered animation delays */
+.delay-1 { animation-delay: 0.06s; }
+.delay-2 { animation-delay: 0.12s; }
+.delay-3 { animation-delay: 0.18s; }
+.delay-4 { animation-delay: 0.24s; }
+.delay-5 { animation-delay: 0.30s; }
+.delay-6 { animation-delay: 0.36s; }
+
+/* Shimmer effect for KPI cards — more refined */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer-border {
+  position: relative;
+}
+
+.shimmer-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(100, 180, 255, 0.15) 25%,
+    rgba(139, 92, 246, 0.08) 50%,
+    rgba(100, 180, 255, 0.15) 75%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 5s linear infinite;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.shimmer-border:hover::before {
+  opacity: 1;
+}
+
+/* Scrollbar — refined blue tint */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(80, 140, 255, 0.12);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(80, 140, 255, 0.25);
+}
+
+/* Number display with richer blue-white gradient */
+.gradient-number {
+  background: linear-gradient(
+    135deg, 
+    #f0f8ff 0%, 
+    #c8e0ff 40%,
+    rgba(160, 200, 255, 0.85) 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 8px rgba(100, 160, 255, 0.1));
+}
+
+/* Blue accent glow utility */
+.blue-glow {
+  box-shadow: 0 0 20px rgba(56, 152, 248, 0.15), 0 0 60px rgba(56, 152, 248, 0.05);
+}
+
+/* Header glow bar */
+.header-glow {
+  position: relative;
+}
+
+.header-glow::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 5%;
+  right: 5%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(80, 140, 255, 0.15) 20%,
+    rgba(59, 130, 246, 0.25) 50%,
+    rgba(80, 140, 255, 0.15) 80%,
+    transparent
+  );
+}
+
+/* Floating label badge */
+.status-badge {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(16, 185, 129, 0.06));
+  border: 1px solid rgba(16, 185, 129, 0.15);
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.08);
+}
+
+/* Smooth icon button hover */
+.icon-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.icon-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at center, rgba(59, 130, 246, 0.12), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.icon-btn:hover::before {
+  opacity: 1;
+}
+
+/* Notification ring animation */
+@keyframes notification-ring {
+  0% { transform: rotate(0deg); }
+  5% { transform: rotate(8deg); }
+  10% { transform: rotate(-6deg); }
+  15% { transform: rotate(4deg); }
+  20% { transform: rotate(0deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.notification-bell:hover svg {
+  animation: notification-ring 1s ease-in-out;
+  transform-origin: top center;
+}
+
+/* Breathing glow for live indicators */
+@keyframes breathe {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+.animate-breathe {
+  animation: breathe 3s ease-in-out infinite;
+}
+
+/* Enhanced tooltip-style dropdown arrows */
+.dropdown-arrow {
+  transition: transform 0.2s ease;
+}
+
+.dropdown-arrow:hover {
+  transform: translateY(1px);
+}
+
+/* Ambient orb decorations */
+@keyframes float-orb {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(10px, -10px) scale(1.05); }
+  66% { transform: translate(-5px, 5px) scale(0.95); }
+}
+
+.ambient-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(40px);
+  pointer-events: none;
+  animation: float-orb 12s ease-in-out infinite;
+}
+
+/* Progress bar with glow */
+.progress-glow {
+  position: relative;
+}
+
+.progress-glow::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -1px;
+  width: 6px;
+  height: calc(100% + 4px);
+  border-radius: 50%;
+  filter: blur(3px);
+  background: inherit;
+  opacity: 0.6;
 }

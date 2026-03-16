@@ -1,0 +1,61 @@
+/**
+ * Global Theme CSS Custom Properties — Blue Theme
+ * Design system tokens as CSS variables
+ */
+
+:root {
+  /* Neutral/Panel backgrounds — deep navy */
+  --color-panel-bg: #071428;
+  --color-panel-edge: #0c1e3a;
+  --color-panel-highlight: rgba(100, 160, 255, 0.06);
+
+  /* Text colors — cool blue-white */
+  --color-text-primary: #d0e4f5;
+  --color-text-muted: rgba(160, 195, 230, 0.6);
+
+  /* Component backgrounds */
+  --color-track-bg: rgba(80, 140, 255, 0.12);
+
+  /* Primary accent — electric blue */
+  --color-primary: #3b82f6;
+  --color-primary-light: #60a5fa;
+  --color-primary-glow: rgba(59, 130, 246, 0.15);
+
+  /* Status colors - Success */
+  --color-status-success: #27d17d;
+  --color-status-success-light: #34f3a0;
+
+  /* Status colors - Warning */
+  --color-status-warning: #f5a524;
+  --color-status-warning-light: #ffd86b;
+
+  /* Status colors - Danger */
+  --color-status-danger: #ff4d4d;
+  --color-status-danger-light: #ff7b7b;
+
+  /* Typography */
+  --font-size-sm: 0.9rem;
+  --font-size-base: 0.98rem;
+  --font-size-lg: 1.5rem;
+
+  --font-weight-normal: 400;
+  --font-weight-semibold: 600;
+
+  --letter-spacing-tight: 0.02em;
+
+  --line-height-normal: 1.5;
+  --line-height-tight: 1.2;
+
+  /* Spacing */
+  --spacing-xs: 6px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 18px;
+  --spacing-xl: 24px;
+  --spacing-2xl: 28px;
+  --spacing-3xl: 30px;
+
+  /* Border radius */
+  --border-radius-sm: 22px;
+  --border-radius-md: 26px;
+}
