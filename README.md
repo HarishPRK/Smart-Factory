@@ -1,75 +1,81 @@
-# React + TypeScript + Vite
+# Smart Factory Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+An industrial monitoring dashboard built with React 19, TypeScript, and Vite.
 
-Currently, two official plugins are available:
+## Tech Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **React 19** with TypeScript
+- **Vite** (rolldown-vite) for fast builds
+- **Tailwind CSS** for styling
+- **Vitest** + Testing Library for tests
+- **GitHub Actions** for CI/CD
+- **GitHub Pages** for hosting
 
-## React Compiler
+## Getting Started
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
-
-Note: This will impact Vite dev & build performances.
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Available Scripts
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+| Command | Description |
+|---|---|
+| `npm run dev` | Start local dev server |
+| `npm run build` | Type-check + production build |
+| `npm run lint` | Run ESLint |
+| `npm run test` | Run tests once |
+| `npm run test:watch` | Run tests in watch mode |
+| `npm run preview` | Preview the production build locally |
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+---
+
+## Development Workflow
+
+### Making changes
+
+1. Make your changes locally
+2. Run `npm run lint` to catch any lint errors
+3. Run `npm run build` to verify it compiles without type errors
+4. Run `npm run test` to make sure the tests pass
+5. Commit and push to `master`
+
+### What happens automatically (CI)
+
+Every push to `master` triggers the **CI workflow** on GitHub Actions. It runs:
+
+1. Lint
+2. Build (includes TypeScript type-check)
+3. Tests
+
+You can see the results in the **Actions** tab on GitHub. CI is informational only — it won't block your push.
+
+### Deploying to GitHub Pages
+
+Deployment is **manual**. When you're ready to publish your changes:
+
+1. Go to the repo on GitHub
+2. Click the **Actions** tab
+3. Select **"Deploy to GitHub Pages"** in the left sidebar
+4. Click **"Run workflow"** → **"Run workflow"**
+5. Wait for it to finish — the live URL will appear in the run summary
+
+Live site: `https://harishprk.github.io/smart-factory/`
+
+---
+
+## Project Structure
+
+```
+src/
+├── components/
+│   ├── Dashboard.tsx       # Main dashboard layout
+│   ├── ActiveMachinery.tsx # Machine status panel
+│   ├── CurrentConsumption.tsx
+│   ├── KPIBar.tsx
+│   └── ZoneTabs.tsx
+├── Weather.tsx             # Weather widget
+├── App.tsx
+└── main.tsx
 ```
