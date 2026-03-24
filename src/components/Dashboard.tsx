@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import KPIBar from "./KPIBar";
 import ActiveMachinery from "./ActiveMachinery";
 import CurrentConsumption from "./CurrentConsumption";
 import ZoneTabs from "./ZoneTabs";
+import FilterBar from "./FilterBar";
 import workerIcon from "../assets/icons/worker.svg";
 import mapImage from "../assets/map.png";
 import machineGear from "../assets/icons/machine_gear.svg";
@@ -11,27 +12,81 @@ import gearIcon from "../assets/icons/Gear.svg";
 import energyBolt from "../assets/icons/energy_bolt.svg";
 import aiMic from "../assets/icons/ai_mic.svg";
 import Weather from "../Weather";
+import { ShiftIndicator, SystemStatus } from "./HeaderWidgets";
+import { useFilters } from "../context/FilterContext";
+import { computeOverviewChips, getFilteredHeatZones, carouselMachines } from "../data/mockData";
+import type { PLCInput } from "../data/mockData";
 
 const Dashboard: React.FC = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [carouselIndex, setCarouselIndex] = useState(0);
+  const { state, filteredMachines, filteredAlerts } = useFilters();
 
-  const overviewChips = [
-    {
-      label: "Critical",
-      value: "2",
-      tone: "text-red-300 bg-red-500/[0.08] border border-red-500/[0.12] shadow-[0_0_14px_rgba(239,68,68,0.08)]",
-    },
-    {
-      label: "Warnings",
-      value: "1",
-      tone: "text-amber-300 bg-amber-500/[0.08] border border-amber-500/[0.12] shadow-[0_0_14px_rgba(245,158,11,0.08)]",
-    },
-    {
-      label: "Online",
-      value: "6",
-      tone: "text-emerald-300 bg-emerald-500/[0.08] border border-emerald-500/[0.12] shadow-[0_0_14px_rgba(16,185,129,0.08)]",
-    },
-  ];
+  // --- PLC simulation state ---
+  const plcBase = carouselMachines.find((m) => m.type === "plc");
+  const [plcInputs, setPlcInputs] = useState<PLCInput[]>(
+    plcBase?.type === "plc" ? plcBase.inputs : []
+  );
+  const [plcOutputs, setPlcOutputs] = useState<{ label: string; active: boolean }[]>(
+    plcBase?.type === "plc" ? plcBase.outputs : []
+  );
+
+  // PLC logic: derive outputs from current input values
+  const runPlcLogic = useCallback((inputs: PLCInput[]) => {
+    const get = (label: string) => parseFloat(inputs.find((i) => i.label === label)?.value ?? "0");
+    const pressure = get("Pressure");
+    const pH = get("pH");
+    const flow = get("Flow");
+    const o2 = get("O2");
+
+    // Motor ON when: pressure is in safe range AND flow is adequate
+    const motorOn = pressure >= 2.0 && pressure <= 6.5 && flow >= 8.0;
+    // Fan ON when: O2 drops below threshold OR pH is outside safe band
+    const fanOn = o2 < 20.0 || pH < 6.0 || pH > 8.0;
+
+    return [
+      { label: "Motor", active: motorOn },
+      { label: "Fan", active: fanOn },
+    ];
+  }, []);
+
+  // Simulate sensor drift every 2s
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setPlcInputs((prev) => {
+        const next = prev.map((input) => {
+          // Random walk: drift toward nominal with some noise
+          const current = parseFloat(input.value);
+          const drift = (input.nominal - current) * 0.1; // pull toward nominal
+          const noise = (Math.random() - 0.5) * (input.max - input.min) * 0.08;
+          const raw = current + drift + noise;
+          const clamped = Math.max(input.min, Math.min(input.max, raw));
+          return { ...input, value: clamped.toFixed(1) };
+        });
+        // Run PLC logic on new values and update outputs
+        setPlcOutputs(runPlcLogic(next));
+        return next;
+      });
+    }, 2000);
+    return () => clearInterval(timer);
+  }, [runPlcLogic]);
+
+  // Build the current carousel machine with live PLC data
+  const currentCarouselMachine = (() => {
+    const base = carouselMachines[carouselIndex];
+    if (base.type === "plc") {
+      return { ...base, inputs: plcInputs, outputs: plcOutputs };
+    }
+    return base;
+  })();
+
+  const prevCarousel = () =>
+    setCarouselIndex((i) => (i - 1 + carouselMachines.length) % carouselMachines.length);
+  const nextCarousel = () =>
+    setCarouselIndex((i) => (i + 1) % carouselMachines.length);
+
+  const overviewChips = computeOverviewChips(filteredMachines);
+  const visibleHeatZones = getFilteredHeatZones(state);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -64,14 +119,7 @@ const Dashboard: React.FC = () => {
           </div>
           <div className="hidden xl:flex items-center gap-3 min-w-0 pl-2">
             <div className="h-10 w-px bg-gradient-to-b from-transparent via-cyan-300/25 to-transparent"></div>
-            {/* <div className="rounded-2xl border border-cyan-300/15 bg-cyan-400/[0.06] px-4 py-2.5 min-w-[220px]">
-              <div className="text-[9px] uppercase tracking-[0.18em] text-sky-200/55 font-semibold">
-                Command Center
-              </div>
-              <div className="text-[13px] text-sky-50/95 font-semibold mt-1">
-                Neon overview active across all production zones.
-              </div>
-            </div> */}
+            <SystemStatus operational={true} />
           </div>
         </div>
 
@@ -117,35 +165,19 @@ const Dashboard: React.FC = () => {
             <span className="w-2 h-2 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,0.9)]"></span>
             Factory 028
           </div>
-          <div className="hidden xl:flex items-center gap-2 rounded-full border border-cyan-300/14 bg-sky-400/[0.05] px-4 py-2 text-[10px] text-sky-100/80 font-medium">
-            <svg
-              width="10"
-              height="10"
-              viewBox="0 0 16 16"
-              fill="none"
-              className="text-cyan-200/75"
-            >
-              <path
-                d="M8 1.5C5.5 1.5 3.5 3.5 3.5 6c0 3.5 4.5 8.5 4.5 8.5s4.5-5 4.5-8.5c0-2.5-2-4.5-4.5-4.5z"
-                stroke="currentColor"
-                strokeWidth="1.4"
-              />
-              <circle
-                cx="8"
-                cy="6"
-                r="1.4"
-                stroke="currentColor"
-                strokeWidth="1.4"
-              />
-            </svg>
-            Colorado
-          </div>
+          <ShiftIndicator />
           <Weather
             temperature={25}
             condition="partly_cloudy"
             unit="C"
             location="Colorado"
+            humidity={62}
+            windSpeed={12}
+            aqi={42}
+            aqiLabel="Good"
           />
+
+          <div className="hidden xl:block h-6 w-px bg-gradient-to-b from-transparent via-cyan-300/20 to-transparent"></div>
 
           <button className="icon-btn w-10 h-10 flex items-center justify-center rounded-full glass text-cyan-100/55 hover:text-cyan-50 relative transition-all duration-300 hover:shadow-[0_0_24px_rgba(34,211,238,0.18)] group/ai">
             <img
@@ -184,7 +216,7 @@ const Dashboard: React.FC = () => {
               />
             </svg>
             <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-gradient-to-r from-red-500 to-rose-500 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.6)] text-[8px] font-bold flex items-center justify-center px-1 text-white border border-[#030b1a]/80">
-              3
+              {filteredAlerts.length}
             </span>
           </button>
 
@@ -267,6 +299,7 @@ const Dashboard: React.FC = () => {
               ))}
             </div>
           </div>
+          <FilterBar />
           <KPIBar />
           <div className="flex-grow min-h-0 card relative overflow-hidden flex items-center justify-center group">
             <img
@@ -292,24 +325,6 @@ const Dashboard: React.FC = () => {
               <ZoneTabs />
             </div>
 
-            {/* <div className="absolute top-18 left-5 z-20 glass rounded-2xl px-4 py-3 max-w-[320px]">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-blue-200/60">
-                Plant Overview
-              </div>
-              <div className="text-sm text-blue-50/92 font-semibold mt-1.5 leading-snug">
-                Zone 2 is in focus with 2 active alerts requiring operator
-                review.
-              </div>
-              <div className="flex items-center gap-2 flex-wrap mt-3">
-                <span className="text-[9px] text-blue-200/70 bg-blue-500/[0.08] border border-blue-400/[0.1] px-2.5 py-1 rounded-lg uppercase tracking-[0.12em] font-semibold">
-                  2,498 workers on floor
-                </span>
-                <span className="text-[9px] text-emerald-300/80 bg-emerald-500/[0.08] border border-emerald-500/[0.12] px-2.5 py-1 rounded-lg uppercase tracking-[0.12em] font-semibold">
-                  Monitoring live
-                </span>
-              </div>
-            </div> */}
-
             <div className="absolute top-5 right-5 glass rounded-2xl px-5 py-3 flex items-center gap-4 z-20">
               <div className="text-right">
                 <div className="text-lg font-semibold gradient-number leading-none">
@@ -328,58 +343,93 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Alert Cards with Warning Icons — enhanced */}
-            <div className="absolute bottom-24 left-5 z-20">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-red-200/75">
-                Priority Alerts
-              </div>
-              <div className="text-[10px] text-blue-300/45 mt-1">
-                Issues are sorted by severity for faster response.
-              </div>
-            </div>
-            <div className="absolute bottom-4 left-4 right-4 flex gap-3 z-20">
-              {[
-                {
-                  name: "Injection Holding Machine",
-                  issue: "Temperature critical",
-                  time: "12m ago",
-                },
-                {
-                  name: "Hydraulic Press Unit",
-                  issue: "Pressure anomaly detected",
-                  time: "8m ago",
-                },
-              ].map((alert, i) => (
-                <div
-                  key={i}
-                  className="flex-1 bg-gradient-to-br from-red-950/30 to-red-950/15 backdrop-blur-xl border border-red-500/10 rounded-2xl p-3 flex items-center gap-3 hover:border-red-500/25 transition-all duration-300 group/alert relative overflow-hidden"
-                >
-                  {/* Alert icon */}
-                  <div className="w-9 h-9 bg-red-500/[0.10] rounded-xl flex items-center justify-center border border-red-500/[0.15] flex-shrink-0 shadow-[0_0_16px_rgba(239,68,68,0.12)]">
-                    <img
-                      src={alertWarning}
-                      alt="Warning"
-                      className="w-4 h-4 opacity-60 invert"
-                    />
+            {/* Alert Cards */}
+            {filteredAlerts.length > 0 && (
+              <>
+                <div className="absolute bottom-24 left-5 z-20">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-red-200/75">
+                    Priority Alerts
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[11px] font-medium text-red-200/90 group-hover/alert:text-red-100 transition-colors truncate">
-                      {alert.name}
-                    </div>
-                    <div className="text-[9px] text-red-400/60 mt-0.5 font-medium flex items-center gap-1.5">
-                      <span
-                        className="w-1.5 h-1.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.7)] animate-pulse-glow"
-                        style={{ color: "#ef4444" }}
-                      ></span>
-                      {alert.issue} • {alert.time}
-                    </div>
+                  <div className="text-[10px] text-blue-300/45 mt-1">
+                    Issues are sorted by severity for faster response.
                   </div>
-                  {/* Red glow — enhanced */}
-                  <div className="absolute -bottom-6 -left-6 w-20 h-20 bg-red-500/[0.06] blur-[25px] rounded-full pointer-events-none group-hover/alert:bg-red-500/[0.10] transition-all duration-500"></div>
-                  <div className="absolute -top-8 -right-8 w-16 h-16 bg-red-500/[0.03] blur-[20px] rounded-full pointer-events-none"></div>
                 </div>
-              ))}
-            </div>
+                <div className="absolute bottom-4 left-4 right-4 flex gap-3 z-20">
+                  {filteredAlerts.slice(0, 2).map((alert) => (
+                    <div
+                      key={alert.id}
+                      className={`flex-1 backdrop-blur-xl border rounded-2xl p-3 flex items-center gap-3 transition-all duration-300 group/alert relative overflow-hidden ${
+                        alert.severity === "critical"
+                          ? "bg-gradient-to-br from-red-950/30 to-red-950/15 border-red-500/10 hover:border-red-500/25"
+                          : alert.severity === "warning"
+                            ? "bg-gradient-to-br from-amber-950/30 to-amber-950/15 border-amber-500/10 hover:border-amber-500/25"
+                            : "bg-gradient-to-br from-blue-950/30 to-blue-950/15 border-blue-500/10 hover:border-blue-500/25"
+                      }`}
+                    >
+                      {/* Alert icon */}
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center border flex-shrink-0 ${
+                        alert.severity === "critical"
+                          ? "bg-red-500/[0.10] border-red-500/[0.15] shadow-[0_0_16px_rgba(239,68,68,0.12)]"
+                          : alert.severity === "warning"
+                            ? "bg-amber-500/[0.10] border-amber-500/[0.15] shadow-[0_0_16px_rgba(245,158,11,0.12)]"
+                            : "bg-blue-500/[0.10] border-blue-500/[0.15] shadow-[0_0_16px_rgba(59,130,246,0.12)]"
+                      }`}>
+                        <img
+                          src={alertWarning}
+                          alt="Warning"
+                          className="w-4 h-4 opacity-60 invert"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className={`text-[11px] font-medium transition-colors truncate ${
+                          alert.severity === "critical"
+                            ? "text-red-200/90 group-hover/alert:text-red-100"
+                            : alert.severity === "warning"
+                              ? "text-amber-200/90 group-hover/alert:text-amber-100"
+                              : "text-blue-200/90 group-hover/alert:text-blue-100"
+                        }`}>
+                          {alert.machineName}
+                        </div>
+                        <div className={`text-[9px] mt-0.5 font-medium flex items-center gap-1.5 ${
+                          alert.severity === "critical"
+                            ? "text-red-400/60"
+                            : alert.severity === "warning"
+                              ? "text-amber-400/60"
+                              : "text-blue-400/60"
+                        }`}>
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full animate-pulse-glow ${
+                              alert.severity === "critical"
+                                ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.7)]"
+                                : alert.severity === "warning"
+                                  ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.7)]"
+                                  : "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.7)]"
+                            }`}
+                            style={{ color: alert.severity === "critical" ? "#ef4444" : alert.severity === "warning" ? "#f59e0b" : "#3b82f6" }}
+                          ></span>
+                          {alert.issue} • {alert.time}
+                        </div>
+                      </div>
+                      {/* Glow */}
+                      <div className={`absolute -bottom-6 -left-6 w-20 h-20 blur-[25px] rounded-full pointer-events-none transition-all duration-500 ${
+                        alert.severity === "critical"
+                          ? "bg-red-500/[0.06] group-hover/alert:bg-red-500/[0.10]"
+                          : alert.severity === "warning"
+                            ? "bg-amber-500/[0.06] group-hover/alert:bg-amber-500/[0.10]"
+                            : "bg-blue-500/[0.06] group-hover/alert:bg-blue-500/[0.10]"
+                      }`}></div>
+                      <div className={`absolute -top-8 -right-8 w-16 h-16 blur-[20px] rounded-full pointer-events-none ${
+                        alert.severity === "critical"
+                          ? "bg-red-500/[0.03]"
+                          : alert.severity === "warning"
+                            ? "bg-amber-500/[0.03]"
+                            : "bg-blue-500/[0.03]"
+                      }`}></div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -429,56 +479,7 @@ const Dashboard: React.FC = () => {
               </span>
             </div>
             <div className="grid grid-cols-2 gap-3 flex-grow overflow-hidden">
-              {[
-                {
-                  temp: 60,
-                  zone: "Zone 1",
-                  status: "Safe",
-                  color: "text-emerald-400",
-                  dot: "bg-emerald-400",
-                  glow: "shadow-[0_0_8px_rgba(52,211,153,0.4)]",
-                  borderAccent: "hover:border-emerald-500/20",
-                  glowBg: "bg-emerald-500/[0.04]",
-                  trend: "↓ 2°",
-                  trendColor: "text-emerald-400",
-                },
-                {
-                  temp: 72,
-                  zone: "Zone 2",
-                  status: "Warning",
-                  color: "text-amber-400",
-                  dot: "bg-amber-400",
-                  glow: "shadow-[0_0_8px_rgba(251,191,36,0.4)]",
-                  borderAccent: "hover:border-amber-500/20",
-                  glowBg: "bg-amber-500/[0.04]",
-                  trend: "↑ 5°",
-                  trendColor: "text-amber-400",
-                },
-                {
-                  temp: 90,
-                  zone: "Zone 3",
-                  status: "Critical",
-                  color: "text-red-400",
-                  dot: "bg-red-500",
-                  glow: "shadow-[0_0_8px_rgba(239,68,68,0.5)]",
-                  borderAccent: "hover:border-red-500/20",
-                  glowBg: "bg-red-500/[0.04]",
-                  trend: "↑ 12°",
-                  trendColor: "text-red-400",
-                },
-                {
-                  temp: 66,
-                  zone: "Zone 4",
-                  status: "Safe",
-                  color: "text-emerald-400",
-                  dot: "bg-emerald-400",
-                  glow: "shadow-[0_0_8px_rgba(52,211,153,0.4)]",
-                  borderAccent: "hover:border-emerald-500/20",
-                  glowBg: "bg-emerald-500/[0.04]",
-                  trend: "↓ 1°",
-                  trendColor: "text-emerald-400",
-                },
-              ].map((item, i) => (
+              {visibleHeatZones.map((item, i) => (
                 <div
                   key={i}
                   className={`card-inner p-3.5 flex flex-col justify-between ${item.borderAccent} transition-all duration-300 relative overflow-hidden group/heat`}
@@ -498,21 +499,29 @@ const Dashboard: React.FC = () => {
                       {item.status}
                     </span>
                   </div>
-                  <div className="relative z-10">
-                    <div className="text-[24px] font-semibold gradient-number leading-none">
-                      {item.temp}
-                      <span
-                        className="text-[10px] text-blue-300/25 font-normal ml-0.5"
-                        style={{
-                          WebkitTextFillColor: "rgb(120 160 210 / 0.35)",
-                        }}
-                      >
-                        °C
-                      </span>
+                  <div className="flex items-end justify-between relative z-10">
+                    <div>
+                      <div className="text-[24px] font-semibold gradient-number leading-none">
+                        {item.temp}
+                        <span
+                          className="text-[10px] text-blue-300/25 font-normal ml-0.5"
+                          style={{
+                            WebkitTextFillColor: "rgb(120 160 210 / 0.35)",
+                          }}
+                        >
+                          °C
+                        </span>
+                      </div>
+                      <div className="text-[9px] text-blue-300/50 mt-1.5 uppercase tracking-[0.15em] font-medium">
+                        {item.zone}
+                      </div>
                     </div>
-                    <div className="text-[9px] text-blue-300/50 mt-1.5 uppercase tracking-[0.15em] font-medium">
-                      {item.zone}
-                    </div>
+                    {/* Mini thermometer */}
+                    <svg width="16" height="38" viewBox="0 0 16 38" fill="none" className="opacity-[0.15] group-hover/heat:opacity-[0.25] transition-opacity duration-500 flex-shrink-0">
+                      <rect x="5" y="2" width="6" height="24" rx="3" stroke={item.status === "Critical" ? "#ef4444" : item.status === "Warning" ? "#f59e0b" : "#34d399"} strokeWidth="1.2" />
+                      <rect x="6.5" y={2 + 22 * (1 - Math.min(item.temp / 100, 1))} width="3" height={22 * Math.min(item.temp / 100, 1)} rx="1.5" fill={item.status === "Critical" ? "#ef4444" : item.status === "Warning" ? "#f59e0b" : "#34d399"} />
+                      <circle cx="8" cy="31" r="5" fill={item.status === "Critical" ? "#ef4444" : item.status === "Warning" ? "#f59e0b" : "#34d399"} opacity="0.7" />
+                    </svg>
                   </div>
                   {/* Ambient glow */}
                   <div
@@ -546,7 +555,53 @@ const Dashboard: React.FC = () => {
                 Active
               </span>
             </div>
-            <div className="flex items-end justify-between mt-4 z-10">
+            {/* Green energy illustration */}
+            <div className="flex-1 flex items-center justify-center z-0 pointer-events-none">
+              <svg width="100%" height="100%" viewBox="0 0 220 65" fill="none" className="max-h-[65px] opacity-[0.06] group-hover/energy:opacity-[0.10] transition-opacity duration-700">
+                {/* Solar panel */}
+                <rect x="8" y="20" width="50" height="32" rx="2" stroke="#34d399" strokeWidth="1.5" transform="rotate(-12 33 36)" />
+                <line x1="14" y1="28" x2="52" y2="22" stroke="#34d399" strokeWidth="0.8" />
+                <line x1="16" y1="38" x2="54" y2="32" stroke="#34d399" strokeWidth="0.8" />
+                <line x1="18" y1="48" x2="56" y2="42" stroke="#34d399" strokeWidth="0.8" />
+                <line x1="22" y1="18" x2="26" y2="54" stroke="#34d399" strokeWidth="0.8" />
+                <line x1="34" y1="16" x2="38" y2="52" stroke="#34d399" strokeWidth="0.8" />
+                <line x1="46" y1="14" x2="50" y2="50" stroke="#34d399" strokeWidth="0.8" />
+                {/* Panel stand */}
+                <line x1="33" y1="52" x2="33" y2="62" stroke="#6ee7b7" strokeWidth="2" />
+                <line x1="25" y1="62" x2="41" y2="62" stroke="#6ee7b7" strokeWidth="2" strokeLinecap="round" />
+                {/* Wind turbine */}
+                <line x1="100" y1="18" x2="100" y2="62" stroke="#a7f3d0" strokeWidth="2.5" />
+                <circle cx="100" cy="18" r="3" fill="#34d399" />
+                {/* Turbine blades */}
+                <path d="M100 18 C95 8 92 2 100 2 C104 2 103 12 100 18Z" fill="#6ee7b7" />
+                <path d="M100 18 C108 22 116 26 112 32 C108 32 104 24 100 18Z" fill="#6ee7b7" />
+                <path d="M100 18 C92 22 84 26 88 32 C92 32 96 24 100 18Z" fill="#6ee7b7" />
+                {/* Sun rays */}
+                <circle cx="160" cy="20" r="10" fill="url(#sunGrad)" />
+                <line x1="160" y1="4" x2="160" y2="8" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round" />
+                <line x1="160" y1="32" x2="160" y2="36" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round" />
+                <line x1="144" y1="20" x2="148" y2="20" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round" />
+                <line x1="172" y1="20" x2="176" y2="20" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round" />
+                <line x1="149" y1="9" x2="152" y2="12" stroke="#fbbf24" strokeWidth="1.5" strokeLinecap="round" />
+                <line x1="168" y1="28" x2="171" y2="31" stroke="#fbbf24" strokeWidth="1.5" strokeLinecap="round" />
+                <line x1="149" y1="31" x2="152" y2="28" stroke="#fbbf24" strokeWidth="1.5" strokeLinecap="round" />
+                <line x1="168" y1="12" x2="171" y2="9" stroke="#fbbf24" strokeWidth="1.5" strokeLinecap="round" />
+                {/* Leaf */}
+                <path d="M190 55 C190 35 210 30 215 25 C215 45 200 55 190 55Z" fill="url(#leafGrad)" />
+                <path d="M190 55 C198 48 207 38 215 25" stroke="#34d399" strokeWidth="0.8" fill="none" />
+                <defs>
+                  <linearGradient id="sunGrad" cx="160" cy="20" r="10" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stopColor="#fbbf24" />
+                    <stop offset="100%" stopColor="#f59e0b" />
+                  </linearGradient>
+                  <linearGradient id="leafGrad" x1="190" y1="55" x2="215" y2="25">
+                    <stop offset="0%" stopColor="#059669" />
+                    <stop offset="100%" stopColor="#34d399" />
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+            <div className="flex items-end justify-between z-10">
               <div>
                 <div
                   className="text-[34px] font-semibold text-emerald-400 tracking-tight leading-none"
@@ -595,81 +650,161 @@ const Dashboard: React.FC = () => {
             <div className="absolute top-4 right-4 w-16 h-16 bg-emerald-400/[0.02] blur-[20px] rounded-full pointer-events-none"></div>
           </div>
 
-          {/* Idle Machine */}
-          <div className="card p-4 flex items-center justify-between flex-[0.85] min-h-0 animate-fade-in delay-6 relative overflow-hidden group/idle">
-            <div className="flex items-center gap-4 z-10">
-              <div className="w-11 h-11 card-inner rounded-xl flex items-center justify-center relative">
-                <img
-                  src={machineGear}
-                  className="w-5 h-5 opacity-25 grayscale invert group-hover/idle:opacity-35 transition-opacity duration-300"
-                  alt="Gear"
-                />
-                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-blue-500/30 rounded-full border-2 border-[#0a1832] shadow-[0_0_4px_rgba(59,130,246,0.3)]">
-                  <svg
-                    width="5"
-                    height="5"
-                    viewBox="0 0 6 6"
-                    className="absolute top-[2px] left-[2px]"
-                  >
-                    <rect
-                      width="2"
-                      height="4"
-                      x="0"
-                      y="1"
-                      fill="rgba(147,197,253,0.5)"
-                      rx="0.5"
+          {/* Machine Carousel */}
+          <div className="card p-4 flex flex-col gap-3 flex-[0.85] min-h-0 animate-fade-in delay-6 relative overflow-hidden group/idle">
+            {/* Header row */}
+            <div className="flex items-center justify-between z-10 flex-none">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 card-inner rounded-xl flex items-center justify-center relative flex-shrink-0">
+                  {currentCarouselMachine.type === "plc" ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="opacity-35 group-hover/idle:opacity-50 transition-opacity duration-300">
+                      <rect x="3" y="4" width="18" height="16" rx="2" stroke="white" strokeWidth="1.5" />
+                      <circle cx="7.5" cy="9" r="1" fill="rgba(103,232,249,0.5)" />
+                      <circle cx="11" cy="9" r="1" fill="rgba(103,232,249,0.5)" />
+                      <circle cx="14.5" cy="9" r="1" fill="rgba(103,232,249,0.5)" />
+                      <circle cx="18" cy="9" r="1" fill="rgba(103,232,249,0.5)" />
+                      <rect x="6" y="14" width="5" height="3" rx="0.5" stroke="white" strokeWidth="1" className="opacity-35" />
+                      <rect x="13" y="14" width="5" height="3" rx="0.5" stroke="white" strokeWidth="1" className="opacity-35" />
+                    </svg>
+                  ) : (
+                    <img
+                      src={machineGear}
+                      className="w-5 h-5 opacity-25 grayscale invert group-hover/idle:opacity-35 transition-opacity duration-300"
+                      alt="Gear"
                     />
-                    <rect
-                      width="2"
-                      height="4"
-                      x="3"
-                      y="1"
-                      fill="rgba(147,197,253,0.5)"
-                      rx="0.5"
-                    />
+                  )}
+                  <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#0a1832] ${
+                    currentCarouselMachine.status === "RUNNING"
+                      ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]"
+                      : "bg-blue-500/30 shadow-[0_0_4px_rgba(59,130,246,0.3)]"
+                  }`}>
+                    {currentCarouselMachine.status === "IDLE" && (
+                      <svg width="5" height="5" viewBox="0 0 6 6" className="absolute top-[1px] left-[1px]">
+                        <rect width="1.5" height="3.5" x="0" y="1" fill="rgba(147,197,253,0.5)" rx="0.5" />
+                        <rect width="1.5" height="3.5" x="3" y="1" fill="rgba(147,197,253,0.5)" rx="0.5" />
+                      </svg>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[13px] font-semibold text-blue-100/90 leading-none">
+                    {currentCarouselMachine.name}
+                  </div>
+                  <div className="text-[10px] text-blue-300/50 mt-1.5 flex items-center gap-1.5 font-medium tracking-[0.12em]">
+                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                      currentCarouselMachine.status === "RUNNING"
+                        ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)] animate-pulse-glow"
+                        : "bg-blue-500/30 shadow-[0_0_4px_rgba(59,130,246,0.3)] animate-breathe"
+                    }`} style={currentCarouselMachine.status === "RUNNING" ? { color: "#34d399" } : undefined}></span>
+                    <span className={currentCarouselMachine.status === "RUNNING" ? "text-emerald-400/70" : ""}>
+                      {currentCarouselMachine.status}
+                    </span>
+                    {currentCarouselMachine.type === "simple" && (
+                      <>
+                        <span className="text-blue-400/15">•</span>
+                        <span className="text-[9px] text-blue-400/40 tracking-normal">
+                          {currentCarouselMachine.idleTime}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-1.5 flex-shrink-0">
+                <button onClick={prevCarousel} className="w-7 h-7 rounded-full card-inner text-blue-300/35 flex items-center justify-center text-xs hover:text-white hover:bg-blue-500/[0.10] transition-all duration-200 hover:shadow-[0_0_8px_rgba(59,130,246,0.1)]">
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                    <path d="M6 2L3 5l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                </div>
-              </div>
-              <div>
-                <div className="text-sm font-semibold text-blue-100/90">
-                  CNC Lathe
-                </div>
-                <div className="text-[10px] text-blue-300/50 mt-1 flex items-center gap-2 font-medium tracking-[0.12em]">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500/30 shadow-[0_0_4px_rgba(59,130,246,0.3)] animate-breathe"></span>
-                  IDLE
-                  <span className="text-blue-400/15">•</span>
-                  <span className="text-[9px] text-blue-400/40 tracking-normal">
-                    2h 14m
-                  </span>
-                </div>
+                </button>
+                <button onClick={nextCarousel} className="w-7 h-7 rounded-full card-inner text-blue-300/35 flex items-center justify-center text-xs hover:text-white hover:bg-blue-500/[0.10] transition-all duration-200 hover:shadow-[0_0_8px_rgba(59,130,246,0.1)]">
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                    <path d="M4 2l3 3-3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
               </div>
             </div>
-            <div className="flex gap-2 z-10">
-              <button className="w-7 h-7 rounded-full card-inner text-blue-300/35 flex items-center justify-center text-xs hover:text-white hover:bg-blue-500/[0.10] transition-all duration-200 hover:shadow-[0_0_8px_rgba(59,130,246,0.1)]">
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                  <path
-                    d="M6 2L3 5l3 3"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
-              <button className="w-7 h-7 rounded-full card-inner text-blue-300/35 flex items-center justify-center text-xs hover:text-white hover:bg-blue-500/[0.10] transition-all duration-200 hover:shadow-[0_0_8px_rgba(59,130,246,0.1)]">
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                  <path
-                    d="M4 2l3 3-3 3"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
-            </div>
-            {/* Subtle idle glow */}
-            <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-blue-500/[0.03] blur-[30px] rounded-full pointer-events-none group-hover/idle:bg-blue-500/[0.06] transition-all duration-500"></div>
+
+            {/* PLC I/O Display */}
+            {currentCarouselMachine.type === "plc" && (
+              <div className="z-10 flex-1 flex flex-col gap-2 min-h-0">
+                {/* Divider */}
+                <div className="h-px bg-gradient-to-r from-transparent via-cyan-300/[0.08] to-transparent"></div>
+                <div className="flex gap-2.5 flex-1 min-h-0">
+                  {/* Inputs */}
+                  <div className="flex-1 flex flex-col min-h-0">
+                    <div className="text-[8px] text-cyan-300/35 uppercase tracking-[0.18em] font-semibold mb-2 flex items-center gap-1.5">
+                      <svg width="8" height="8" viewBox="0 0 10 10" fill="none" className="opacity-50">
+                        <path d="M1 5h3M6 5h3M5 1v3M5 6v3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" className="text-cyan-400" />
+                      </svg>
+                      Inputs
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5 flex-1">
+                      {currentCarouselMachine.inputs.map((input) => {
+                        const val = parseFloat(input.value);
+                        const range = input.max - input.min;
+                        const lowThresh = input.min + range * 0.15;
+                        const highThresh = input.max - range * 0.15;
+                        const isAlert = val <= lowThresh || val >= highThresh;
+                        return (
+                          <div key={input.label} className={`card-inner px-2.5 py-2 rounded-lg flex flex-col justify-center border transition-all duration-500 ${
+                            isAlert
+                              ? "border-amber-500/[0.15] shadow-[0_0_8px_rgba(245,158,11,0.06)]"
+                              : "border-transparent hover:border-cyan-500/[0.08]"
+                          }`}>
+                            <div className="flex items-center gap-1">
+                              <div className="text-[8px] text-blue-300/40 font-medium tracking-wide">{input.label}</div>
+                              {isAlert && <span className="w-1 h-1 rounded-full bg-amber-400 shadow-[0_0_4px_rgba(245,158,11,0.6)] animate-pulse"></span>}
+                            </div>
+                            <div className="text-[13px] font-semibold leading-tight mt-0.5 transition-colors duration-300" style={{ fontVariantNumeric: "tabular-nums" }}>
+                              <span className={isAlert ? "text-amber-300/90" : "text-cyan-50/90"}>{input.value}</span>
+                              {input.unit && <span className="text-[9px] text-blue-300/30 font-normal ml-1">{input.unit}</span>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  {/* Outputs */}
+                  <div className="w-[88px] flex-shrink-0 flex flex-col min-h-0">
+                    <div className="text-[8px] text-cyan-300/35 uppercase tracking-[0.18em] font-semibold mb-2 flex items-center gap-1.5">
+                      <svg width="8" height="8" viewBox="0 0 10 10" fill="none" className="opacity-50">
+                        <path d="M2 5h6M6 3l2 2-2 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400" />
+                      </svg>
+                      Outputs
+                    </div>
+                    <div className="flex flex-col gap-1.5 flex-1">
+                      {currentCarouselMachine.outputs.map((output) => (
+                        <div key={output.label} className={`card-inner px-2.5 py-2 rounded-lg flex items-center justify-between flex-1 border transition-all duration-500 ${
+                          output.active
+                            ? "border-emerald-500/[0.10] shadow-[0_0_10px_rgba(52,211,153,0.05)]"
+                            : "border-red-500/[0.08]"
+                        }`}>
+                          <div className="text-[9px] text-blue-200/50 font-medium">{output.label}</div>
+                          <div className={`flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 rounded-md transition-all duration-500 ${
+                            output.active
+                              ? "text-emerald-300 bg-emerald-500/[0.12] border border-emerald-400/[0.15] shadow-[0_0_6px_rgba(52,211,153,0.15)]"
+                              : "text-red-300/50 bg-red-500/[0.08] border border-red-400/[0.12]"
+                          }`}>
+                            <span className={`w-1 h-1 rounded-full transition-all duration-500 ${output.active ? "bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.5)]" : "bg-red-400/50"}`}></span>
+                            {output.active ? "ON" : "OFF"}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Subtle glow */}
+            <div className={`absolute -bottom-8 -left-8 w-24 h-24 blur-[30px] rounded-full pointer-events-none transition-all duration-500 ${
+              currentCarouselMachine.status === "RUNNING"
+                ? "bg-emerald-500/[0.04] group-hover/idle:bg-emerald-500/[0.08]"
+                : "bg-blue-500/[0.03] group-hover/idle:bg-blue-500/[0.06]"
+            }`}></div>
+            <div className={`absolute -top-6 -right-6 w-20 h-20 blur-[25px] rounded-full pointer-events-none ${
+              currentCarouselMachine.status === "RUNNING" ? "bg-cyan-500/[0.03]" : "bg-blue-500/[0.02]"
+            }`}></div>
           </div>
         </div>
       </div>
