@@ -7,32 +7,63 @@ import { usePLCContext } from "../context/PLCContext";
 function startSiren(): { stop: () => void } {
   const ctx = new AudioContext();
 
-  // Carrier oscillator — the audible siren tone
+  // Primary carrier — aggressive sawtooth siren
   const carrier = ctx.createOscillator();
   carrier.type = "sawtooth";
-  carrier.frequency.value = 800;
+  carrier.frequency.value = 900;
 
-  // LFO — sweeps the carrier frequency up and down
+  // Second carrier — higher harmonic for piercing effect
+  const carrier2 = ctx.createOscillator();
+  carrier2.type = "square";
+  carrier2.frequency.value = 1400;
+
+  // LFO — sweeps both carriers up and down
   const lfo = ctx.createOscillator();
   lfo.type = "sine";
-  lfo.frequency.value = 2.5; // sweep speed (~2.5 cycles/sec)
+  lfo.frequency.value = 3.5; // faster sweep (~3.5 cycles/sec)
 
-  const lfoGain = ctx.createGain();
-  lfoGain.gain.value = 400; // sweep depth: 800 ± 400 = 400–1200 Hz
+  const lfoGain1 = ctx.createGain();
+  lfoGain1.gain.value = 500; // sweep depth: 900 ± 500 = 400–1400 Hz
 
-  // Volume envelope
+  const lfoGain2 = ctx.createGain();
+  lfoGain2.gain.value = 600; // sweep depth: 1400 ± 600 = 800–2000 Hz
+
+  // Distortion for more intensity
+  const distortion = ctx.createWaveShaper();
+  const curve = new Float32Array(256);
+  for (let i = 0; i < 256; i++) {
+    const x = (i * 2) / 256 - 1;
+    curve[i] = (Math.PI + 3) * x / (Math.PI + 3 * Math.abs(x));
+  }
+  distortion.curve = curve;
+  distortion.oversample = "2x";
+
+  // Volume controls
+  const gain1 = ctx.createGain();
+  gain1.gain.value = 0.22;
+
+  const gain2 = ctx.createGain();
+  gain2.gain.value = 0.10;
+
   const masterGain = ctx.createGain();
-  masterGain.gain.value = 0.05;
+  masterGain.gain.value = 0.35;
 
-  // Connect: LFO → lfoGain → carrier.frequency
-  lfo.connect(lfoGain);
-  lfoGain.connect(carrier.frequency);
+  // Connect LFO to both carriers
+  lfo.connect(lfoGain1);
+  lfo.connect(lfoGain2);
+  lfoGain1.connect(carrier.frequency);
+  lfoGain2.connect(carrier2.frequency);
 
-  // Connect: carrier → master → output
-  carrier.connect(masterGain);
+  // Connect carriers through distortion to master
+  carrier.connect(gain1);
+  carrier2.connect(gain2);
+  gain1.connect(distortion);
+  gain2.connect(distortion);
+  distortion.connect(masterGain);
   masterGain.connect(ctx.destination);
 
   carrier.start();
+  carrier2.start();
   lfo.start();
 
   let stopped = false;
@@ -40,16 +71,17 @@ function startSiren(): { stop: () => void } {
     if (stopped) return;
     stopped = true;
     clearTimeout(autoStop);
-    masterGain.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+    masterGain.gain.setTargetAtTime(0, ctx.currentTime, 0.08);
     setTimeout(() => {
       carrier.stop();
+      carrier2.stop();
       lfo.stop();
       ctx.close();
-    }, 200);
+    }, 300);
   };
 
-  // Auto-stop after 5 seconds
-  const autoStop = setTimeout(stop, 5000);
+  // Auto-stop after 8 seconds
+  const autoStop = setTimeout(stop, 8000);
 
   return { stop };
 }
@@ -61,12 +93,11 @@ interface EmergencyLightWidgetProps {
 const EmergencyLightWidget: React.FC<EmergencyLightWidgetProps> = ({ className = "" }) => {
   const { outputs, sendCommand } = usePLCContext();
   const [manualAlert, setManualAlert] = useState(false);
-  const [isPending, setIsPending] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animRef = useRef<number>(0);
 
-  // Active if manually toggled OR PLC alerts triggered
-  const plcAlert = outputs.alerts.some(Boolean);
+  // Active if manually toggled OR PLC relay[1] is on OR PLC alerts triggered
+  const plcAlert = outputs.emergencyLightOn || outputs.alerts.some(Boolean);
   const hasAlert = manualAlert || plcAlert;
   const [showBanner, setShowBanner] = useState(false);
   const sirenRef = useRef<{ stop: () => void } | null>(null);
@@ -94,17 +125,17 @@ const EmergencyLightWidget: React.FC<EmergencyLightWidgetProps> = ({ className =
     };
   }, [hasAlert]);
 
-  const handleToggle = async () => {
-    if (isPending) return;
-    setManualAlert((prev) => !prev);
-    setIsPending(true);
-    try {
-      await sendCommand("emergency_light", { action: "toggle" });
-    } catch {
-      // keep toggled state for visual
-    } finally {
-      setIsPending(false);
-    }
+  const handleToggle = () => {
+    const turningOn = !manualAlert;
+    setManualAlert(turningOn);
+    // Publish to plc/control with relay channel 1
+    const relayState = turningOn
+      ? [0, 1, 0, 0, 0, 0, 0, 0]
+      : [0, 0, 0, 0, 0, 0, 0, 0];
+    sendCommand("emergency_light", {
+      _topic: "plc/control",
+      _rawPayload: { "8ch_relay_1": relayState },
+    }).catch(() => {});
   };
 
   useEffect(() => {
@@ -318,7 +349,7 @@ const EmergencyLightWidget: React.FC<EmergencyLightWidgetProps> = ({ className =
 
   return (
     <div
-      className={`card p-3 flex flex-col gap-2 animate-fade-in delay-5 cursor-pointer active:scale-[0.97] transition-all duration-300 ${isPending ? "opacity-60 cursor-wait" : ""} ${className}`}
+      className={`card p-3 flex flex-col gap-2 animate-fade-in delay-5 cursor-pointer active:scale-[0.97] transition-all duration-300 ${className}`}
       onClick={handleToggle}
     >
       {/* Header */}

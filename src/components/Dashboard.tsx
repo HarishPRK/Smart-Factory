@@ -45,11 +45,9 @@ const Dashboard: React.FC = () => {
           </div>
           <div className="min-w-0">
             <div className="text-[16px] font-semibold tracking-[0.24em] text-cyan-50 uppercase truncate">
-              Capgemini Factory
+              Digital Factory
             </div>
             <div className="text-[10px] text-sky-200/60 font-medium tracking-[0.22em] mt-1 flex items-center gap-2 uppercase">
-              <span>Digital Factory</span>
-              <span className="w-1 h-1 rounded-full bg-cyan-300 shadow-[0_0_8px_rgba(103,232,249,0.75)]"></span>
               <span className="text-cyan-200/85">Live Operations</span>
             </div>
           </div>

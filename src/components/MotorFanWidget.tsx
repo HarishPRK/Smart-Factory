@@ -153,7 +153,7 @@ const MotorFanWidget: React.FC<MotorFanWidgetProps> = ({ className = "" }) => {
             </svg>
           </div>
           <h3 className="text-[12px] font-semibold text-blue-200/60 uppercase tracking-[0.15em]">
-            Motor Fan
+            Motor
           </h3>
         </div>
         <span className={`text-[11px] font-medium flex items-center gap-1.5 px-2 py-0.5 rounded-md border transition-all duration-700 ${
@@ -240,7 +240,7 @@ const MotorFanWidget: React.FC<MotorFanWidgetProps> = ({ className = "" }) => {
             </div>
             <div className="flex-grow min-w-0">
               <div className="text-[13px] font-bold text-cyan-300 uppercase tracking-wider">
-                Motor Fan Activated
+                Motor Activated
               </div>
               <div className="text-[11px] text-cyan-200/60 mt-0.5">
                 Motor fan is now running. Sensor triggered or manual override active.

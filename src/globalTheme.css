@@ -4,34 +4,34 @@
  */
 
 :root {
-  /* Neutral/Panel backgrounds — deep navy */
-  --color-panel-bg: #071428;
-  --color-panel-edge: #0c1e3a;
-  --color-panel-highlight: rgba(100, 160, 255, 0.06);
+  /* Neutral/Panel backgrounds — ultra-deep navy */
+  --color-panel-bg: #040e20;
+  --color-panel-edge: #081830;
+  --color-panel-highlight: rgba(0, 200, 255, 0.07);
 
   /* Text colors — cool blue-white */
-  --color-text-primary: #d0e4f5;
-  --color-text-muted: rgba(160, 195, 230, 0.6);
+  --color-text-primary: #d0e8ff;
+  --color-text-muted: rgba(140, 200, 255, 0.6);
 
   /* Component backgrounds */
-  --color-track-bg: rgba(80, 140, 255, 0.12);
+  --color-track-bg: rgba(0, 180, 255, 0.12);
 
-  /* Primary accent — electric blue */
-  --color-primary: #3b82f6;
-  --color-primary-light: #60a5fa;
-  --color-primary-glow: rgba(59, 130, 246, 0.15);
+  /* Primary accent — neon cyan-blue */
+  --color-primary: #00c8ff;
+  --color-primary-light: #40e0ff;
+  --color-primary-glow: rgba(0, 200, 255, 0.2);
 
-  /* Status colors - Success */
-  --color-status-success: #27d17d;
-  --color-status-success-light: #34f3a0;
+  /* Status colors - Success — neon green */
+  --color-status-success: #00ff9f;
+  --color-status-success-light: #40ffb8;
 
-  /* Status colors - Warning */
-  --color-status-warning: #f5a524;
-  --color-status-warning-light: #ffd86b;
+  /* Status colors - Warning — neon amber */
+  --color-status-warning: #ffb800;
+  --color-status-warning-light: #ffd54f;
 
-  /* Status colors - Danger */
-  --color-status-danger: #ff4d4d;
-  --color-status-danger-light: #ff7b7b;
+  /* Status colors - Danger — neon red */
+  --color-status-danger: #ff3355;
+  --color-status-danger-light: #ff6680;
 
   /* Typography */
   --font-size-sm: 0.9rem;

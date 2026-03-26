@@ -23,7 +23,7 @@
 .weather-icon-glow {
   position: absolute;
   inset: -4px;
-  background: radial-gradient(circle at center, rgba(251, 191, 36, 0.12), transparent 70%);
+  background: radial-gradient(circle at center, rgba(255, 200, 0, 0.18), transparent 70%);
   border-radius: 50%;
   filter: blur(8px);
   pointer-events: none;
@@ -31,7 +31,7 @@
 }
 
 .weather-widget:hover .weather-icon-glow {
-  background: radial-gradient(circle at center, rgba(251, 191, 36, 0.2), transparent 70%);
+  background: radial-gradient(circle at center, rgba(255, 200, 0, 0.3), transparent 70%);
 }
 
 /* Temperature block */
@@ -81,7 +81,7 @@
 .weather-divider {
   width: 1px;
   height: 24px;
-  background: linear-gradient(to bottom, transparent, rgba(103, 232, 249, 0.2), transparent);
+  background: linear-gradient(to bottom, transparent, rgba(0, 255, 240, 0.25), transparent);
   flex-shrink: 0;
 }
 
@@ -114,5 +114,5 @@
 
 /* Hover lift effect */
 .weather-widget:hover {
-  border-color: rgba(103, 232, 249, 0.18);
+  border-color: rgba(0, 255, 240, 0.22);
 }

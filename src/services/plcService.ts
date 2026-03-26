@@ -19,6 +19,7 @@ export interface RawPLCPayload {
 
 export interface PLCOutputs {
   motorFanOn: boolean;
+  emergencyLightOn: boolean;
   photoESensor: boolean;
   relay: boolean[];
   pushButton: boolean;
@@ -32,6 +33,7 @@ export interface PLCState {
 
 export const DEFAULT_OUTPUTS: PLCOutputs = {
   motorFanOn: false,
+  emergencyLightOn: false,
   photoESensor: false,
   relay: [false, false, false, false, false, false, false, false],
   pushButton: false,
@@ -167,7 +169,8 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
   return {
     params,
     outputs: {
-      motorFanOn: sensorTriggered,
+      motorFanOn: relay[0] || sensorTriggered,
+      emergencyLightOn: relay[1],
       photoESensor: photoEActive,
       relay,
       pushButton: bit(raw.push_button, prev?.outputs.pushButton ?? false),
@@ -737,7 +740,7 @@ export function createPLCService(): PLCService {
   }
 
   if (mode === "mosquitto") {
-    const bridgeUrl = import.meta.env.VITE_MQTT_BRIDGE_URL ?? "ws://localhost:9001";
+    const bridgeUrl = import.meta.env.VITE_MQTT_BRIDGE_URL ?? `ws://${window.location.hostname}:9001`;
     return new MosquittoPLCService(bridgeUrl);
   }
 
