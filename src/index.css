@@ -365,6 +365,60 @@ body::after {
   transform: translateY(1px);
 }
 
+/* Fan / gear spin animation */
+@keyframes fan-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Emergency light — sweeping beam highlight */
+@keyframes siren-sweep {
+  0%   { transform: translateX(-10px); opacity: 0.15; }
+  25%  { transform: translateX(0px); opacity: 0.7; }
+  50%  { transform: translateX(10px); opacity: 0.15; }
+  75%  { transform: translateX(0px); opacity: 0.7; }
+  100% { transform: translateX(-10px); opacity: 0.15; }
+}
+
+@keyframes siren-glow {
+  0%   { opacity: 0.1; transform: translateX(-12px) scaleX(0.7); }
+  25%  { opacity: 0.5; transform: translateX(0px) scaleX(1); }
+  50%  { opacity: 0.1; transform: translateX(12px) scaleX(0.7); }
+  75%  { opacity: 0.5; transform: translateX(0px) scaleX(1); }
+  100% { opacity: 0.1; transform: translateX(-12px) scaleX(0.7); }
+}
+
+@keyframes siren-flash {
+  0%, 100% { opacity: 0.3; }
+  12%, 16% { opacity: 1; }
+  14%      { opacity: 0.4; }
+  50%      { opacity: 0.3; }
+  62%, 66% { opacity: 1; }
+  64%      { opacity: 0.4; }
+}
+
+.animate-siren-sweep {
+  animation: siren-sweep 0.8s ease-in-out infinite;
+}
+
+.animate-siren-glow {
+  animation: siren-glow 0.8s ease-in-out infinite;
+}
+
+.animate-siren-flash {
+  animation: siren-flash 0.8s linear infinite;
+}
+
+@keyframes ping-slow {
+  0%   { opacity: 0.7; transform: scale(1); }
+  70%  { opacity: 0; transform: scale(1.6); }
+  100% { opacity: 0; transform: scale(1.6); }
+}
+
+.animate-ping-slow {
+  animation: ping-slow 1.2s ease-out infinite;
+}
+
 /* Ambient orb decorations */
 @keyframes float-orb {
   0%, 100% { transform: translate(0, 0) scale(1); }
