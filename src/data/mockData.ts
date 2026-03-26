@@ -4,11 +4,11 @@ import type {
   Machine,
   Alert,
   KpiData,
-  HeatZone,
   OverviewChip,
   FilterState,
   MachineType,
   KpiZoneValue,
+  PLCParameter,
 } from "../types";
 import energyIcon from "../assets/icons/energy_bolt.svg";
 import noiseIcon from "../assets/icons/noise_ear.svg";
@@ -295,60 +295,71 @@ export const kpis: KpiData[] = [
   },
 ];
 
-// --- Heat Zones ---
+// --- PLC Parameters (Input Devices) ---
 
-export const heatZones: HeatZone[] = [
+export const plcParameters: PLCParameter[] = [
   {
-    temp: 60,
-    zone: "Zone 1",
-    zoneId: 1,
-    status: "Safe",
-    color: "text-emerald-400",
-    dot: "bg-emerald-400",
-    glow: "shadow-[0_0_8px_rgba(52,211,153,0.4)]",
-    borderAccent: "hover:border-emerald-500/20",
-    glowBg: "bg-emerald-500/[0.04]",
-    trend: "↓ 2°",
-    trendColor: "text-emerald-400",
+    id: "voltage",
+    label: "Voltage",
+    kind: "analog",
+    value: 5.0,
+    unit: "V",
+    min: 0,
+    max: 12,
+    nominal: 5.0,
+    decimals: 1,
+    accentHex: "#f59e0b",
+    status: "normal",
   },
   {
-    temp: 72,
-    zone: "Zone 2",
-    zoneId: 2,
-    status: "Warning",
-    color: "text-amber-400",
-    dot: "bg-amber-400",
-    glow: "shadow-[0_0_8px_rgba(251,191,36,0.4)]",
-    borderAccent: "hover:border-amber-500/20",
-    glowBg: "bg-amber-500/[0.04]",
-    trend: "↑ 5°",
-    trendColor: "text-amber-400",
+    id: "current",
+    label: "Current",
+    kind: "analog",
+    value: 6.0,
+    unit: "A",
+    min: 0,
+    max: 10,
+    nominal: 6.0,
+    decimals: 1,
+    accentHex: "#06b6d4",
+    status: "normal",
   },
   {
-    temp: 90,
-    zone: "Zone 3",
-    zoneId: 3,
-    status: "Critical",
-    color: "text-red-400",
-    dot: "bg-red-500",
-    glow: "shadow-[0_0_8px_rgba(239,68,68,0.5)]",
-    borderAccent: "hover:border-red-500/20",
-    glowBg: "bg-red-500/[0.04]",
-    trend: "↑ 12°",
-    trendColor: "text-red-400",
+    id: "relay",
+    label: "Relay",
+    kind: "relay",
+    active: true,
+    accentHex: "#10b981",
+    status: "normal",
   },
   {
-    temp: 66,
-    zone: "Zone 4",
-    zoneId: 1,
-    status: "Safe",
-    color: "text-emerald-400",
-    dot: "bg-emerald-400",
-    glow: "shadow-[0_0_8px_rgba(52,211,153,0.4)]",
-    borderAccent: "hover:border-emerald-500/20",
-    glowBg: "bg-emerald-500/[0.04]",
-    trend: "↓ 1°",
-    trendColor: "text-emerald-400",
+    id: "ph",
+    label: "pH",
+    kind: "analog",
+    value: 7.0,
+    unit: "",
+    min: 0,
+    max: 14,
+    nominal: 7.0,
+    decimals: 1,
+    accentHex: "#8b5cf6",
+    status: "normal",
+  },
+  {
+    id: "photoE",
+    label: "Photo-E",
+    kind: "digital",
+    active: false,
+    accentHex: "#10b981",
+    status: "normal",
+  },
+  {
+    id: "metal",
+    label: "Metal Det.",
+    kind: "digital",
+    active: false,
+    accentHex: "#f97316",
+    status: "normal",
   },
 ];
 
@@ -405,13 +416,6 @@ export type PLCCarouselMachine = CarouselMachineBase & {
 export type CarouselMachine = SimpleCarouselMachine | PLCCarouselMachine;
 
 export const carouselMachines: CarouselMachine[] = [
-  {
-    id: "cm1",
-    name: "CNC Lathe",
-    type: "simple",
-    status: "IDLE",
-    idleTime: "2h 14m",
-  },
   {
     id: "cm2",
     name: "PLC",
@@ -506,7 +510,3 @@ export function getKpiForZone(
   return kpi.zoneValues[zoneId];
 }
 
-export function getFilteredHeatZones(state: FilterState): HeatZone[] {
-  if (state.selectedZone === "all") return heatZones;
-  return heatZones.filter((h) => h.zoneId === state.selectedZone);
-}

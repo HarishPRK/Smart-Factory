@@ -87,22 +87,31 @@ export type FilterState = {
   selectedKpi: KpiId | null;
 };
 
-export type HeatZone = {
-  temp: number;
-  zone: string;
-  zoneId: ZoneId;
-  status: string;
-  color: string;
-  dot: string;
-  glow: string;
-  borderAccent: string;
-  glowBg: string;
-  trend: string;
-  trendColor: string;
-};
 
 export type OverviewChip = {
   label: string;
   value: string;
   tone: string;
+};
+
+export type PLCParameterKind = "analog" | "digital" | "relay";
+
+export type PLCParameter = {
+  id: string;
+  label: string;
+  kind: PLCParameterKind;
+  // Analog fields
+  value?: number;
+  unit?: string;
+  min?: number;
+  max?: number;
+  nominal?: number;
+  decimals?: number;
+  // Digital fields
+  active?: boolean;
+  // Visual styling
+  accentHex: string;
+  status: "normal" | "warning" | "critical";
+  // Whether this is a placeholder
+  placeholder?: boolean;
 };

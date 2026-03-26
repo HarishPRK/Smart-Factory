@@ -9,11 +9,22 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "mqtt-bridge": "node scripts/mqtt-bridge.mjs",
+    "ai-proxy": "node scripts/ai-proxy.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.80.0",
+    "@aws-crypto/sha256-js": "^5.2.0",
+    "@aws-sdk/client-cognito-identity": "^3.1017.0",
+    "@aws-sdk/credential-providers": "^3.1017.0",
+    "@aws-sdk/util-format-url": "^3.972.8",
+    "@smithy/protocol-http": "^5.3.12",
+    "@smithy/signature-v4": "^5.3.12",
+    "mqtt": "^5.15.1",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "ws": "^8.20.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
