@@ -34,7 +34,7 @@ const MiniSparkline: React.FC<{ data: number[]; color: string }> = ({
       width={width}
       height={height}
       viewBox={`0 0 ${width} ${height}`}
-      className="opacity-30 group-hover:opacity-60 transition-opacity duration-500"
+      className="opacity-50 group-hover:opacity-75 transition-opacity duration-500"
     >
       <defs>
         <linearGradient
@@ -116,16 +116,16 @@ const KPIBar: React.FC = () => {
                   <img
                     src={kpi.icon}
                     alt={kpi.label}
-                    className="w-3.5 h-3.5 opacity-60 invert"
+                    className="w-3.5 h-3.5 opacity-75 invert"
                   />
                 </div>
-                <span className="text-[10px] text-blue-200/60 uppercase tracking-[0.12em] font-semibold">
+                <span className="text-[11px] text-blue-100/85 uppercase tracking-[0.12em] font-semibold">
                   {kpi.label}
                 </span>
               </div>
               {/* Trend indicator */}
               <div
-                className={`flex items-center gap-0.5 text-[9px] font-semibold ${kpi.trendColor} bg-white/[0.03] px-2 py-0.5 rounded-md border border-white/[0.04]`}
+                className={`flex items-center gap-0.5 text-[10px] font-semibold ${kpi.trendColor} bg-white/[0.03] px-2 py-0.5 rounded-md border border-white/[0.04]`}
               >
                 <svg
                   width="8"
@@ -143,7 +143,7 @@ const KPIBar: React.FC = () => {
               <span className="text-[26px] font-semibold gradient-number leading-none tracking-tight">
                 {zoneData.value}
               </span>
-              <span className="text-[10px] text-blue-300/45 font-medium">
+              <span className="text-[11px] text-blue-200/70 font-medium">
                 {kpi.unit}
               </span>
             </div>

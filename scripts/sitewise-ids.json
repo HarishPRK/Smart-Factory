@@ -1,0 +1,28 @@
+{
+  "region": "us-east-1",
+  "aliasPrefix": "/smart-factory/plc-1",
+  "models": {
+    "analogSensor": "941b27eb-fb5b-47cb-930b-b9b2e3eb14d2",
+    "digitalActuator": "d0640840-75f6-4220-9dab-e0c89a09c55c",
+    "plcUnit": "2e2fe820-7265-4865-8e98-daf8744064b6"
+  },
+  "assets": {
+    "plc1": "202e62a0-1317-417d-ac6f-2e942eb4a8cc",
+    "voltage": "88c16d0b-f47f-450c-9192-b34cd515708b",
+    "current": "9d6ac01c-d065-4168-8c3c-648567f40347",
+    "pH": "a91f78e9-1d4f-4e82-8ad0-aebce27e1cfc",
+    "temperature": "ed9c6c9f-b1f2-4301-ab92-2a93d035e883",
+    "photoE_sensor": "d0f5fce0-da62-4663-9796-2a56b2e461f6",
+    "metal_sensor": "abcd809e-634c-402a-b6f8-60911c6d614d",
+    "push_button": "5be8d15c-b8d0-460b-bd7c-1b5f2910f304",
+    "motor": "d5145d6f-78d5-45f2-99e9-1afa4ce40471",
+    "relay_ch0": "cc946c79-0051-446c-a743-56d750218197",
+    "relay_ch1": "f2973daf-38bc-41a6-a91d-519d5171474c",
+    "relay_ch2": "db0b1262-c1f0-448a-892a-e520f2233787",
+    "relay_ch3": "18d428c9-9f38-4d10-b9e0-3f8ae1682285",
+    "relay_ch4": "a2d0fcf2-be90-47dc-904b-caf67c6d1e4b",
+    "relay_ch5": "62e2b6b9-482d-4c8f-a3fc-9be018095aff",
+    "relay_ch6": "fec0ea57-2593-4de4-a853-c859722fdeab",
+    "relay_ch7": "64f6b4dc-493f-44fc-be45-7fb3372cab8f"
+  }
+}

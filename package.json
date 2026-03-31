@@ -11,12 +11,14 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "mqtt-bridge": "node scripts/mqtt-bridge.mjs",
-    "ai-proxy": "node scripts/ai-proxy.mjs"
+    "ai-proxy": "node scripts/ai-proxy.mjs",
+    "sitewise-ingest": "node scripts/sitewise-ingest.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
     "@aws-crypto/sha256-js": "^5.2.0",
     "@aws-sdk/client-cognito-identity": "^3.1017.0",
+    "@aws-sdk/client-iotsitewise": "^3.1019.0",
     "@aws-sdk/credential-providers": "^3.1017.0",
     "@aws-sdk/util-format-url": "^3.972.8",
     "@smithy/protocol-http": "^5.3.12",

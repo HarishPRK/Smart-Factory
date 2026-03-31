@@ -360,19 +360,19 @@ const EmergencyLightWidget: React.FC<EmergencyLightWidgetProps> = ({ className =
               ? "from-red-500/[0.2] to-red-600/[0.1] border-red-400/[0.2] shadow-[0_0_8px_rgba(239,68,68,0.15)]"
               : "from-red-500/[0.08] to-blue-500/[0.04] border-red-400/[0.08] shadow-[0_0_8px_rgba(239,68,68,0.05)]"
           }`}>
-            <svg width="10" height="10" viewBox="0 0 16 16" fill="none" className="opacity-60">
+            <svg width="10" height="10" viewBox="0 0 16 16" fill="none" className="opacity-75">
               <path d="M8 1 L9 6 L14 5 L10 8 L14 11 L9 10 L8 15 L7 10 L2 11 L6 8 L2 5 L7 6 Z"
                 stroke="white" strokeWidth="0.8" fill="none" strokeLinejoin="round" />
             </svg>
           </div>
-          <h3 className="text-[12px] font-semibold text-blue-200/60 uppercase tracking-[0.15em]">
+          <h3 className="text-[13px] font-semibold text-blue-100/90 uppercase tracking-[0.15em]">
             Emergency
           </h3>
         </div>
-        <span className={`text-[11px] font-medium flex items-center gap-1.5 px-2 py-0.5 rounded-md border transition-all duration-500 ${
+        <span className={`text-[12px] font-medium flex items-center gap-1.5 px-2 py-0.5 rounded-md border transition-all duration-500 ${
           hasAlert
             ? "text-red-400/90 bg-red-500/[0.1] border-red-500/[0.2]"
-            : "text-blue-200/40 bg-blue-500/[0.04] border-blue-400/[0.06]"
+            : "text-blue-200/60 bg-blue-500/[0.04] border-blue-400/[0.06]"
         }`}>
           <span
             className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${hasAlert ? "bg-red-400 animate-pulse" : "bg-blue-400/30"}`}

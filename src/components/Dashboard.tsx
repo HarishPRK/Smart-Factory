@@ -9,7 +9,6 @@ import mapImage from "../assets/map.png";
 import capgeminiLogo from "../assets/capgemini-logo.jpeg";
 import alertWarning from "../assets/icons/alert_warning.svg";
 import gearIcon from "../assets/icons/Gear.svg";
-import aiMic from "../assets/icons/ai_mic.svg";
 import Weather from "../Weather";
 import { ShiftIndicator, SystemStatus } from "./HeaderWidgets";
 import { useFilters } from "../context/FilterContext";
@@ -17,11 +16,15 @@ import { computeOverviewChips } from "../data/mockData";
 import PLCParametersWidget from "./PLCParametersWidget";
 import MotorFanWidget from "./MotorFanWidget";
 import EmergencyLightWidget from "./EmergencyLightWidget";
-import AIChatPanel from "./AIChatPanel";
+import AIAssistantModal, { AIFloatingButton } from "./AIAssistantModal";
+import NotificationDrawer from "./NotificationDrawer";
+import KPIAnalyticsPanel from "./KPIAnalyticsPanel";
 
 const Dashboard: React.FC = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [aiChatOpen, setAiChatOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const { filteredMachines, filteredAlerts } = useFilters();
 
   const overviewChips = computeOverviewChips(filteredMachines);
@@ -47,7 +50,7 @@ const Dashboard: React.FC = () => {
             <div className="text-[16px] font-semibold tracking-[0.24em] text-cyan-50 uppercase truncate">
               Digital Factory
             </div>
-            <div className="text-[10px] text-sky-200/60 font-medium tracking-[0.22em] mt-1 flex items-center gap-2 uppercase">
+            <div className="text-[11px] text-sky-200/70 font-medium tracking-[0.22em] mt-1 flex items-center gap-2 uppercase">
               <span className="text-cyan-200/85">Live Operations</span>
             </div>
           </div>
@@ -113,29 +116,13 @@ const Dashboard: React.FC = () => {
 
           <div className="hidden xl:block h-6 w-px bg-gradient-to-b from-transparent via-cyan-300/20 to-transparent"></div>
 
-          <button
-            onClick={() => setAiChatOpen(true)}
-            className="icon-btn w-10 h-10 flex items-center justify-center rounded-full glass text-cyan-100/55 hover:text-cyan-50 relative transition-all duration-300 hover:shadow-[0_0_24px_rgba(34,211,238,0.18)] group/ai"
-          >
-            <img
-              src={aiMic}
-              alt="AI Assistant"
-              className="w-4 h-4 opacity-40 invert group-hover/ai:opacity-75 transition-all duration-300"
-            />
-            <div
-              className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-cyan-300 rounded-full shadow-[0_0_10px_rgba(103,232,249,0.85)] animate-pulse-glow"
-              style={{ color: "#67e8f9" }}
-            ></div>
-            <div className="absolute inset-0 rounded-full border border-cyan-300/0 group-hover/ai:border-cyan-300/25 transition-all duration-500"></div>
-          </button>
-
-          <button className="icon-btn notification-bell w-10 h-10 flex items-center justify-center rounded-full glass text-cyan-100/50 hover:text-white relative transition-all duration-300 hover:shadow-[0_0_24px_rgba(34,211,238,0.15)]">
+          <button onClick={() => setNotifOpen(true)} className="icon-btn notification-bell w-10 h-10 flex items-center justify-center rounded-full glass text-cyan-100/50 hover:text-white relative transition-all duration-300 hover:shadow-[0_0_24px_rgba(34,211,238,0.15)]">
             <svg
               width="16"
               height="16"
               viewBox="0 0 20 20"
               fill="none"
-              className="opacity-50 transition-opacity duration-300 group-hover:opacity-80"
+              className="opacity-65 transition-opacity duration-300 group-hover:opacity-80"
             >
               <path
                 d="M10 2a6 6 0 00-6 6v3l-1.5 2.5h15L16 11V8a6 6 0 00-6-6z"
@@ -161,7 +148,7 @@ const Dashboard: React.FC = () => {
             <img
               src={gearIcon}
               alt="Settings"
-              className="w-4 h-4 opacity-35 invert group-hover/settings:opacity-65 group-hover/settings:rotate-90 transition-all duration-500"
+              className="w-4 h-4 opacity-70 invert group-hover/settings:opacity-65 group-hover/settings:rotate-90 transition-all duration-500"
             />
           </button>
 
@@ -213,10 +200,10 @@ const Dashboard: React.FC = () => {
         <div className="col-span-6 flex flex-col gap-4 h-full min-h-0">
           <div className="flex items-end justify-between gap-4 px-1 animate-fade-in delay-1">
             <div>
-              <div className="text-[10px] font-semibold text-cyan-200/55 uppercase tracking-[0.18em]">
+              <div className="text-[11px] font-semibold text-cyan-200/70 uppercase tracking-[0.18em]">
                 Operations Snapshot
               </div>
-              <div className="text-[17px] font-semibold text-cyan-50/95 mt-1 tracking-tight leading-tight">
+              <div className="text-[18px] font-semibold text-cyan-50 mt-1 tracking-tight leading-tight">
                 Monitor alerts, machine health, and plant KPIs in one view.
               </div>
             </div>
@@ -237,7 +224,21 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
           <FilterBar />
-          <KPIBar />
+          <div className="flex items-center gap-3">
+            <div className="flex-1"><KPIBar /></div>
+            <button
+              onClick={() => setAnalyticsOpen(true)}
+              className="flex-shrink-0 h-[96px] px-3 card flex flex-col items-center justify-center gap-1.5 group/analytics cursor-pointer hover:border-cyan-400/20 transition-all duration-300"
+            >
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" className="text-cyan-300/50 group-hover/analytics:text-cyan-300 transition-colors">
+                <rect x="2" y="10" width="3" height="8" rx="1" fill="currentColor" />
+                <rect x="7" y="6" width="3" height="12" rx="1" fill="currentColor" />
+                <rect x="12" y="3" width="3" height="15" rx="1" fill="currentColor" />
+                <path d="M3 9L8 5L13 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.5" />
+              </svg>
+              <span className="text-[8px] text-sky-200/50 group-hover/analytics:text-sky-200/80 font-semibold uppercase tracking-[0.1em] transition-colors">Analytics</span>
+            </button>
+          </div>
           <div className="flex-grow min-h-0 card relative overflow-hidden flex items-center justify-center group">
             <img
               src={mapImage}
@@ -267,7 +268,7 @@ const Dashboard: React.FC = () => {
                 <div className="text-lg font-semibold gradient-number leading-none">
                   2,498
                 </div>
-                <div className="text-[9px] text-blue-300/55 uppercase tracking-[0.15em] mt-1.5 font-medium">
+                <div className="text-[10px] text-blue-300/55 uppercase tracking-[0.15em] mt-1.5 font-medium">
                   On-floor Workforce
                 </div>
               </div>
@@ -275,7 +276,7 @@ const Dashboard: React.FC = () => {
                 <img
                   src={workerIcon}
                   alt="Worker"
-                  className="w-4 h-4 opacity-55 invert"
+                  className="w-4 h-4 opacity-70 invert"
                 />
               </div>
             </div>
@@ -287,7 +288,7 @@ const Dashboard: React.FC = () => {
                   <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-red-200/75">
                     Priority Alerts
                   </div>
-                  <div className="text-[10px] text-blue-300/45 mt-1">
+                  <div className="text-[11px] text-blue-200/70 mt-1">
                     Issues are sorted by severity for faster response.
                   </div>
                 </div>
@@ -318,7 +319,7 @@ const Dashboard: React.FC = () => {
                         />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className={`text-[11px] font-medium transition-colors truncate ${
+                        <div className={`text-[12px] font-medium transition-colors truncate ${
                           alert.severity === "critical"
                             ? "text-red-200/90 group-hover/alert:text-red-100"
                             : alert.severity === "warning"
@@ -327,7 +328,7 @@ const Dashboard: React.FC = () => {
                         }`}>
                           {alert.machineName}
                         </div>
-                        <div className={`text-[9px] mt-0.5 font-medium flex items-center gap-1.5 ${
+                        <div className={`text-[10px] mt-0.5 font-medium flex items-center gap-1.5 ${
                           alert.severity === "critical"
                             ? "text-red-400/60"
                             : alert.severity === "warning"
@@ -382,7 +383,10 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      <AIChatPanel open={aiChatOpen} onClose={() => setAiChatOpen(false)} />
+      <AIFloatingButton onClick={() => setAiChatOpen(true)} />
+      <AIAssistantModal open={aiChatOpen} onClose={() => setAiChatOpen(false)} />
+      <NotificationDrawer open={notifOpen} onClose={() => setNotifOpen(false)} alerts={filteredAlerts} />
+      <KPIAnalyticsPanel open={analyticsOpen} onClose={() => setAnalyticsOpen(false)} />
     </div>
   );
 };
