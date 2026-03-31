@@ -15,7 +15,7 @@ const severities: { value: Severity | "all"; label: string }[] = [
 const activePill =
   "bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold shadow-[0_2px_12px_rgba(59,130,246,0.3),0_0_0_0.5px_rgba(255,255,255,0.1)_inset]";
 const inactivePill =
-  "text-blue-200/50 font-medium hover:text-white hover:bg-blue-500/[0.08]";
+  "text-blue-200/65 font-medium hover:text-white hover:bg-blue-500/[0.08]";
 
 const FilterBar: React.FC = () => {
   const { state, dispatch } = useFilters();
@@ -33,7 +33,7 @@ const FilterBar: React.FC = () => {
           <button
             key={t}
             onClick={() => dispatch({ type: "SET_TIME_RANGE", timeRange: t })}
-            className={`px-3 py-1 rounded-full text-[9px] transition-all duration-300 relative overflow-hidden ${
+            className={`px-3 py-1 rounded-full text-[10px] transition-all duration-300 relative overflow-hidden ${
               state.timeRange === t ? activePill : inactivePill
             }`}
           >
@@ -53,7 +53,7 @@ const FilterBar: React.FC = () => {
             onClick={() =>
               dispatch({ type: "SET_SEVERITY", severity: s.value })
             }
-            className={`px-3 py-1 rounded-full text-[9px] transition-all duration-300 relative overflow-hidden ${
+            className={`px-3 py-1 rounded-full text-[10px] transition-all duration-300 relative overflow-hidden ${
               state.severity === s.value ? activePill : inactivePill
             }`}
           >
@@ -75,7 +75,7 @@ const FilterBar: React.FC = () => {
               machineType: e.target.value as MachineType | "all",
             })
           }
-          className="glass rounded-full px-3 py-1 text-[9px] font-medium text-blue-200/60 bg-transparent border-none outline-none cursor-pointer appearance-none pr-6 shadow-[0_2px_12px_rgba(0,10,40,0.2)] hover:text-white transition-colors duration-300"
+          className="glass rounded-full px-3 py-1 text-[10px] font-medium text-blue-200/75 bg-transparent border-none outline-none cursor-pointer appearance-none pr-6 shadow-[0_2px_12px_rgba(0,10,40,0.2)] hover:text-white transition-colors duration-300"
         >
           <option value="all" className="bg-[#0a1832] text-blue-200">
             All Machines
@@ -91,7 +91,7 @@ const FilterBar: React.FC = () => {
           height="8"
           viewBox="0 0 8 8"
           fill="currentColor"
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-blue-300/40 pointer-events-none rotate-180"
+          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-blue-300/60 pointer-events-none rotate-180"
         >
           <path d="M4 1L7 5H1L4 1Z" />
         </svg>
@@ -101,7 +101,7 @@ const FilterBar: React.FC = () => {
       {hasActiveFilters && (
         <button
           onClick={() => dispatch({ type: "RESET_FILTERS" })}
-          className="glass rounded-full px-3 py-1 text-[9px] font-medium text-blue-200/50 hover:text-white hover:bg-red-500/[0.08] transition-all duration-300 shadow-[0_2px_12px_rgba(0,10,40,0.2)] flex items-center gap-1"
+          className="glass rounded-full px-3 py-1 text-[10px] font-medium text-blue-200/65 hover:text-white hover:bg-red-500/[0.08] transition-all duration-300 shadow-[0_2px_12px_rgba(0,10,40,0.2)] flex items-center gap-1"
         >
           <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="opacity-60">
             <path d="M1.5 1.5L6.5 6.5M6.5 1.5L1.5 6.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />

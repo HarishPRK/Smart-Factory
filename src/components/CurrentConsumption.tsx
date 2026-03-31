@@ -77,7 +77,7 @@ const CurrentConsumption: React.FC<CurrentConsumptionProps> = ({
               height="12"
               viewBox="0 0 16 16"
               fill="none"
-              className="opacity-55"
+              className="opacity-70"
             >
               <path
                 d="M8 1v6l4 2M8 1a7 7 0 100 14 7 7 0 000-14z"
@@ -89,15 +89,15 @@ const CurrentConsumption: React.FC<CurrentConsumptionProps> = ({
             </svg>
           </div>
           <div>
-            <h3 className="text-[10px] font-semibold text-blue-200/60 uppercase tracking-[0.15em]">
+            <h3 className="text-[11px] font-semibold text-blue-100/85 uppercase tracking-[0.15em]">
               Current Consumption
             </h3>
-            <div className="text-[9px] text-blue-300/40 mt-1">
+            <div className="text-[10px] text-blue-200/70 mt-1">
               Compared against the previous hour
             </div>
           </div>
         </div>
-        <span className="text-[9px] text-blue-200/55 bg-blue-500/[0.04] px-2.5 py-1 rounded-lg border border-blue-400/[0.08] uppercase tracking-[0.12em] font-semibold whitespace-nowrap">
+        <span className="text-[10px] text-blue-200/75 bg-blue-500/[0.04] px-2.5 py-1 rounded-lg border border-blue-400/[0.08] uppercase tracking-[0.12em] font-semibold whitespace-nowrap">
           Hourly View
         </span>
       </div>
@@ -112,10 +112,10 @@ const CurrentConsumption: React.FC<CurrentConsumptionProps> = ({
                 <img
                   src={energyIcon}
                   alt="Energy"
-                  className="w-3 h-3 opacity-55 invert"
+                  className="w-3 h-3 opacity-70 invert"
                 />
               </div>
-              <div className="text-blue-200/60 text-[10px] uppercase tracking-[0.12em] font-semibold">
+              <div className="text-blue-100/85 text-[11px] uppercase tracking-[0.12em] font-semibold">
                 Energy
               </div>
             </div>
@@ -155,7 +155,7 @@ const CurrentConsumption: React.FC<CurrentConsumptionProps> = ({
               <div className="text-[24px] font-semibold gradient-number leading-none">
                 {data.energy.value}
               </div>
-              <div className="text-[9px] text-blue-300/45 font-medium">
+              <div className="text-[10px] text-blue-200/75 font-medium">
                 kW/h
               </div>
             </div>
@@ -169,10 +169,10 @@ const CurrentConsumption: React.FC<CurrentConsumptionProps> = ({
               >
                 <path d="M4 1L7 5H1L4 1Z" />
               </svg>
-              <span className={`text-[9px] font-semibold ${data.energy.changePositive ? "text-emerald-400" : "text-red-400"}`}>
+              <span className={`text-[10px] font-semibold ${data.energy.changePositive ? "text-emerald-400" : "text-red-400"}`}>
                 {data.energy.change}
               </span>
-              <span className="text-[8px] text-blue-400/25 font-medium ml-0.5">
+              <span className="text-[10px] text-blue-300/60 font-medium ml-0.5">
                 vs last hr
               </span>
             </div>
@@ -190,10 +190,10 @@ const CurrentConsumption: React.FC<CurrentConsumptionProps> = ({
                 <img
                   src={waterIcon}
                   alt="Water"
-                  className="w-3 h-3 opacity-55 invert"
+                  className="w-3 h-3 opacity-70 invert"
                 />
               </div>
-              <div className="text-blue-200/60 text-[10px] uppercase tracking-[0.12em] font-semibold">
+              <div className="text-blue-100/85 text-[11px] uppercase tracking-[0.12em] font-semibold">
                 Water
               </div>
             </div>
@@ -247,7 +247,7 @@ const CurrentConsumption: React.FC<CurrentConsumptionProps> = ({
               <div className="text-[24px] font-semibold gradient-number leading-none">
                 {data.water.value}
               </div>
-              <div className="text-[9px] text-blue-300/30 font-medium">m³</div>
+              <div className="text-[10px] text-blue-200/70 font-medium">m³</div>
             </div>
             <div className="flex items-center gap-1 mt-1.5">
               <svg
@@ -259,10 +259,10 @@ const CurrentConsumption: React.FC<CurrentConsumptionProps> = ({
               >
                 <path d="M4 1L7 5H1L4 1Z" />
               </svg>
-              <span className={`text-[9px] font-semibold ${data.water.changePositive ? "text-emerald-400" : "text-red-400"}`}>
+              <span className={`text-[10px] font-semibold ${data.water.changePositive ? "text-emerald-400" : "text-red-400"}`}>
                 {data.water.change}
               </span>
-              <span className="text-[8px] text-blue-400/25 font-medium ml-0.5">
+              <span className="text-[10px] text-blue-300/60 font-medium ml-0.5">
                 vs last hr
               </span>
             </div>
