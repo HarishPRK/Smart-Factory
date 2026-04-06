@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
-import { usePLCContext } from "../context/PLCContext";
+import { usePLCContext, useMqttBufferContext } from "../context/PLCContext";
+import { isSiteWiseConfigured, fetchAlarms, fetchMetrics, type SiteWiseProperty } from "../services/siteWiseService";
 
 interface Message {
   role: "user" | "assistant";
@@ -8,8 +9,55 @@ interface Message {
 
 const AI_PROXY_URL = "http://localhost:9002/chat";
 
-function buildPLCContext(params: ReturnType<typeof usePLCContext>["params"], outputs: ReturnType<typeof usePLCContext>["outputs"]): string {
-  const lines: string[] = [];
+const ANALOG_PROPS: { id: SiteWiseProperty; label: string; unit: string }[] = [
+  { id: "voltage", label: "Voltage", unit: "V" },
+  { id: "current", label: "Current", unit: "A" },
+  { id: "pH", label: "pH", unit: "pH" },
+  { id: "temperature", label: "Temperature", unit: "°C" },
+];
+
+async function buildSiteWiseContext(): Promise<string> {
+  if (!isSiteWiseConfigured()) return "";
+
+  const lines: string[] = ["\n--- SiteWise Historical Data ---"];
+
+  try {
+    // Fetch computed metrics for each analog sensor
+    for (const prop of ANALOG_PROPS) {
+      try {
+        const metrics = await fetchMetrics(prop.id);
+        const avg = metrics.avg_1h?.value;
+        const max = metrics.max_1h?.value;
+        if (avg != null || max != null) {
+          lines.push(`${prop.label} (1h): avg=${avg?.toFixed(1) ?? "?"} ${prop.unit}, max=${max?.toFixed(1) ?? "?"} ${prop.unit}`);
+        }
+      } catch { /* skip */ }
+    }
+
+    // Fetch alarm states
+    try {
+      const alarmResp = await fetchAlarms();
+      const active = alarmResp.alarms.filter((a) => a.state === "ACTIVE");
+      if (active.length > 0) {
+        lines.push(`\nACTIVE ALARMS (${active.length}):`);
+        for (const a of active) {
+          lines.push(`  - ${a.label}: ${a.property} is ${a.currentValue?.toFixed(1)} (threshold: ${a.threshold.operator} ${a.threshold.value})`);
+        }
+      } else {
+        lines.push(`\nAlarms: All clear (${alarmResp.total} rules monitored)`);
+      }
+    } catch { /* skip */ }
+  } catch { /* skip */ }
+
+  return lines.length > 1 ? lines.join("\n") : "";
+}
+
+function buildPLCContext(
+  params: ReturnType<typeof usePLCContext>["params"],
+  outputs: ReturnType<typeof usePLCContext>["outputs"],
+  bufferSummary: string
+): string {
+  const lines: string[] = ["--- Live PLC Data ---"];
 
   for (const p of params) {
     if (p.kind === "analog") {
@@ -26,6 +74,10 @@ function buildPLCContext(params: ReturnType<typeof usePLCContext>["params"], out
   lines.push(`Alerts: ${outputs.alerts.some(Boolean) ? "ACTIVE" : "NONE"}`);
   lines.push(`Push Button: ${outputs.pushButton ? "PRESSED" : "RELEASED"}`);
 
+  if (bufferSummary) {
+    lines.push(bufferSummary);
+  }
+
   return lines.join("\n");
 }
 
@@ -36,6 +88,7 @@ interface AIChatPanelProps {
 
 const AIChatPanel: React.FC<AIChatPanelProps> = ({ open, onClose }) => {
   const { params, outputs } = usePLCContext();
+  const buffer = useMqttBufferContext();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -63,13 +116,33 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({ open, onClose }) => {
     setLoading(true);
 
     try {
-      const plcContext = buildPLCContext(params, outputs);
+      // Build buffer summary (last 5 min trends)
+      let bufferSummary = "";
+      const bufSize = buffer.getBufferSize();
+      if (bufSize > 10) {
+        const lines: string[] = ["\n--- Recent Trends (5 min buffer) ---"];
+        for (const prop of ANALOG_PROPS) {
+          const pts = buffer.getHistory(prop.id, 300_000);
+          if (pts.length > 2) {
+            const vals = pts.map((p) => p.value);
+            const avg = vals.reduce((s, v) => s + v, 0) / vals.length;
+            const trend = vals[vals.length - 1] - vals[0];
+            lines.push(`${prop.label}: avg=${avg.toFixed(1)}${prop.unit}, trend=${trend > 0 ? "+" : ""}${trend.toFixed(2)}${prop.unit} (${pts.length} samples)`);
+          }
+        }
+        bufferSummary = lines.join("\n");
+      }
+
+      const plcContext = buildPLCContext(params, outputs, bufferSummary);
+      const siteWiseContext = await buildSiteWiseContext();
+      const fullContext = plcContext + siteWiseContext;
+
       const res = await fetch(AI_PROXY_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
-          plcContext,
+          plcContext: fullContext,
         }),
       });
 

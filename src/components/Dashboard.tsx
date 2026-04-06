@@ -5,7 +5,8 @@ import CurrentConsumption from "./CurrentConsumption";
 import ZoneTabs from "./ZoneTabs";
 import FilterBar from "./FilterBar";
 import workerIcon from "../assets/icons/worker.svg";
-import mapImage from "../assets/map.png";
+import FactoryScene from "./factory3d/FactoryScene";
+import PLCControlRoom from "./factory3d/PLCControlRoom";
 import capgeminiLogo from "../assets/capgemini-logo.jpeg";
 import alertWarning from "../assets/icons/alert_warning.svg";
 import gearIcon from "../assets/icons/Gear.svg";
@@ -19,12 +20,21 @@ import EmergencyLightWidget from "./EmergencyLightWidget";
 import AIAssistantModal, { AIFloatingButton } from "./AIAssistantModal";
 import NotificationDrawer from "./NotificationDrawer";
 import KPIAnalyticsPanel from "./KPIAnalyticsPanel";
+import OEEPanel from "./OEEPanel";
+import PredictivePanel from "./PredictivePanel";
+import DigitalTwinPanel from "./DigitalTwinPanel";
+import { usePredictionStore } from "../stores/predictionStore";
 
 const Dashboard: React.FC = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [aiChatOpen, setAiChatOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
+  const [oeeOpen, setOeeOpen] = useState(false);
+  const [predictiveOpen, setPredictiveOpen] = useState(false);
+  const [digitalTwinOpen, setDigitalTwinOpen] = useState(false);
+  const predAlertCount = usePredictionStore((s) => s.anomalyAlerts.length);
+  const [sceneView, setSceneView] = useState<"factory" | "plc">("factory");
   const { filteredMachines, filteredAlerts } = useFilters();
 
   const overviewChips = computeOverviewChips(filteredMachines);
@@ -224,46 +234,44 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
           <FilterBar />
-          <div className="flex items-center gap-3">
-            <div className="flex-1"><KPIBar /></div>
-            <button
-              onClick={() => setAnalyticsOpen(true)}
-              className="flex-shrink-0 h-[96px] px-3 card flex flex-col items-center justify-center gap-1.5 group/analytics cursor-pointer hover:border-cyan-400/20 transition-all duration-300"
-            >
-              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" className="text-cyan-300/50 group-hover/analytics:text-cyan-300 transition-colors">
-                <rect x="2" y="10" width="3" height="8" rx="1" fill="currentColor" />
-                <rect x="7" y="6" width="3" height="12" rx="1" fill="currentColor" />
-                <rect x="12" y="3" width="3" height="15" rx="1" fill="currentColor" />
-                <path d="M3 9L8 5L13 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.5" />
-              </svg>
-              <span className="text-[8px] text-sky-200/50 group-hover/analytics:text-sky-200/80 font-semibold uppercase tracking-[0.1em] transition-colors">Analytics</span>
-            </button>
-          </div>
-          <div className="flex-grow min-h-0 card relative overflow-hidden flex items-center justify-center group">
-            <img
-              src={mapImage}
-              alt="Map"
-              className="w-full h-full object-cover opacity-35 mix-blend-luminosity scale-105 group-hover:scale-110 group-hover:opacity-45 transition-all duration-[1.5s] ease-out"
-            />
+          <KPIBar
+            onOeeClick={() => setOeeOpen(true)}
+            onAnalyticsClick={() => setAnalyticsOpen(true)}
+            onPredictClick={() => setPredictiveOpen(true)}
+            onDigitalTwinClick={() => setDigitalTwinOpen(true)}
+            predAlertCount={predAlertCount}
+          />
+          <div className="flex-grow min-h-0 card relative overflow-hidden group">
+            {/* 3D Scene — Factory or PLC Control Room */}
+            {sceneView === "factory" ? <FactoryScene /> : <PLCControlRoom />}
 
-            {/* Gradient overlays — richer blue tinted */}
-            <div className="absolute inset-0 bg-gradient-to-b from-[#030b1a]/50 via-transparent to-[#030b1a]/95 pointer-events-none"></div>
-            <div className="absolute inset-0 bg-gradient-to-r from-[#030b1a]/30 via-transparent to-[#030b1a]/30 pointer-events-none"></div>
-            <div className="absolute inset-0 bg-gradient-to-t from-blue-950/25 via-transparent to-transparent pointer-events-none"></div>
+            {/* Gradient overlays */}
+            <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-[#030b1a]/60 to-transparent pointer-events-none z-10"></div>
+            <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#030b1a]/90 to-transparent pointer-events-none z-10"></div>
 
-            {/* Ambient orbs for map section */}
-            <div className="ambient-orb w-32 h-32 bg-blue-500/[0.04] top-10 right-20"></div>
-            <div
-              className="ambient-orb w-24 h-24 bg-indigo-500/[0.03] bottom-20 left-16"
-              style={{ animationDelay: "-4s" }}
-            ></div>
+            {/* View switcher tab */}
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex gap-1 p-1 rounded-xl bg-black/40 backdrop-blur-md border border-cyan-300/10">
+              {([["factory", "Factory Floor"], ["plc", "PLC Controls"]] as const).map(([id, label]) => (
+                <button
+                  key={id}
+                  onClick={() => setSceneView(id)}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all duration-200 pointer-events-auto ${
+                    sceneView === id
+                      ? "bg-cyan-400/15 text-cyan-200 border border-cyan-400/25 shadow-[0_0_10px_rgba(34,211,238,0.1)]"
+                      : "text-sky-200/50 hover:text-sky-200/80 border border-transparent"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
 
-            {/* Map overlays */}
-            <div className="absolute top-5 left-5 z-20">
+            {/* Overlays — only show on factory view */}
+            <div className={`absolute top-14 left-5 z-20 pointer-events-auto ${sceneView !== "factory" ? "hidden" : ""}`}>
               <ZoneTabs />
             </div>
 
-            <div className="absolute top-5 right-5 glass rounded-2xl px-5 py-3 flex items-center gap-4 z-20">
+            <div className={`absolute top-14 right-5 glass rounded-2xl px-5 py-3 flex items-center gap-4 z-20 ${sceneView !== "factory" ? "hidden" : ""}`}>
               <div className="text-right">
                 <div className="text-lg font-semibold gradient-number leading-none">
                   2,498
@@ -282,7 +290,7 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* Alert Cards */}
-            {filteredAlerts.length > 0 && (
+            {filteredAlerts.length > 0 && sceneView === "factory" && (
               <>
                 <div className="absolute bottom-24 left-5 z-20">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-red-200/75">
@@ -387,6 +395,9 @@ const Dashboard: React.FC = () => {
       <AIAssistantModal open={aiChatOpen} onClose={() => setAiChatOpen(false)} />
       <NotificationDrawer open={notifOpen} onClose={() => setNotifOpen(false)} alerts={filteredAlerts} />
       <KPIAnalyticsPanel open={analyticsOpen} onClose={() => setAnalyticsOpen(false)} />
+      <OEEPanel open={oeeOpen} onClose={() => setOeeOpen(false)} />
+      <PredictivePanel open={predictiveOpen} onClose={() => setPredictiveOpen(false)} />
+      <DigitalTwinPanel open={digitalTwinOpen} onClose={() => setDigitalTwinOpen(false)} />
     </div>
   );
 };

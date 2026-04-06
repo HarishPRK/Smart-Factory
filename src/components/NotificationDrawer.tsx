@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import type { Alert, Severity } from "../types";
+import { useSiteWiseAlarms } from "../hooks/useSiteWiseAlarms";
 
 /* ── Types ───────────────────────────────────────────── */
 
@@ -182,12 +183,29 @@ const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const drawerRef = useRef<HTMLDivElement>(null);
+  const { alarms, configured: alarmsConfigured } = useSiteWiseAlarms(10_000);
 
-  // Build full notification list from alerts + static data
+  // Build full notification list from alerts + SiteWise alarms + static data
   const allNotifications = useMemo<Notification[]>(() => {
     const fromAlerts = alertsToNotifications(alerts);
-    return [...fromAlerts, ...UPDATE_NOTIFICATIONS, ...SYSTEM_NOTIFICATIONS];
-  }, [alerts]);
+
+    // Convert SiteWise alarms to notifications
+    const fromAlarms: Notification[] = alarmsConfigured
+      ? alarms
+          .filter((a) => a.state === "ACTIVE")
+          .map((a) => ({
+            id: `sw-alarm-${a.alarmId}`,
+            title: `${a.label} Alarm`,
+            message: `${a.property} is ${a.currentValue?.toFixed(1) ?? "?"} (threshold: ${a.threshold.operator} ${a.threshold.value})`,
+            severity: a.severity === 1 ? "critical" as Severity : "warning" as Severity,
+            time: a.timestamp ? `${Math.round((Date.now() - a.timestamp) / 60000)}m ago` : "now",
+            group: "alerts" as const,
+            read: false,
+          }))
+      : [];
+
+    return [...fromAlarms, ...fromAlerts, ...UPDATE_NOTIFICATIONS, ...SYSTEM_NOTIFICATIONS];
+  }, [alerts, alarms, alarmsConfigured]);
 
   // Apply read state
   const notifications = useMemo(

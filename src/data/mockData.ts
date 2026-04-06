@@ -9,11 +9,14 @@ import type {
   MachineType,
   KpiZoneValue,
   PLCParameter,
+  OEEMetrics,
+  OEETrend,
 } from "../types";
 import energyIcon from "../assets/icons/energy_bolt.svg";
 import noiseIcon from "../assets/icons/noise_ear.svg";
 import emissionIcon from "../assets/icons/emission_cloud.svg";
 import waterIcon from "../assets/icons/water_drop.svg";
+import oeeIcon from "../assets/icons/oee_gauge.svg";
 
 // --- Zones ---
 
@@ -293,6 +296,28 @@ export const kpis: KpiData[] = [
       3: { value: "37.4", trend: "-2.8%", trendUp: false, sparkData: [55, 50, 60, 45, 40, 44, 36, 34, 38, 30] },
     },
   },
+  {
+    id: "oee",
+    label: "OEE",
+    value: "75.2",
+    unit: "%",
+    icon: oeeIcon,
+    trend: "+2.1%",
+    trendUp: true,
+    accent: "from-emerald-500/10 to-transparent",
+    iconBg: "bg-gradient-to-br from-emerald-500/[0.12] to-emerald-600/[0.06]",
+    iconBorder: "border-emerald-400/[0.14]",
+    iconGlow: "shadow-[0_0_14px_rgba(16,185,129,0.12)]",
+    hoverBorder: "hover:border-emerald-500/20",
+    trendColor: "text-emerald-400",
+    sparkColor: "#10b981",
+    sparkData: [68, 70, 72, 71, 73, 74, 72, 75, 74, 75],
+    zoneValues: {
+      1: { value: "78.4", trend: "+3.2%", trendUp: true, sparkData: [70, 72, 74, 73, 76, 77, 75, 78, 77, 78] },
+      2: { value: "72.1", trend: "+1.5%", trendUp: true, sparkData: [65, 67, 69, 68, 70, 71, 70, 72, 71, 72] },
+      3: { value: "74.8", trend: "+1.8%", trendUp: true, sparkData: [68, 70, 72, 71, 73, 74, 72, 75, 74, 75] },
+    },
+  },
 ];
 
 // --- PLC Parameters (Input Devices) ---
@@ -508,5 +533,45 @@ export function getKpiForZone(
     };
   }
   return kpi.zoneValues[zoneId];
+}
+
+// --- Mock OEE Data ---
+
+export const mockOEEMetrics: OEEMetrics = {
+  machineId: "plc-1",
+  timestamp: Date.now(),
+  availability: { value: 0.90, percentage: "90.0%" },
+  performance: { value: 0.85, percentage: "85.3%" },
+  quality: { value: 0.98, percentage: "98.1%" },
+  oee: { value: 0.752, percentage: "75.2%" },
+  plannedProductionTimeSec: 28800,
+  runTimeSec: 25920,
+  plannedDowntimeSec: 1800,
+  unplannedDowntimeSec: 1080,
+  totalCycles: 864,
+  goodCycles: 848,
+  rejectCycles: 16,
+  idealCycleTimeSec: 30,
+  shiftId: "morning",
+};
+
+export function generateMockOEETrend(hours: number): OEETrend[] {
+  const now = Date.now();
+  const points: OEETrend[] = [];
+  for (let i = 0; i < hours; i++) {
+    const t = now - (hours - i) * 3600_000;
+    const base = 0.72 + Math.sin(i * 0.5) * 0.06;
+    const a = 0.88 + Math.sin(i * 0.3) * 0.04;
+    const p = 0.83 + Math.cos(i * 0.4) * 0.05;
+    const q = 0.96 + Math.sin(i * 0.7) * 0.02;
+    points.push({
+      timestamp: t,
+      oee: Math.round(a * p * q * 1000) / 1000,
+      availability: Math.round(a * 1000) / 1000,
+      performance: Math.round(p * 1000) / 1000,
+      quality: Math.round(q * 1000) / 1000,
+    });
+  }
+  return points;
 }
 
