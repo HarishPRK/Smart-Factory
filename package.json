@@ -21,12 +21,17 @@
     "@aws-sdk/client-iotsitewise": "^3.1019.0",
     "@aws-sdk/credential-providers": "^3.1017.0",
     "@aws-sdk/util-format-url": "^3.972.8",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.5.0",
     "@smithy/protocol-http": "^5.3.12",
     "@smithy/signature-v4": "^5.3.12",
+    "@types/three": "^0.183.1",
     "mqtt": "^5.15.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "ws": "^8.20.0"
+    "three": "^0.183.2",
+    "ws": "^8.20.0",
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

@@ -49,7 +49,7 @@ export type Alert = {
   zoneId: ZoneId;
 };
 
-export type KpiId = "energy" | "noise" | "emission" | "water";
+export type KpiId = "energy" | "noise" | "emission" | "water" | "oee";
 
 export type KpiZoneValue = {
   value: string;
@@ -115,3 +115,58 @@ export type PLCParameter = {
   // Whether this is a placeholder
   placeholder?: boolean;
 };
+
+// ── OEE Types ──────────────────────────────────────────
+
+export type MachineState = "running" | "idle" | "planned_downtime" | "unplanned_downtime";
+
+export type ShiftId = "morning" | "afternoon" | "night";
+
+export type ShiftSchedule = {
+  id: ShiftId;
+  label: string;
+  startHour: number;
+  endHour: number;
+  plannedBreakMinutes: number;
+};
+
+export type MachineOEEConfig = {
+  machineId: string;
+  idealCycleTimeSec: number;
+  cycleSignal: "photoE_sensor";
+  rejectSignal: "metal_sensor";
+  runSignals: ("motor" | "relay_ch0")[];
+};
+
+export type OEEPillar = {
+  value: number;
+  percentage: string;
+};
+
+export type OEEMetrics = {
+  machineId: string;
+  timestamp: number;
+  availability: OEEPillar;
+  performance: OEEPillar;
+  quality: OEEPillar;
+  oee: OEEPillar;
+  plannedProductionTimeSec: number;
+  runTimeSec: number;
+  plannedDowntimeSec: number;
+  unplannedDowntimeSec: number;
+  totalCycles: number;
+  goodCycles: number;
+  rejectCycles: number;
+  idealCycleTimeSec: number;
+  shiftId: ShiftId;
+};
+
+export type OEETrend = {
+  timestamp: number;
+  oee: number;
+  availability: number;
+  performance: number;
+  quality: number;
+};
+
+export type OEETimeRange = "shift" | "24h" | "7d" | "30d";
