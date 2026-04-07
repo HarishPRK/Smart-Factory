@@ -1,20 +1,18 @@
 import type { ZoneId } from "../../types";
 
 // Machine positions in 3D space [x, y(up), z]
+// Legacy machines removed — only the CNC Lathe and Cooling Tower remain
+// as auxiliary equipment near the digital twin pipeline
 export const MACHINE_POSITIONS: Record<string, [number, number, number]> = {
-  m1: [-7, 0, -2],   // Injection Molding  (Zone 1)
-  m4: [-7, 0,  3],   // Conveyor Belt      (Zone 1)
-  m2: [ 0, 0, -2],   // Hydraulic Press    (Zone 2)
-  m5: [ 0, 0,  3],   // CNC Lathe          (Zone 2)
-  m3: [ 7, 0, -2],   // Industrial Boiler  (Zone 3)
-  m6: [ 7, 0,  3],   // Cooling Tower      (Zone 3)
+  m5: [-6, 0,  -3],   // CNC Lathe (tool maintenance area)
+  m6: [ 6, 0,  -3],   // Cooling Tower (utilities)
 };
 
 // Zone floor rectangles [centerX, centerZ, width, depth]
 export const ZONE_BOUNDS: Record<ZoneId, [number, number, number, number]> = {
-  1: [-7, 0.5, 8, 12],
-  2: [ 0, 0.5, 8, 12],
-  3: [ 7, 0.5, 8, 12],
+  1: [-5, 2, 10, 8],
+  2: [ 0, -2, 10, 8],
+  3: [ 5, 2, 10, 8],
 };
 
 export const ZONE_COLORS: Record<ZoneId, string> = {
@@ -37,12 +35,42 @@ export const STATUS_MAP: Record<string, StatusTier> = {
   low: "normal",
 };
 
-// Conveyor path waypoints (runs along front of all zones)
+/**
+ * Zig-zag conveyor path for the PET bottle production line.
+ *
+ * Layout (top-down view):
+ *
+ *   INTAKE ──── MIXING ─────┐
+ *                            │  (turn 1)
+ *   FORMING ←────────────────┘
+ *   │
+ *   └──────────── CURING ─── QUALITY
+ *                                │  (turn 2)
+ *   DISPATCH ← PACKAGING ───────┘
+ *
+ * Conveyor runs at y=0.5 with smooth corners.
+ */
 export const CONVEYOR_PATH: [number, number, number][] = [
-  [-10, 0.5, 3],
-  [ -4, 0.5, 3],
-  [  4, 0.5, 3],
-  [ 10, 0.5, 3],
+  // Row 1: left to right (intake → mixing)
+  [-8,  0.5,  4],
+  [-4,  0.5,  4],
+  [ 0,  0.5,  4],
+  [ 4,  0.5,  4],
+  // Turn 1: right side, go down
+  [ 5,  0.5,  3],
+  [ 5,  0.5,  1],
+  // Row 2: right to left (forming → curing)
+  [ 4,  0.5,  0],
+  [ 0,  0.5,  0],
+  [-4,  0.5,  0],
+  // Turn 2: left side, go down
+  [-5,  0.5, -1],
+  [-5,  0.5, -3],
+  // Row 3: left to right (quality → packaging → dispatch)
+  [-4,  0.5, -4],
+  [ 0,  0.5, -4],
+  [ 4,  0.5, -4],
+  [ 8,  0.5, -4],
 ];
 
 // Re-export digital twin layout for convenience

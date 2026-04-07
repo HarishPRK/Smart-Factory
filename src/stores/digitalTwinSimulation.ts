@@ -178,7 +178,7 @@ function evaluateThresholds(stages: ManufacturingStage[]): number {
           break;
         case "slowdown":
           if (stageStatus === "running") stageStatus = "warning";
-          minSpeed = Math.min(minSpeed, 0.5);
+          minSpeed = Math.min(minSpeed, 0.8);
           break;
         case "quality_degrade":
           if (stageStatus === "running") stageStatus = "warning";
@@ -222,7 +222,7 @@ function isEffectTriggered(value: number, nominal: number, effect: ThresholdEffe
 
 /* ── Product flow — mutates product array in place ────── */
 
-const SPAWN_INTERVAL_SEC = 3;
+const SPAWN_INTERVAL_SEC = 1.2;  // Faster spawning — mass production
 const CONVEYOR_FULL_DURATION_SEC = 15;
 
 function tickProducts(stages: ManufacturingStage[], products: ProductOnBelt[], dt: number, conveyorSpeed: number): number {
@@ -299,43 +299,118 @@ function tickProducts(stages: ManufacturingStage[], products: ProductOnBelt[], d
 
 type ScenarioFn = (elapsed: number, dt: number) => boolean;
 
+/**
+ * Aggressive lerp — moves 20% of remaining distance per tick.
+ * Reaches ~95% of target in about 3 seconds at 30Hz.
+ */
+function forceTo(key: string, target: number, min: number, max: number, speed: number, dt: number) {
+  const current = sensorValues[key] ?? target;
+  const pull = (target - current) * speed * dt;
+  const noise = (Math.random() - 0.5) * 0.5 * dt;
+  sensorValues[key] = clamp(current + pull + noise, min, max);
+}
+
 const scenarioFns: Record<string, ScenarioFn> = {
-  normal_production: (elapsed) => elapsed >= 30,
+  normal_production: (elapsed, dt) => {
+    // Aggressively force ALL sensors back to nominal values
+    forceTo("mixing_ph", 7.0, 0, 14, 3.0, dt);
+    forceTo("mixing_orp", 200, -500, 500, 3.0, dt);
+    forceTo("mixing_turbidity", 15, 0, 100, 3.0, dt);
+    forceTo("mixing_mq", 50, 0, 1000, 3.0, dt);
+    forceTo("curing_mq", 30, 0, 1000, 3.0, dt);
+    forceTo("curing_o2", 20.9, 0, 25, 3.0, dt);
+    forceTo("curing_motion", 0, 0, 1, 3.0, dt);
+    forceTo("quality_lidar", 0.5, 0, 50, 3.0, dt);
+    forceTo("quality_turbidity", 5, 0, 100, 3.0, dt);
+    forceTo("quality_light", 600, 0, 1000, 3.0, dt);
+    forceTo("forming_pressure", 80, 0, 200, 3.0, dt);
+    forceTo("pkg_pressure", 30, 0, 100, 3.0, dt);
+    forceTo("pkg_water", 0, 0, 1, 3.0, dt);
+
+    // Also re-enable any stopped motors/devices
+    if (elapsed > 1) {
+      const stages = useDigitalTwinStore.getState().stages;
+      for (const stage of stages) {
+        if (stage.status === "faulted") stage.status = "running";
+        for (const d of stage.outputDevices) {
+          if (d.type === "motor" && !d.active) {
+            d.active = true;
+            const cfg = STAGE_CONFIGS.find(c => c.id === stage.id)
+              ?.outputDeviceConfigs.find(c => c.deviceId === d.deviceId);
+            d.rpm = cfg?.defaultRpm ?? 60;
+            d.direction = "forward";
+          }
+          if (d.type === "emergency_light") d.active = false;
+        }
+      }
+    }
+
+    return elapsed >= 10;
+  },
 
   chemical_spill: (elapsed, dt) => {
-    if (elapsed > 3 && elapsed < 15) {
-      sensorValues["mixing_ph"] = drift(sensorValues["mixing_ph"], 11.0, 8, 14, 1.5, dt);
-      sensorValues["mixing_orp"] = drift(sensorValues["mixing_orp"], 450, 300, 500, 15, dt);
+    if (elapsed > 1 && elapsed < 12) {
+      // Aggressively push pH to 12 and ORP to 460 — well above critical thresholds
+      forceTo("mixing_ph", 12.0, 8, 14, 3.0, dt);
+      forceTo("mixing_orp", 460, 300, 500, 3.0, dt);
+      forceTo("mixing_mq", 400, 100, 800, 2.0, dt);
     }
-    if (elapsed > 15 && elapsed < 25) {
-      sensorValues["mixing_ph"] = drift(sensorValues["mixing_ph"], 7.0, 5, 10, 1.0, dt);
-      sensorValues["mixing_orp"] = drift(sensorValues["mixing_orp"], 200, 100, 350, 10, dt);
+    if (elapsed >= 12 && elapsed < 22) {
+      // Recovery — pull back to nominal + restart motors
+      forceTo("mixing_ph", 7.0, 4, 10, 3.0, dt);
+      forceTo("mixing_orp", 200, 50, 350, 3.0, dt);
+      forceTo("mixing_mq", 50, 0, 200, 3.0, dt);
+      // Re-enable mixing equipment
+      const stages = useDigitalTwinStore.getState().stages;
+      const mixing = stages.find(s => s.id === "mixing");
+      if (mixing && mixing.status === "faulted") mixing.status = "running";
+      if (mixing) for (const d of mixing.outputDevices) {
+        if (d.type === "motor" && !d.active) { d.active = true; d.rpm = 120; d.direction = "forward"; }
+        if (d.type === "emergency_light") d.active = false;
+      }
     }
-    return elapsed >= 25;
+    return elapsed >= 22;
   },
 
   gas_leak: (elapsed, dt) => {
-    if (elapsed > 2 && elapsed < 10) {
-      sensorValues["curing_mq"] = drift(sensorValues["curing_mq"], 700, 200, 1000, 30, dt);
-      sensorValues["curing_o2"] = drift(sensorValues["curing_o2"], 14, 10, 18, 1.5, dt);
+    if (elapsed > 1 && elapsed < 10) {
+      // Force MQ gas way above critical (500ppm) and O2 below critical (16%)
+      forceTo("curing_mq", 800, 200, 1000, 3.0, dt);
+      forceTo("curing_o2", 13, 10, 18, 3.0, dt);
     }
-    if (elapsed > 10 && elapsed < 20) {
-      sensorValues["curing_mq"] = drift(sensorValues["curing_mq"], 30, 0, 200, 15, dt);
-      sensorValues["curing_o2"] = drift(sensorValues["curing_o2"], 20.9, 16, 25, 0.8, dt);
+    if (elapsed >= 10 && elapsed < 18) {
+      // Recovery + restart
+      forceTo("curing_mq", 30, 0, 200, 3.0, dt);
+      forceTo("curing_o2", 20.9, 16, 25, 3.0, dt);
+      const stages = useDigitalTwinStore.getState().stages;
+      const curing = stages.find(s => s.id === "curing");
+      if (curing && curing.status === "faulted") curing.status = "running";
+      if (curing) for (const d of curing.outputDevices) {
+        if (d.type === "motor" && !d.active) { d.active = true; d.rpm = 200; d.direction = "forward"; }
+        if (d.type === "emergency_light") d.active = false;
+      }
     }
-    return elapsed >= 20;
+    return elapsed >= 18;
   },
 
   quality_failure: (elapsed, dt) => {
-    if (elapsed > 2 && elapsed < 18) {
-      sensorValues["quality_lidar"] = drift(sensorValues["quality_lidar"], 3.0, 0.5, 10, 0.8, dt);
-      sensorValues["quality_turbidity"] = drift(sensorValues["quality_turbidity"], 60, 10, 100, 5, dt);
+    if (elapsed > 1 && elapsed < 14) {
+      // Push LiDAR above critical (2.0mm) and turbidity above critical (50 NTU)
+      forceTo("quality_lidar", 4.0, 0.5, 10, 3.0, dt);
+      forceTo("quality_turbidity", 70, 10, 100, 3.0, dt);
     }
-    if (elapsed > 18 && elapsed < 28) {
-      sensorValues["quality_lidar"] = drift(sensorValues["quality_lidar"], 0.5, 0, 5, 0.5, dt);
-      sensorValues["quality_turbidity"] = drift(sensorValues["quality_turbidity"], 5, 0, 30, 3, dt);
+    if (elapsed >= 14 && elapsed < 22) {
+      // Recovery + restart
+      forceTo("quality_lidar", 0.5, 0, 5, 3.0, dt);
+      forceTo("quality_turbidity", 5, 0, 30, 3.0, dt);
+      const stages = useDigitalTwinStore.getState().stages;
+      const quality = stages.find(s => s.id === "quality");
+      if (quality && quality.status === "faulted") quality.status = "running";
+      if (quality) for (const d of quality.outputDevices) {
+        if (d.type === "emergency_light") d.active = false;
+      }
     }
-    return elapsed >= 28;
+    return elapsed >= 22;
   },
 };
 
@@ -353,21 +428,35 @@ function tick() {
   const stages = store.stages;
   const products = store.products;
 
-  // Scenario overrides
+  // Normal sensor drift first
+  tickSensors(stages, dt);
+
+  // Scenario overrides AFTER normal drift — so scenario values stick
   if (activeScenario && scenarioFns[activeScenario]) {
     const elapsed = (now - scenarioStartTime) / 1000;
     if (scenarioFns[activeScenario](elapsed, dt)) {
       activeScenario = null;
       useDigitalTwinStore.setState({ activeScenario: null });
     }
+    // Re-apply scenario sensor values to stage objects (drift may have overwritten)
+    for (const stage of stages) {
+      for (const sensor of stage.sensors) {
+        if (sensorValues[sensor.sensorId] !== undefined) {
+          sensor.value = sensorValues[sensor.sensorId];
+          const sc = STAGE_CONFIGS.find(c => c.id === stage.id)?.sensorConfigs.find(c => c.sensorId === sensor.sensorId);
+          if (sc) sensor.status = sensorStatus(sensor.value, sc);
+        }
+      }
+    }
   }
 
-  tickSensors(stages, dt);
-  const conveyorSpeed = evaluateThresholds(stages);
-  const throughput = tickProducts(stages, products, dt, conveyorSpeed);
+  const thresholdSpeed = evaluateThresholds(stages);
+  const userSpeed = useDigitalTwinStore.getState().userSpeedMultiplier;
+  const combinedSpeed = thresholdSpeed * userSpeed;
+  const throughput = tickProducts(stages, products, dt, combinedSpeed);
 
   // Single setState call per tick — only scalar values change identity
-  commitTick(conveyorSpeed, throughput, producedCount, rejectedCount);
+  commitTick(thresholdSpeed, throughput, producedCount, rejectedCount);
 }
 
 /* ── Public API ───────────────────────────────────────── */

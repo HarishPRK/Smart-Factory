@@ -8,23 +8,21 @@ interface MaterialFlowProps {
   active: boolean;
 }
 
-const PARTICLE_COUNT = 10;
-const FLOW_SPEED = 1.5;
+const PARTICLE_COUNT = 15;
+const FLOW_SPEED = 2;
 
 const MaterialFlow: React.FC<MaterialFlowProps> = ({ path, active }) => {
   const instanceRef = useRef<THREE.InstancedMesh>(null);
   const glowRef = useRef<THREE.InstancedMesh>(null);
   const progressRef = useRef<Float32Array>(new Float32Array(PARTICLE_COUNT));
 
-  const pathLength = useMemo(() => {
-    let len = 0;
-    for (let i = 1; i < path.length; i++) {
-      const dx = path[i][0] - path[i - 1][0];
-      const dz = path[i][2] - path[i - 1][2];
-      len += Math.sqrt(dx * dx + dz * dz);
-    }
-    return len;
+  // Smooth curve through waypoints
+  const curve = useMemo(() => {
+    const points = path.map((p) => new THREE.Vector3(p[0], p[1], p[2]));
+    return new THREE.CatmullRomCurve3(points, false, "catmullrom", 0.3);
   }, [path]);
+
+  const curveLength = useMemo(() => curve.getLength(), [curve]);
 
   useMemo(() => {
     for (let i = 0; i < PARTICLE_COUNT; i++) {
@@ -35,30 +33,18 @@ const MaterialFlow: React.FC<MaterialFlowProps> = ({ path, active }) => {
   const tempMatrix = useMemo(() => new THREE.Matrix4(), []);
   const glowMatrix = useMemo(() => new THREE.Matrix4(), []);
   const zeroMatrix = useMemo(() => new THREE.Matrix4().makeScale(0, 0, 0), []);
-
-  const getPathPosition = (t: number): [number, number, number] => {
-    const clampedT = ((t % 1) + 1) % 1;
-    const totalT = clampedT * (path.length - 1);
-    const segIdx = Math.min(Math.floor(totalT), path.length - 2);
-    const segT = totalT - segIdx;
-    const a = path[segIdx];
-    const b = path[segIdx + 1];
-    return [
-      a[0] + (b[0] - a[0]) * segT,
-      a[1] + (b[1] - a[1]) * segT + 0.2,
-      a[2] + (b[2] - a[2]) * segT,
-    ];
-  };
+  const tempPos = useMemo(() => new THREE.Vector3(), []);
 
   useFrame((_, delta) => {
     if (!instanceRef.current || !glowRef.current) return;
 
     for (let i = 0; i < PARTICLE_COUNT; i++) {
       if (active) {
-        progressRef.current[i] = (progressRef.current[i] + (delta * FLOW_SPEED) / pathLength) % 1;
-        const pos = getPathPosition(progressRef.current[i]);
-        tempMatrix.makeTranslation(pos[0], pos[1], pos[2]);
-        glowMatrix.makeTranslation(pos[0], pos[1], pos[2]);
+        progressRef.current[i] = (progressRef.current[i] + (delta * FLOW_SPEED) / curveLength) % 1;
+        curve.getPointAt(progressRef.current[i], tempPos);
+        tempPos.y += 0.2; // Slightly above belt
+        tempMatrix.makeTranslation(tempPos.x, tempPos.y, tempPos.z);
+        glowMatrix.makeTranslation(tempPos.x, tempPos.y, tempPos.z);
         glowMatrix.scale(new THREE.Vector3(2.5, 2.5, 2.5));
       } else {
         tempMatrix.copy(zeroMatrix);

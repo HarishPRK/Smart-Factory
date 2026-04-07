@@ -24,7 +24,7 @@ const StageTooltip3D: React.FC<StageTooltip3DProps> = ({ stage, position, onClos
         className="rounded-xl p-3 shadow-2xl text-[10px] w-[220px]"
         style={{
           backgroundColor: "rgba(10, 22, 40, 0.95)",
-          backdropFilter: "blur(16px)",
+          /* no backdrop-filter for perf */
           border: "1px solid rgba(0, 220, 255, 0.12)",
           color: "#e8f0fa",
         }}

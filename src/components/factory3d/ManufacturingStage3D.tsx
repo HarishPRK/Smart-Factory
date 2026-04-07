@@ -1,23 +1,41 @@
 "use no memo";
-import React, { useRef, useMemo } from "react";
+import React, { useRef, useMemo, useCallback } from "react";
 import { useFrame } from "@react-three/fiber";
+import { Html } from "@react-three/drei";
 import * as THREE from "three";
-import { SENSOR_OFFSETS, DEVICE_OFFSETS, STAGE_STATUS_COLORS } from "./digitalTwinLayout";
+import { SENSOR_OFFSETS, DEVICE_OFFSETS, STAGE_STATUS_COLORS, STAGE_CONFIGS } from "./digitalTwinLayout";
 import { useDigitalTwinStore } from "../../stores/digitalTwinStore";
-import type { ManufacturingStage } from "../../types/digitalTwin";
+import StageEquipment3D from "./StageEquipment3D";
+import type { ManufacturingStage, StageId } from "../../types/digitalTwin";
 
 interface ManufacturingStage3DProps {
   stageIndex: number;
   onClick: (stage: ManufacturingStage) => void;
 }
 
+const STATUS_COLORS: Record<string, string> = {
+  normal: "#10b981",
+  warning: "#f59e0b",
+  critical: "#ef4444",
+};
+
+const STAGE_LABELS: Record<StageId, string> = {
+  intake: "RAW MATERIAL INTAKE",
+  mixing: "CHEMICAL MIXING",
+  forming: "BLOW MOLDING",
+  curing: "COOLING & CURING",
+  quality: "QUALITY INSPECTION",
+  packaging: "PACKAGING",
+  dispatch: "DISPATCH",
+};
+
 /**
  * ManufacturingStage3D — Performance-optimized
  *
- * ONE useFrame for the entire stage (sensors + devices + status).
+ * ONE useFrame for the entire stage (sensors + devices + status + effects).
  * Reads store via getState() — zero React re-renders from simulation.
- * No Html overlays — uses emissive meshes for status indication.
- * Sensor/device animations are inline, not separate components.
+ * Floating sensor readouts updated imperatively via DOM refs.
+ * Threshold effects: warning halo, backdrop glow, area point light.
  */
 const ManufacturingStage3D: React.FC<ManufacturingStage3DProps> = ({ stageIndex, onClick }) => {
   const ringRef = useRef<THREE.Mesh>(null);
@@ -25,6 +43,20 @@ const ManufacturingStage3D: React.FC<ManufacturingStage3DProps> = ({ stageIndex,
   const sensorRefs = useRef<(THREE.Mesh | null)[]>([]);
   const deviceRefs = useRef<(THREE.Mesh | null)[]>([]);
   const statusLedRefs = useRef<(THREE.Mesh | null)[]>([]);
+
+  // Threshold effect refs
+  const warningHaloRef = useRef<THREE.Mesh>(null);
+  const backdropRef = useRef<THREE.Mesh>(null);
+  const stageLightRef = useRef<THREE.PointLight>(null);
+
+  // Floating sensor label refs — direct element refs (no querySelector needed)
+  const sensorValueRefs = useRef<(HTMLSpanElement | null)[]>([]);
+  const sensorDotRefs = useRef<(HTMLSpanElement | null)[]>([]);
+  const sensorContainerRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const lastDomUpdateRef = useRef(0); // throttle DOM writes
+
+  // Stage name label ref
+  const stageLabelRef = useRef<HTMLDivElement>(null);
 
   // Read initial position (stable — never changes)
   const position = useMemo(() => {
@@ -67,7 +99,52 @@ const ManufacturingStage3D: React.FC<ManufacturingStage3DProps> = ({ stageIndex,
       }
     }
 
-    // Sensor LEDs — update color based on sensor status
+    // ── Threshold visual effects ──────────────────────────
+    // Warning halo — large floor torus
+    if (warningHaloRef.current) {
+      const mat = warningHaloRef.current.material as THREE.MeshBasicMaterial;
+      if (stage.status === "faulted") {
+        mat.opacity = 0.15 + Math.sin(t * 6) * 0.15;
+        mat.color.set("#ef4444");
+      } else if (stage.status === "warning") {
+        mat.opacity = 0.08 + Math.sin(t * 2) * 0.05;
+        mat.color.set("#f59e0b");
+      } else {
+        mat.opacity = 0;
+      }
+    }
+
+    // Backdrop glow panel
+    if (backdropRef.current) {
+      const mat = backdropRef.current.material as THREE.MeshBasicMaterial;
+      if (stage.status === "faulted") {
+        mat.opacity = 0.12 + Math.sin(t * 4) * 0.08;
+        mat.color.set("#ef4444");
+      } else if (stage.status === "warning") {
+        mat.opacity = 0.06 + Math.sin(t * 2) * 0.03;
+        mat.color.set("#f59e0b");
+      } else {
+        mat.opacity = 0;
+      }
+    }
+
+    // Stage area point light
+    if (stageLightRef.current) {
+      if (stage.status === "faulted") {
+        stageLightRef.current.intensity = 1.5 + Math.sin(t * 6) * 1.0;
+        stageLightRef.current.color.set("#ef4444");
+      } else if (stage.status === "warning") {
+        stageLightRef.current.intensity = 0.4 + Math.sin(t * 2) * 0.3;
+        stageLightRef.current.color.set("#f59e0b");
+      } else if (stage.status === "running") {
+        stageLightRef.current.intensity = 0.15;
+        stageLightRef.current.color.set("#10b981");
+      } else {
+        stageLightRef.current.intensity = 0;
+      }
+    }
+
+    // Sensor LEDs — update color (Three.js materials, no DOM cost)
     for (let i = 0; i < stage.sensors.length && i < statusLedRefs.current.length; i++) {
       const led = statusLedRefs.current[i];
       if (!led) continue;
@@ -81,6 +158,54 @@ const ManufacturingStage3D: React.FC<ManufacturingStage3DProps> = ({ stageIndex,
         mat.emissiveIntensity = 0.4 + Math.sin(t * speed) * 0.6;
       } else {
         mat.emissiveIntensity = 0.3;
+      }
+    }
+
+    // ── DOM updates — throttled to every 100ms (not every frame) ──
+    // This eliminates layout thrashing from 60fps DOM writes
+    const now = performance.now();
+    if (now - lastDomUpdateRef.current > 100) {
+      lastDomUpdateRef.current = now;
+
+      // Stage name label color
+      if (stageLabelRef.current) {
+        const color = stage.status === "faulted" ? "#ef4444" : stage.status === "warning" ? "#f59e0b" : stage.status === "running" ? "#10b981" : "#94a3b8";
+        stageLabelRef.current.style.borderColor = color;
+        stageLabelRef.current.style.boxShadow = stage.status === "faulted" ? `0 0 12px ${color}` : stage.status === "warning" ? `0 0 8px ${color}` : "none";
+      }
+
+      // Sensor readouts — direct ref access (no querySelector)
+      for (let i = 0; i < stage.sensors.length; i++) {
+        const sensor = stage.sensors[i];
+        const statusColor = STATUS_COLORS[sensor.status] ?? STATUS_COLORS.normal;
+
+        const valueEl = sensorValueRefs.current[i];
+        if (valueEl) {
+          const formatted = sensor.unit === "" || sensor.unit === "m"
+            ? sensor.value.toFixed(1)
+            : sensor.value.toFixed(sensor.value >= 100 ? 0 : 1);
+          valueEl.textContent = `${formatted}${sensor.unit ? " " + sensor.unit : ""}`;
+        }
+
+        const dotEl = sensorDotRefs.current[i];
+        if (dotEl) {
+          dotEl.style.backgroundColor = statusColor;
+          dotEl.style.boxShadow = sensor.status !== "normal" ? `0 0 6px ${statusColor}` : "none";
+        }
+
+        const container = sensorContainerRefs.current[i];
+        if (container) {
+          if (sensor.status === "critical") {
+            container.style.borderColor = "#ef4444";
+            container.style.boxShadow = "0 0 8px rgba(239,68,68,0.5)";
+          } else if (sensor.status === "warning") {
+            container.style.borderColor = "#f59e0b";
+            container.style.boxShadow = "0 0 6px rgba(245,158,11,0.3)";
+          } else {
+            container.style.borderColor = "rgba(100,116,139,0.3)";
+            container.style.boxShadow = "none";
+          }
+        }
       }
     }
 
@@ -178,6 +303,9 @@ const ManufacturingStage3D: React.FC<ManufacturingStage3DProps> = ({ stageIndex,
 
   const sensorCount = initStage.sensors.length;
   const deviceCount = initStage.outputDevices.length;
+  const stageId = initStage.id as StageId;
+  const stageLabel = STAGE_LABELS[stageId] ?? initStage.id;
+  const stageConfig = STAGE_CONFIGS.find((c) => c.id === stageId);
 
   return (
     <group
@@ -190,11 +318,51 @@ const ManufacturingStage3D: React.FC<ManufacturingStage3DProps> = ({ stageIndex,
       onPointerOver={() => { document.body.style.cursor = "pointer"; }}
       onPointerOut={() => { document.body.style.cursor = "auto"; }}
     >
+      {/* ── Threshold effects ── */}
+      {/* Warning halo — large floor torus */}
+      <mesh ref={warningHaloRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.44, 0]}>
+        <torusGeometry args={[1.2, 0.12, 8, 32]} />
+        <meshBasicMaterial color="#ef4444" transparent opacity={0} side={THREE.DoubleSide} />
+      </mesh>
+
+      {/* Backdrop glow panel */}
+      <mesh ref={backdropRef} position={[0, 0.8, -0.8]}>
+        <planeGeometry args={[1.8, 2.5]} />
+        <meshBasicMaterial color="#ef4444" transparent opacity={0} side={THREE.DoubleSide} />
+      </mesh>
+
+      {/* Stage area point light for dramatic fault/warning illumination */}
+      <pointLight ref={stageLightRef} position={[0, 2.0, 0]} color="#ef4444" intensity={0} distance={5} decay={2} />
+
       {/* Floor status ring */}
       <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.45, 0]}>
         <torusGeometry args={[0.8, 0.04, 4, 32]} />
         <meshBasicMaterial color="#10b981" transparent opacity={0.25} />
       </mesh>
+
+      {/* ── Stage name label ── */}
+      <Html position={[0, 2.1, 0]} center distanceFactor={12} style={{ pointerEvents: "none", willChange: "transform" }}>
+        <div
+          ref={stageLabelRef}
+          style={{
+            background: "rgba(10, 22, 40, 0.92)",
+            border: "1px solid rgba(100,116,139,0.3)",
+            borderRadius: "6px",
+            padding: "4px 10px",
+            whiteSpace: "nowrap",
+            fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
+          }}
+        >
+          <div style={{ color: "#e2e8f0", fontSize: "10px", fontWeight: 700, letterSpacing: "0.05em", textAlign: "center" }}>
+            {stageLabel}
+          </div>
+          {stageConfig && (
+            <div style={{ color: "#94a3b8", fontSize: "8px", textAlign: "center", marginTop: "1px" }}>
+              {stageConfig.description}
+            </div>
+          )}
+        </div>
+      </Html>
 
       {/* Archway pillars */}
       <mesh position={[-0.5, 0.6, 0]} castShadow>
@@ -226,12 +394,56 @@ const ManufacturingStage3D: React.FC<ManufacturingStage3DProps> = ({ stageIndex,
         <meshStandardMaterial color="#6b7280" metalness={0.5} roughness={0.5} />
       </mesh>
 
-      {/* Sensors — static geometry with ref for animation */}
+      {/* Stage-specific PET bottle manufacturing equipment */}
+      <StageEquipment3D stageId={stageId} />
+
+      {/* Sensors — static geometry with ref for animation + floating readouts */}
       {Array.from({ length: sensorCount }).map((_, i) => {
         const offset = SENSOR_OFFSETS[i % SENSOR_OFFSETS.length];
         const sensorType = initStage.sensors[i].type;
+        const sensorLabel = initStage.sensors[i].label;
         return (
           <group key={`s${i}`} position={offset}>
+            {/* ── Floating sensor readout — direct refs, no querySelector ── */}
+            <Html position={[0, 0.4, 0]} center distanceFactor={8} style={{ pointerEvents: "none", willChange: "transform" }}>
+              <div
+                ref={(el) => { sensorContainerRefs.current[i] = el; }}
+                style={{
+                  background: "rgba(10, 22, 40, 0.9)",
+                  border: "1px solid rgba(100,116,139,0.3)",
+                  borderRadius: "5px",
+                  padding: "3px 7px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "5px",
+                  whiteSpace: "nowrap",
+                  fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
+                  transition: "border-color 0.2s, box-shadow 0.2s",
+                }}
+              >
+                <span
+                  ref={(el) => { sensorDotRefs.current[i] = el; }}
+                  style={{
+                    width: "6px",
+                    height: "6px",
+                    borderRadius: "50%",
+                    backgroundColor: "#10b981",
+                    flexShrink: 0,
+                    transition: "background-color 0.2s, box-shadow 0.2s",
+                  }}
+                />
+                <span style={{ color: "#94a3b8", fontSize: "9px", fontWeight: 500 }}>
+                  {sensorLabel}
+                </span>
+                <span
+                  ref={(el) => { sensorValueRefs.current[i] = el; }}
+                  style={{ color: "#e2e8f0", fontSize: "10px", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}
+                >
+                  --
+                </span>
+              </div>
+            </Html>
+
             {/* Base mount */}
             <mesh position={[0, -0.08, 0]}>
               <boxGeometry args={[0.12, 0.06, 0.12]} />

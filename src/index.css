@@ -399,6 +399,15 @@ body::after {
   64%      { opacity: 0.4; }
 }
 
+@keyframes siren-flash {
+  0%, 100% { opacity: 0.3; }
+  12%, 16% { opacity: 1; }
+  14%      { opacity: 0.4; }
+  50%      { opacity: 0.3; }
+  62%, 66% { opacity: 1; }
+  64%      { opacity: 0.4; }
+}
+
 .animate-siren-sweep {
   animation: siren-sweep 0.8s ease-in-out infinite;
 }
@@ -522,3 +531,4 @@ body::after {
   70% { transform: scale(2); opacity: 0; }
   100% { transform: scale(2); opacity: 0; }
 }
+@keyframes fadeInOut { 0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); } 15% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); } 25% { transform: translate(-50%, -50%) scale(1); } 85% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); } }
