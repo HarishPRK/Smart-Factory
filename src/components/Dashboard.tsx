@@ -271,7 +271,7 @@ const Dashboard: React.FC = () => {
               <ZoneTabs />
             </div>
 
-            <div className={`absolute top-14 right-5 glass rounded-2xl px-5 py-3 flex items-center gap-4 z-20 ${sceneView !== "factory" ? "hidden" : ""}`}>
+            <div className={`absolute top-[280px] right-5 glass rounded-2xl px-5 py-3 flex items-center gap-4 z-20 hidden`}>
               <div className="text-right">
                 <div className="text-lg font-semibold gradient-number leading-none">
                   2,498
@@ -289,8 +289,8 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Alert Cards */}
-            {filteredAlerts.length > 0 && sceneView === "factory" && (
+            {/* Alert Cards — hidden in factory view for full 3D scene visibility */}
+            {filteredAlerts.length > 0 && sceneView === "factory" && false && (
               <>
                 <div className="absolute bottom-24 left-5 z-20">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-red-200/75">

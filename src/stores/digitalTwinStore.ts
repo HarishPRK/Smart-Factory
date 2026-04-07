@@ -25,6 +25,9 @@ export interface DigitalTwinStore {
   products: ProductOnBelt[];
   conveyorSpeedMultiplier: number;
 
+  /** User-controlled speed override from the controls panel (0-3x) */
+  userSpeedMultiplier: number;
+
   simulationActive: boolean;
   activeScenario: string | null;
 
@@ -41,6 +44,7 @@ export const useDigitalTwinStore = create<DigitalTwinStore>(() => ({
   stages: [],
   products: [],
   conveyorSpeedMultiplier: 1,
+  userSpeedMultiplier: 1,
   simulationActive: false,
   activeScenario: null,
   totalProduced: 0,
@@ -81,10 +85,11 @@ export function commitTick(
   const bumpUi = now - lastUiTick >= UI_THROTTLE_MS;
   if (bumpUi) lastUiTick = now;
 
+  // Combine simulation conveyor speed with user speed override
   // Always update scalars (3D reads these via getState() every frame)
   // Only bump tick when the 2D panel should refresh
   useDigitalTwinStore.setState((s) => ({
-    conveyorSpeedMultiplier: conveyorSpeed,
+    conveyorSpeedMultiplier: conveyorSpeed * s.userSpeedMultiplier,
     throughputPerMin: throughput,
     totalProduced: produced,
     totalRejected: rejected,

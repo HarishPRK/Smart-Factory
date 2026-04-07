@@ -12,27 +12,34 @@ import type {
   ThresholdEffect,
 } from "../../types/digitalTwin";
 
-// ── Stage positions along the conveyor (x, y, z) ──────────
-// Conveyor runs from x=-10 to x=10 at y=0.5, z=3
+// ── Stage positions along the zig-zag conveyor (x, y, z) ──
+//
+// Row 1 (z=4):  INTAKE ──── MIXING ─────┐
+//                                        │ turn
+// Row 2 (z=0):  FORMING ←── CURING ─────┘
+//   │
+//   └──── Row 3 (z=-4): QUALITY ── PACKAGING ── DISPATCH
+//
 export const STAGE_POSITIONS: Record<StageId, [number, number, number]> = {
-  intake:    [-9.5, 0.5, 3],
-  mixing:    [-6.5, 0.5, 3],
-  forming:   [-3.0, 0.5, 3],
-  curing:    [ 0.0, 0.5, 3],
-  quality:   [ 3.0, 0.5, 3],
-  packaging: [ 6.5, 0.5, 3],
-  dispatch:  [ 9.5, 0.5, 3],
+  intake:    [-6,  0.5,  4],   // Row 1 left
+  mixing:    [ 0,  0.5,  4],   // Row 1 center
+  forming:   [ 3,  0.5,  0],   // Row 2 right (after turn 1)
+  curing:    [-2,  0.5,  0],   // Row 2 left
+  quality:   [-3,  0.5, -4],   // Row 3 left (after turn 2)
+  packaging: [ 2,  0.5, -4],   // Row 3 center
+  dispatch:  [ 7,  0.5, -4],   // Row 3 right
 };
 
-// Parametric t-values (0–1) along the conveyor path for each stage
+// Parametric t-values (0–1) along the zig-zag conveyor path
+// Total path: ~15 waypoints, so t-values are spread across the full path
 export const STAGE_CONVEYOR_T: Record<StageId, number> = {
-  intake:    0.025,
-  mixing:    0.175,
-  forming:   0.35,
-  curing:    0.50,
-  quality:   0.65,
-  packaging: 0.825,
-  dispatch:  0.975,
+  intake:    0.04,   // near start of row 1
+  mixing:    0.18,   // middle of row 1
+  forming:   0.40,   // after turn 1, row 2 right
+  curing:    0.55,   // row 2 left
+  quality:   0.72,   // after turn 2, row 3 left
+  packaging: 0.85,   // row 3 center
+  dispatch:  0.96,   // near end of row 3
 };
 
 // ── Sensor offset positions relative to stage center ───────
