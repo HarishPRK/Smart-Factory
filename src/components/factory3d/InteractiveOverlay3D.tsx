@@ -147,53 +147,6 @@ const INTERACTIVE_ITEMS: InfoItem[] = [
     ],
     accentColor: "#10b981",
   },
-  // Trucks
-  {
-    id: "truck-delivery",
-    title: "Truck: TX-847-JKL",
-    subtitle: "Raw Material Delivery — Freightliner Cascadia",
-    position: [STAGE_POSITIONS.intake[0] - 4.0, 2.0, STAGE_POSITIONS.intake[2] + 4.0],
-    details: [
-      { label: "Driver", value: "James Rodriguez" },
-      { label: "CDL #", value: "TX-CDL-9284710" },
-      { label: "Cargo", value: "PET Resin — 17,600 lbs" },
-      { label: "Status", value: "Unloading", color: "#f59e0b" },
-      { label: "Origin", value: "Eastman Chemical, Longview TX" },
-      { label: "ETA complete", value: "~25 min" },
-    ],
-    accentColor: "#1e40af",
-  },
-  {
-    id: "truck-shipping",
-    title: "Truck: CA-215-MNP",
-    subtitle: "Finished Goods — Kenworth T680",
-    position: [STAGE_POSITIONS.dispatch[0] + 4.5, 2.0, STAGE_POSITIONS.dispatch[2] - 3.5],
-    details: [
-      { label: "Driver", value: "David Chen" },
-      { label: "CDL #", value: "CA-CDL-5518203" },
-      { label: "Destination", value: "Walmart DC, Dallas TX" },
-      { label: "Loaded", value: "3,200 / 4,800 bottles" },
-      { label: "Status", value: "Loading", color: "#10b981" },
-      { label: "Departure", value: "~45 min" },
-    ],
-    accentColor: "#059669",
-  },
-  // Forklift
-  {
-    id: "forklift",
-    title: "Forklift: CAT EP25N",
-    subtitle: "Palletizer — Electric",
-    position: [STAGE_POSITIONS.dispatch[0] + 1.5, 2.0, STAGE_POSITIONS.dispatch[2]],
-    details: [
-      { label: "Operator", value: "Carlos Gutierrez" },
-      { label: "License", value: "OSHA Forklift Cert." },
-      { label: "Status", value: "Transporting", color: "#10b981" },
-      { label: "Load", value: "Pallet #284 (48 bottles)" },
-      { label: "Trips today", value: "67" },
-      { label: "Battery", value: "62%" },
-    ],
-    accentColor: "#f59e0b",
-  },
 ];
 
 /* ── Hover Ring — glowing circle under hovered items ── */

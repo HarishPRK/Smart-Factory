@@ -321,13 +321,49 @@ const SceneContent: React.FC<{
 const FactoryScene: React.FC = () => {
   const data = useFactoryData();
   const [isNight, setIsNight] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const handleDayNight = useCallback((night: boolean) => {
     setIsNight(night);
   }, []);
 
+  const toggleFullscreen = useCallback(async () => {
+    if (!containerRef.current) return;
+    if (!document.fullscreenElement) {
+      try {
+        await containerRef.current.requestFullscreen();
+      } catch (err) {
+        console.error("Failed to enter fullscreen:", err);
+      }
+    } else {
+      try {
+        await document.exitFullscreen();
+      } catch (err) {
+        console.error("Failed to exit fullscreen:", err);
+      }
+    }
+  }, []);
+
+  // Sync state with browser fullscreen changes (e.g., user pressing Esc)
+  React.useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  // Keyboard shortcut: F to toggle fullscreen
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === "f" || e.key === "F") toggleFullscreen();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toggleFullscreen]);
+
   return (
-    <div style={{ position: "absolute", inset: 0, willChange: "transform" }}>
+    <div ref={containerRef} style={{ position: "absolute", inset: 0, willChange: "transform", background: "#0a0e16" }}>
       <Canvas
         shadows={{ type: THREE.PCFShadowMap }}
         dpr={[1, 2]}
@@ -343,6 +379,42 @@ const FactoryScene: React.FC = () => {
       </Canvas>
       <SensorHUD />
       <FunControls onDayNightToggle={handleDayNight} />
+
+      {/* Fullscreen toggle button */}
+      <button
+        onClick={toggleFullscreen}
+        title={isFullscreen ? "Exit fullscreen (Esc or F)" : "Enter fullscreen (F)"}
+        style={{
+          position: "absolute",
+          bottom: "12px",
+          right: "12px",
+          zIndex: 20,
+          background: "rgba(10, 22, 40, 0.9)",
+          border: "1px solid rgba(59,130,246,0.3)",
+          borderRadius: "8px",
+          color: "#93c5fd",
+          padding: "8px 14px",
+          cursor: "pointer",
+          fontSize: "11px",
+          fontWeight: 600,
+          fontFamily: "'Inter', system-ui, sans-serif",
+          display: "flex",
+          alignItems: "center",
+          gap: "6px",
+          userSelect: "none",
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.background = "rgba(59,130,246,0.2)";
+          (e.currentTarget as HTMLButtonElement).style.color = "#dbeafe";
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.background = "rgba(10, 22, 40, 0.9)";
+          (e.currentTarget as HTMLButtonElement).style.color = "#93c5fd";
+        }}
+      >
+        <span style={{ fontSize: "16px", lineHeight: 1 }}>{isFullscreen ? "⛶" : "⛶"}</span>
+        {isFullscreen ? "EXIT FULLSCREEN" : "FULLSCREEN"}
+      </button>
     </div>
   );
 };
