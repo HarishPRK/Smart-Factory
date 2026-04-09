@@ -349,12 +349,13 @@ const PelletStream: React.FC<{ from: [number, number, number]; to: [number, numb
 /* ── Main ── */
 const MaterialSourceDest3D: React.FC = () => {
   const intake = STAGE_POSITIONS.intake;
-  const dispatch = STAGE_POSITIONS.dispatch;
 
   return (
     <group>
       {/* ══ RAW MATERIAL DELIVERY ══ */}
-      <BulkSilo position={[intake[0] - 2.0, 0, intake[2] - 2.0]} height={2.8} />
+      {/* Tallest silo painted Coca-Cola red so the brand is visible behind the
+          intake stage. The other two stay grey/tan for visual variety. */}
+      <BulkSilo position={[intake[0] - 2.0, 0, intake[2] - 2.0]} height={2.8} color="#dc2626" />
       <BulkSilo position={[intake[0] - 0.5, 0, intake[2] - 2.0]} height={2.2} color="#78716c" />
       <BulkSilo position={[intake[0] + 1.0, 0, intake[2] - 2.0]} height={1.8} color="#6b7280" />
       {/* Silo bands */}
@@ -370,23 +371,15 @@ const MaterialSourceDest3D: React.FC = () => {
         <planeGeometry args={[6, 5]} /><meshBasicMaterial color="#3b82f6" transparent opacity={0.03} />
       </mesh>
 
-      {/* ══ DISPATCH ══ */}
-      {[0, 1, 2, 3].map((i) => (
-        <group key={`fg-${i}`} position={[dispatch[0] + 2.0 + i * 0.9, 0, dispatch[2] - 1.5]}>
-          <mesh position={[0, 0.05, 0]} castShadow><boxGeometry args={[0.7, 0.06, 0.7]} /><meshStandardMaterial color="#92400e" roughness={0.9} /></mesh>
-          {[0, 1].map((j) => (
-            <mesh key={j} position={[0, 0.25 + j * 0.3, 0]} castShadow><boxGeometry args={[0.6, 0.25, 0.6]} /><meshStandardMaterial color="#bfdbfe" transparent opacity={0.25} /></mesh>
-          ))}
-        </group>
-      ))}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[dispatch[0] + 2.5, 0.006, dispatch[2] - 0.5]}>
-        <planeGeometry args={[6, 5]} /><meshBasicMaterial color="#8b5cf6" transparent opacity={0.03} />
-      </mesh>
+      {/* ══ DISPATCH ══
+          Removed the off-floor truck-loading bay (truck, forklift, staged
+          pallets) — they sat outside the factory floor and looked detached.
+          The dispatch stage's own palletizer + Coke crates inside the factory
+          floor (rendered by StageEquipment3D) tell the shipping story now. */}
 
       {/* ══ SIGNS ══ */}
       {[
         { pos: [intake[0] - 1.5, 3.0, intake[2] + 0.5] as [number, number, number], color: "#3b82f6" },
-        { pos: [dispatch[0] + 2.5, 3.0, dispatch[2] - 0.5] as [number, number, number], color: "#8b5cf6" },
       ].map(({ pos, color }, i) => (
         <group key={`sign-${i}`} position={pos}>
           <mesh><boxGeometry args={[1.5, 0.3, 0.04]} /><meshStandardMaterial color="#1e293b" metalness={0.3} roughness={0.7} /></mesh>

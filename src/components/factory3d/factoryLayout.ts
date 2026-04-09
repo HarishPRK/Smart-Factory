@@ -50,27 +50,30 @@ export const STATUS_MAP: Record<string, StatusTier> = {
  *
  * Conveyor runs at y=0.5 with smooth corners.
  */
+// All coordinates are ~2.1× the original tight layout, matching STAGE_POSITIONS
+// in digitalTwinLayout.ts. Stages, sensors, workers, equipment and the cobot
+// follow automatically because they anchor off STAGE_POSITIONS.
 export const CONVEYOR_PATH: [number, number, number][] = [
   // Row 1: left to right (intake → mixing)
-  [-8,  0.5,  4],
-  [-4,  0.5,  4],
-  [ 0,  0.5,  4],
-  [ 4,  0.5,  4],
+  [-16,  0.5,  8],
+  [ -8,  0.5,  8],
+  [  0,  0.5,  8],
+  [  8,  0.5,  8],
   // Turn 1: right side, go down
-  [ 5,  0.5,  3],
-  [ 5,  0.5,  1],
+  [ 10,  0.5,  6],
+  [ 10,  0.5,  2],
   // Row 2: right to left (forming → curing)
-  [ 4,  0.5,  0],
-  [ 0,  0.5,  0],
-  [-4,  0.5,  0],
+  [  8,  0.5,  0],
+  [  0,  0.5,  0],
+  [ -8,  0.5,  0],
   // Turn 2: left side, go down
-  [-5,  0.5, -1],
-  [-5,  0.5, -3],
+  [-10,  0.5, -2],
+  [-10,  0.5, -6],
   // Row 3: left to right (quality → packaging → dispatch)
-  [-4,  0.5, -4],
-  [ 0,  0.5, -4],
-  [ 4,  0.5, -4],
-  [ 8,  0.5, -4],
+  [ -8,  0.5, -8],
+  [  0,  0.5, -8],
+  [  8,  0.5, -8],
+  [ 16,  0.5, -8],
 ];
 
 // Re-export digital twin layout for convenience
