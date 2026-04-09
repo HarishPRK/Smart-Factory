@@ -20,13 +20,13 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const STAGE_LABELS: Record<StageId, string> = {
-  intake: "RAW MATERIAL INTAKE",
-  mixing: "CHEMICAL MIXING",
-  forming: "BLOW MOLDING",
-  curing: "COOLING & CURING",
+  intake: "PET RESIN INTAKE — Coca-Cola",
+  mixing: "SYRUP & WATER MIXING",
+  forming: "BOTTLE BLOW MOLDING",
+  curing: "COOLING TUNNEL",
   quality: "QUALITY INSPECTION",
-  packaging: "PACKAGING",
-  dispatch: "DISPATCH",
+  packaging: "CASE PACKING",
+  dispatch: "SHIPPING DOCK",
 };
 
 /**

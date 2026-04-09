@@ -9,12 +9,14 @@ interface ConveyorBeltProps {
   running: boolean;
 }
 
-const SEGMENT_COUNT = 48;
 const BELT_SPEED = 2;
+// Box geometry below is 0.55 wide; spacing them every 0.4 units gives a small
+// overlap, eliminating any visible gaps. Floor of 60 keeps short paths dense.
+const SEGMENT_SPACING = 0.4;
+const MIN_SEGMENTS = 60;
 
 const ConveyorBelt: React.FC<ConveyorBeltProps> = ({ path, running }) => {
   const instanceRef = useRef<THREE.InstancedMesh>(null);
-  const progressRef = useRef<Float32Array>(new Float32Array(SEGMENT_COUNT));
   const rollerRef = useRef<THREE.Group>(null);
 
   // Build a smooth CatmullRomCurve3 from the waypoints
@@ -25,23 +27,40 @@ const ConveyorBelt: React.FC<ConveyorBeltProps> = ({ path, running }) => {
 
   const curveLength = useMemo(() => curve.getLength(), [curve]);
 
-  // Initialize segment progress evenly along belt
+  // Segment count scales with path length so the belt is fully continuous
+  // regardless of how big the factory layout is.
+  const segmentCount = useMemo(
+    () => Math.max(MIN_SEGMENTS, Math.ceil(curveLength / SEGMENT_SPACING)),
+    [curveLength],
+  );
+
+  // Progress array sized to match segmentCount, evenly distributed along belt.
+  const progressRef = useRef<Float32Array>(new Float32Array(0));
   useMemo(() => {
-    for (let i = 0; i < SEGMENT_COUNT; i++) {
-      progressRef.current[i] = i / SEGMENT_COUNT;
+    progressRef.current = new Float32Array(segmentCount);
+    for (let i = 0; i < segmentCount; i++) {
+      progressRef.current[i] = i / segmentCount;
     }
-  }, []);
+  }, [segmentCount]);
 
   const tempMatrix = useMemo(() => new THREE.Matrix4(), []);
   const tempPos = useMemo(() => new THREE.Vector3(), []);
   const tempTangent = useMemo(() => new THREE.Vector3(), []);
   const tempQuat = useMemo(() => new THREE.Quaternion(), []);
+  const tempColor = useMemo(() => new THREE.Color(), []);
   const upVec = useMemo(() => new THREE.Vector3(0, 1, 0), []);
+
+  // Pre-built segment colors. Every Nth segment is "highlight" Coke red, the
+  // rest are dark grey. Because the segments themselves move along the curve,
+  // the colored highlights visibly travel — making belt motion obvious.
+  const COLOR_BASE = useMemo(() => new THREE.Color("#1f2937"), []);
+  const COLOR_HIGHLIGHT = useMemo(() => new THREE.Color("#dc2626"), []);
+  const COLOR_HIGHLIGHT_DIM = useMemo(() => new THREE.Color("#7f1d1d"), []);
 
   useFrame((_, delta) => {
     if (!instanceRef.current) return;
 
-    for (let i = 0; i < SEGMENT_COUNT; i++) {
+    for (let i = 0; i < segmentCount; i++) {
       if (running) {
         const speedMul = useDigitalTwinStore.getState().conveyorSpeedMultiplier;
         progressRef.current[i] = (progressRef.current[i] + (delta * BELT_SPEED * speedMul) / curveLength) % 1;
@@ -58,8 +77,21 @@ const ConveyorBelt: React.FC<ConveyorBeltProps> = ({ path, running }) => {
 
       tempMatrix.compose(tempPos, tempQuat, new THREE.Vector3(1, 1, 1));
       instanceRef.current.setMatrixAt(i, tempMatrix);
+
+      // Stripe pattern: every 6th segment is bright red, every 6th+1 is dim
+      // red, the rest are dark grey. The pattern is keyed off the *segment
+      // index* (not progress), so as segments cycle around, the stripes
+      // visibly travel along the belt.
+      const mod = i % 6;
+      if (mod === 0) tempColor.copy(running ? COLOR_HIGHLIGHT : COLOR_BASE);
+      else if (mod === 1) tempColor.copy(running ? COLOR_HIGHLIGHT_DIM : COLOR_BASE);
+      else tempColor.copy(COLOR_BASE);
+      instanceRef.current.setColorAt(i, tempColor);
     }
     instanceRef.current.instanceMatrix.needsUpdate = true;
+    if (instanceRef.current.instanceColor) {
+      instanceRef.current.instanceColor.needsUpdate = true;
+    }
 
     // Spin rollers — each child is a group; its first child is the mesh
     if (running && rollerRef.current) {
@@ -133,8 +165,10 @@ const ConveyorBelt: React.FC<ConveyorBeltProps> = ({ path, running }) => {
         <meshStandardMaterial color="#374151" metalness={0.5} roughness={0.5} />
       </mesh>
 
-      {/* Belt segments (instanced) — flat rubber belt panels */}
-      <instancedMesh ref={instanceRef} args={[undefined, undefined, SEGMENT_COUNT]} castShadow>
+      {/* Belt segments (instanced) — flat rubber belt panels.
+          frustumCulled=false because instance positions are far from local
+          origin and three.js's bounding sphere only covers the base geometry. */}
+      <instancedMesh ref={instanceRef} args={[undefined, undefined, segmentCount]} castShadow frustumCulled={false}>
         <boxGeometry args={[0.55, 0.02, 0.55]} />
         <meshStandardMaterial color="#1f2937" metalness={0.15} roughness={0.85} emissive="#059669" emissiveIntensity={running ? 0.08 : 0} />
       </instancedMesh>

@@ -1,5 +1,6 @@
 "use no memo";
 import React from "react";
+import { Html } from "@react-three/drei";
 import * as THREE from "three";
 import type { StageId } from "../../types/digitalTwin";
 
@@ -95,15 +96,37 @@ const PipeRun: React.FC<{ from: [number, number, number]; to: [number, number, n
 /* ── Intake: Large PET Resin Silo + Vibratory Feeder ── */
 const IntakeEquipment: React.FC = () => (
   <group>
-    {/* Main silo */}
+    {/* Main silo — Coca-Cola red */}
     <mesh position={[0, 1.4, -1.0]} castShadow>
       <cylinderGeometry args={[0.7, 0.7, 1.8, 16]} />
-      <meshStandardMaterial color="#6b7280" {...S} />
+      <meshStandardMaterial color="#dc2626" {...S} />
     </mesh>
     <mesh position={[0, 2.35, -1.0]}>
       <coneGeometry args={[0.7, 0.3, 16]} />
-      <meshStandardMaterial color="#6b7280" {...S} />
+      <meshStandardMaterial color="#dc2626" {...S} />
     </mesh>
+    {/* Coca-Cola wordmark on silo (faces camera via drei <Html>) */}
+    <Html
+      position={[0, 1.4, -0.3]}
+      center
+      distanceFactor={6}
+      style={{ pointerEvents: "none", willChange: "transform" }}
+    >
+      <div
+        style={{
+          fontFamily: "'Brush Script MT', cursive, system-ui",
+          fontSize: "32px",
+          fontWeight: 900,
+          color: "#ffffff",
+          textShadow: "0 0 8px #dc2626, 0 0 16px #7f1d1d",
+          letterSpacing: "0.03em",
+          transform: "skewX(-6deg)",
+          whiteSpace: "nowrap",
+        }}
+      >
+        Coca-Cola
+      </div>
+    </Html>
     <mesh position={[0, 0.4, -1.0]}>
       <coneGeometry args={[0.25, 0.4, 12]} />
       <meshStandardMaterial color="#52525b" {...S} />
@@ -153,13 +176,13 @@ const IntakeEquipment: React.FC = () => (
   </group>
 );
 
-/* ── Mixing: Large Compounding Reactor ── */
+/* ── Mixing: Large Compounding Reactor (Coca-Cola red) ── */
 const MixingEquipment: React.FC = () => (
   <group>
     {/* Main reactor vessel */}
     <mesh position={[0, 1.0, -0.8]} castShadow>
       <cylinderGeometry args={[0.65, 0.65, 1.6, 20]} />
-      <meshStandardMaterial color="#71717a" {...S} />
+      <meshStandardMaterial color="#dc2626" {...S} />
     </mesh>
     <mesh position={[0, 1.82, -0.8]}>
       <cylinderGeometry args={[0.67, 0.67, 0.06, 20]} />
@@ -167,7 +190,7 @@ const MixingEquipment: React.FC = () => (
     </mesh>
     <mesh position={[0, 0.18, -0.8]}>
       <sphereGeometry args={[0.65, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
-      <meshStandardMaterial color="#71717a" {...S} />
+      <meshStandardMaterial color="#dc2626" {...S} />
     </mesh>
     {/* Pressure bands */}
     {[0.5, 0.8, 1.1, 1.4].map((y, i) => (
@@ -215,8 +238,11 @@ const MixingEquipment: React.FC = () => (
   </group>
 );
 
-/* ── Forming: Injection + Blow Molding Press ── */
-const FormingEquipment: React.FC = () => (
+/* ── Forming: handled by in-line BlowMolderTunnel in ProcessPipeline3D ── */
+const FormingEquipment: React.FC = () => null;
+
+/* ── Forming: Injection + Blow Molding Press (legacy, no longer rendered) ── */
+const _FormingEquipmentLegacy: React.FC = () => (
   <group>
     {/* Main press frame */}
     <mesh position={[0, 0.9, -0.8]} castShadow>
@@ -295,8 +321,11 @@ const FormingEquipment: React.FC = () => (
   </group>
 );
 
-/* ── Curing: Cooling Tunnel with Fans ── */
-const CuringEquipment: React.FC = () => (
+/* ── Curing: handled by in-line CoolingTunnelInline in ProcessPipeline3D ── */
+const CuringEquipment: React.FC = () => null;
+
+/* ── Curing: Cooling Tunnel with Fans (legacy, no longer rendered) ── */
+const _CuringEquipmentLegacy: React.FC = () => (
   <group>
     {/* Main tunnel body */}
     <mesh position={[0, 0.65, -0.6]} castShadow>
@@ -546,18 +575,36 @@ const DispatchEquipment: React.FC = () => (
       <cylinderGeometry args={[0.02, 0.02, 0.8, 6]} />
       <meshStandardMaterial {...YELLOW} />
     </mesh>
-    {/* Pallets with boxes */}
+    {/* Pallets with stacked Coca-Cola cartons */}
     {[0, 1, 2].map((i) => (
-      <group key={i}>
-        <mesh position={[-0.1 + i * 0.5, 0.05, -1.2]} castShadow>
+      <group key={i} position={[-0.1 + i * 0.5, 0, -1.2]}>
+        {/* Wooden pallet */}
+        <mesh position={[0, 0.05, 0]} castShadow>
           <boxGeometry args={[0.4, 0.05, 0.4]} />
           <meshStandardMaterial color="#92400e" roughness={0.9} metalness={0.05} />
         </mesh>
         {[0, 1].map((j) => (
-          <mesh key={j} position={[-0.1 + i * 0.5, 0.2 + j * 0.2, -1.2]} castShadow>
-            <boxGeometry args={[0.35, 0.15, 0.35]} />
-            <meshStandardMaterial color={j === 0 ? "#e2e8f0" : "#cbd5e1"} transparent opacity={0.4} roughness={0.6} metalness={0.1} />
-          </mesh>
+          <group key={j} position={[0, 0.2 + j * 0.2, 0]}>
+            {/* Cardboard carton — opaque so it doesn't read as a robot */}
+            <mesh castShadow>
+              <boxGeometry args={[0.35, 0.18, 0.35]} />
+              <meshStandardMaterial
+                color={j === 0 ? "#a16207" : "#92400e"}
+                roughness={0.85}
+                metalness={0.05}
+              />
+            </mesh>
+            {/* Red Coca-Cola label panel — front */}
+            <mesh position={[0, 0, 0.176]}>
+              <planeGeometry args={[0.32, 0.12]} />
+              <meshStandardMaterial color="#dc2626" emissive="#7f1d1d" emissiveIntensity={0.15} roughness={0.5} />
+            </mesh>
+            {/* White wave stripe across label */}
+            <mesh position={[0, 0, 0.177]}>
+              <planeGeometry args={[0.28, 0.025]} />
+              <meshStandardMaterial color="#f8fafc" roughness={0.4} />
+            </mesh>
+          </group>
         ))}
       </group>
     ))}

@@ -8,7 +8,7 @@ interface ProductFlow3DProps {
   path: [number, number, number][];
 }
 
-const MAX_PRODUCTS = 60;
+const MAX_PRODUCTS = 160;
 
 /**
  * ISBM Manufacturing Stages (Injection Stretch Blow Molding):
@@ -29,6 +29,19 @@ function classifyStage(progress: number): Stage {
   if (progress < 0.90) return Stage.BOTTLE;
   return Stage.PACKAGED;
 }
+
+// Cobot pickup hide-zone: bottles whose progress lands inside this window are
+// not rendered, so visually they "vanish into" the packaging cobot's gripper.
+const COBOT_HIDE_START = 0.83;
+const COBOT_HIDE_END = 0.90;
+
+// Forming tunnel hide-zone: preforms / bottles inside the blow molder are
+// hidden so visually a preform enters the tunnel and a fully-formed red Coke
+// bottle emerges on the downstream side. Window matches the physical extent
+// of the BlowMolderTunnel (3 units long along belt, curve length ~80 units →
+// ~0.04 in t-space) centered on STAGE_CONVEYOR_T.forming = 0.40.
+const FORMING_HIDE_START = 0.38;
+const FORMING_HIDE_END = 0.42;
 
 // ── Bottle profile — 10x larger base so scales don't need to be huge ──
 function createBottleGeometry(): THREE.LatheGeometry {
@@ -125,6 +138,27 @@ const ProductFlow3D: React.FC<ProductFlow3DProps> = ({ path }) => {
     for (let i = 0; i < visibleCount; i++) {
       const product = products[i];
       const stage = classifyStage(product.progress);
+
+      // Hide products inside the blow molder tunnel — preform goes in,
+      // fully-formed bottle comes out the other side.
+      if (
+        product.progress >= FORMING_HIDE_START &&
+        product.progress < FORMING_HIDE_END
+      ) {
+        continue;
+      }
+
+      // Hide bottles inside the packaging cobot's pickup zone — the cobot
+      // animation visually "consumes" them, and they reappear as packaged
+      // cartons further down the belt.
+      if (
+        stage === Stage.BOTTLE &&
+        product.progress >= COBOT_HIDE_START &&
+        product.progress < COBOT_HIDE_END
+      ) {
+        continue;
+      }
+
       const pos = getPathPosition(product.progress);
 
       tempPos.set(pos[0], pos[1], pos[2]);
@@ -133,51 +167,42 @@ const ProductFlow3D: React.FC<ProductFlow3DProps> = ({ path }) => {
       let sx: number, sy: number, sz: number;
       let color = product.color;
 
-      // Geometries are 10x baked (bottle radius 0.42, height 1.85)
-      // Scale 0.15 → bottle radius ~0.06, height ~0.28 (small, realistic on belt)
+      // Geometries are 10x baked (bottle radius 0.42, height 1.85).
+      // Sizes tuned so a finished bottle is ~0.07 wide × ~0.30 tall — about
+      // half a worker's height, the right scale relative to the cobot's
+      // gripper and the stage equipment.
       switch (stage) {
         case Stage.PELLET: {
           const bounce = Math.sin(t * 4 + i * 2) * 0.005;
-          sx = 0.5; sy = 0.5 + bounce; sz = 0.5;
+          sx = 0.6; sy = 0.6 + bounce; sz = 0.6;
           break;
         }
         case Stage.PREFORM: {
           const subProgress = (product.progress - 0.10) / 0.30;
           if (subProgress < 0.5) {
             const growT = subProgress * 2;
-            sx = 0.12; sy = 0.08 + growT * 0.08; sz = 0.12;
+            sx = 0.13; sy = 0.08 + growT * 0.08; sz = 0.13;
             color = "#f59e0b";
           } else if (subProgress < 0.7) {
-            sx = 0.12; sy = 0.16; sz = 0.12;
+            sx = 0.13; sy = 0.16; sz = 0.13;
             color = "#93c5fd";
           } else {
-            sx = 0.12; sy = 0.16; sz = 0.12;
+            sx = 0.13; sy = 0.16; sz = 0.13;
             const heatPulse = 0.5 + Math.sin(t * 3 + i) * 0.5;
             color = heatPulse > 0.5 ? "#fb923c" : "#fdba74";
           }
           break;
         }
         case Stage.BOTTLE: {
-          const subProgress = (product.progress - 0.40) / 0.50;
-          if (subProgress < 0.3) {
-            const morphT = subProgress / 0.3;
-            const stretchT = Math.min(1, morphT * 2);
-            const blowT = Math.max(0, (morphT - 0.4) / 0.6);
-            sx = 0.12 + blowT * 0.05;
-            sy = 0.16 + stretchT * 0.04;
-            sz = 0.12 + blowT * 0.05;
-            color = blowT < 0.5 ? "#fbbf24" : "#93c5fd";
-          } else if (subProgress < 0.5) {
-            sx = 0.17; sy = 0.20; sz = 0.17;
-            color = "#93c5fd";
-          } else {
-            sx = 0.17; sy = 0.20; sz = 0.17;
-            color = "#93c5fd";
-          }
+          // Final-form Coca-Cola bottle. The morph happens hidden inside the
+          // blow molder tunnel, so by the time a bottle becomes visible
+          // again it's already at full size and Coke red.
+          sx = 0.18; sy = 0.20; sz = 0.18;
+          color = "#dc2626";
           break;
         }
         case Stage.PACKAGED: {
-          sx = 0.8; sy = 0.8; sz = 0.8;
+          sx = 0.85; sy = 0.85; sz = 0.85;
           color = "#e2e8f0";
           break;
         }
@@ -208,7 +233,11 @@ const ProductFlow3D: React.FC<ProductFlow3DProps> = ({ path }) => {
   return (
     <group>
       {/* Stage 1: PET Resin Pellets */}
-      <instancedMesh ref={pelletRef} args={[undefined, undefined, MAX_PRODUCTS]} castShadow>
+      {/* frustumCulled=false: InstancedMesh's bounding sphere is computed from
+          the base geometry at local origin, not from per-instance matrices.
+          Since products live far from world origin (after the spread-out
+          layout), three.js was culling the whole mesh. */}
+      <instancedMesh ref={pelletRef} args={[undefined, undefined, MAX_PRODUCTS]} castShadow frustumCulled={false}>
         <dodecahedronGeometry args={[0.05, 0]} />
         <meshStandardMaterial
           color="#e2e8f0"
@@ -220,7 +249,7 @@ const ProductFlow3D: React.FC<ProductFlow3DProps> = ({ path }) => {
       </instancedMesh>
 
       {/* Stage 2: Preform — thick test tube with finished neck threads */}
-      <instancedMesh ref={preformRef} args={[preformGeo, undefined, MAX_PRODUCTS]} castShadow>
+      <instancedMesh ref={preformRef} args={[preformGeo, undefined, MAX_PRODUCTS]} castShadow frustumCulled={false}>
         <meshStandardMaterial
           color="#93c5fd"
           metalness={0.15}
@@ -232,22 +261,20 @@ const ProductFlow3D: React.FC<ProductFlow3DProps> = ({ path }) => {
         />
       </instancedMesh>
 
-      {/* Stage 3: Blown Bottle — full PET bottle, visible from all angles */}
-      <instancedMesh ref={bottleRef} args={[bottleGeo, undefined, MAX_PRODUCTS]} castShadow>
+      {/* Stage 3: Blown Bottle — Coca-Cola red bottle, visible from all angles */}
+      <instancedMesh ref={bottleRef} args={[bottleGeo, undefined, MAX_PRODUCTS]} castShadow frustumCulled={false}>
         <meshStandardMaterial
-          color="#93c5fd"
-          metalness={0.15}
-          roughness={0.15}
-          transparent
-          opacity={0.8}
-          emissive="#3b82f6"
-          emissiveIntensity={0.2}
+          color="#dc2626"
+          metalness={0.2}
+          roughness={0.2}
+          emissive="#7f1d1d"
+          emissiveIntensity={0.25}
           side={THREE.DoubleSide}
         />
       </instancedMesh>
 
       {/* Stage 4: Packaged — opaque shrink-wrapped carton */}
-      <instancedMesh ref={packageRef} args={[undefined, undefined, MAX_PRODUCTS]} castShadow>
+      <instancedMesh ref={packageRef} args={[undefined, undefined, MAX_PRODUCTS]} castShadow frustumCulled={false}>
         <boxGeometry args={[0.12, 0.15, 0.10]} />
         <meshStandardMaterial
           color="#e2e8f0"

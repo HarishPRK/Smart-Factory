@@ -14,20 +14,23 @@ import type {
 
 // ── Stage positions along the zig-zag conveyor (x, y, z) ──
 //
-// Row 1 (z=4):  INTAKE ──── MIXING ─────┐
+// Row 1 (z=8):  INTAKE ──── MIXING ─────┐
 //                                        │ turn
 // Row 2 (z=0):  FORMING ←── CURING ─────┘
 //   │
-//   └──── Row 3 (z=-4): QUALITY ── PACKAGING ── DISPATCH
+//   └──── Row 3 (z=-8): QUALITY ── PACKAGING ── DISPATCH
+//
+// Spread out (~2.1× the original tight layout) so the line is wide enough to
+// showcase comfortably without components feeling cramped.
 //
 export const STAGE_POSITIONS: Record<StageId, [number, number, number]> = {
-  intake:    [-6,  0.5,  4],   // Row 1 left
-  mixing:    [ 0,  0.5,  4],   // Row 1 center
-  forming:   [ 3,  0.5,  0],   // Row 2 right (after turn 1)
-  curing:    [-2,  0.5,  0],   // Row 2 left
-  quality:   [-3,  0.5, -4],   // Row 3 left (after turn 2)
-  packaging: [ 2,  0.5, -4],   // Row 3 center
-  dispatch:  [ 7,  0.5, -4],   // Row 3 right
+  intake:    [ -13,  0.5,  8],   // Row 1 left
+  mixing:    [   0,  0.5,  8],   // Row 1 center
+  forming:   [   6,  0.5,  0],   // Row 2 right (after turn 1)
+  curing:    [  -4,  0.5,  0],   // Row 2 left
+  quality:   [  -6,  0.5, -8],   // Row 3 left (after turn 2)
+  packaging: [   4,  0.5, -8],   // Row 3 center
+  dispatch:  [  14,  0.5, -8],   // Row 3 right
 };
 
 // Parametric t-values (0–1) along the zig-zag conveyor path

@@ -222,8 +222,11 @@ function isEffectTriggered(value: number, nominal: number, effect: ThresholdEffe
 
 /* ── Product flow — mutates product array in place ────── */
 
-const SPAWN_INTERVAL_SEC = 1.2;  // Faster spawning — mass production
-const CONVEYOR_FULL_DURATION_SEC = 15;
+// 0.5s spawn × 22s traverse → ~44 products on the belt at any time. Combined
+// with the larger product geometry in ProductFlow3D, this fills the belt with
+// a continuous stream of pellets → preforms → bottles → cartons.
+const SPAWN_INTERVAL_SEC = 0.5;
+const CONVEYOR_FULL_DURATION_SEC = 22;
 
 function tickProducts(stages: ManufacturingStage[], products: ProductOnBelt[], dt: number, conveyorSpeed: number): number {
   const now = Date.now();

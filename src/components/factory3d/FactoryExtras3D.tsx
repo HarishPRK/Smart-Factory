@@ -218,7 +218,7 @@ const FactoryExtras3D: React.FC = () => {
         {/* Label */}
         <Html position={[0, 2.6, 0]} center distanceFactor={12} style={{ pointerEvents: "none", willChange: "transform" }}>
           <div style={{ background: "rgba(10,22,40,0.9)", border: "1px solid rgba(59,130,246,0.3)", borderRadius: "4px", padding: "2px 8px", fontSize: "8px", fontWeight: 700, color: "#93c5fd", fontFamily: "'Inter', system-ui", whiteSpace: "nowrap" }}>
-            WATER RESERVOIR — 5000L
+            COCA-COLA PROCESS WATER — 5000L
           </div>
         </Html>
         {/* Tank supports */}
