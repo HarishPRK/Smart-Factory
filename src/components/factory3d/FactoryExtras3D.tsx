@@ -22,8 +22,8 @@ import type { StageId } from "../../types/digitalTwin";
 
 const STAGE_LABELS: [StageId, string][] = [
   ["intake", "IN"],
-  ["mixing", "MIX"],
   ["forming", "FORM"],
+  ["mixing", "FILL"],
   ["curing", "CURE"],
   ["quality", "QC"],
   ["packaging", "PACK"],

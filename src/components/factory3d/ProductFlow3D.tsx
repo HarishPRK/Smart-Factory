@@ -23,11 +23,14 @@ const MAX_PRODUCTS = 160;
  */
 const enum Stage { PELLET, PREFORM, BOTTLE, PACKAGED }
 
+// New Coca-Cola bottling sequence conveyor t-values:
+//   intake=0.04 → forming=0.18 → filling=0.40 → cooling=0.55 →
+//   quality=0.72 → packaging=0.85 → dispatch=0.96
 function classifyStage(progress: number): Stage {
-  if (progress < 0.10) return Stage.PELLET;
-  if (progress < 0.40) return Stage.PREFORM;
-  if (progress < 0.90) return Stage.BOTTLE;
-  return Stage.PACKAGED;
+  if (progress < 0.10) return Stage.PELLET;     // raw pellets (intake area)
+  if (progress < 0.20) return Stage.PREFORM;     // preform → enters blow molder
+  if (progress < 0.90) return Stage.BOTTLE;      // bottle (empty then filled)
+  return Stage.PACKAGED;                          // carton (post case-packing)
 }
 
 // Cobot pickup hide-zone: bottles whose progress lands inside this window are
@@ -35,13 +38,17 @@ function classifyStage(progress: number): Stage {
 const COBOT_HIDE_START = 0.83;
 const COBOT_HIDE_END = 0.90;
 
-// Forming tunnel hide-zone: preforms / bottles inside the blow molder are
-// hidden so visually a preform enters the tunnel and a fully-formed red Coke
-// bottle emerges on the downstream side. Window matches the physical extent
-// of the BlowMolderTunnel (3 units long along belt, curve length ~80 units →
-// ~0.04 in t-space) centered on STAGE_CONVEYOR_T.forming = 0.40.
-const FORMING_HIDE_START = 0.38;
-const FORMING_HIDE_END = 0.42;
+// Forming tunnel hide-zone: preforms inside the blow molder are hidden so
+// visually a preform enters and a clear empty bottle emerges.
+// STAGE_CONVEYOR_T.forming = 0.18, tunnel is ~3 units on ~80-unit path.
+const FORMING_HIDE_START = 0.16;
+const FORMING_HIDE_END = 0.20;
+
+// Filling hide-zone: empty bottles on the carousel are hidden; when they
+// reappear on the downstream belt they're now dark cola-filled.
+// STAGE_CONVEYOR_T.mixing (filling) = 0.40.
+const FILLING_HIDE_START = 0.38;
+const FILLING_HIDE_END = 0.42;
 
 // ── Bottle profile — 10x larger base so scales don't need to be huge ──
 function createBottleGeometry(): THREE.LatheGeometry {
@@ -102,6 +109,8 @@ const ProductFlow3D: React.FC<ProductFlow3DProps> = ({ path }) => {
   const pelletRef = useRef<THREE.InstancedMesh>(null);
   const preformRef = useRef<THREE.InstancedMesh>(null);
   const bottleRef = useRef<THREE.InstancedMesh>(null);
+  const labelRef = useRef<THREE.InstancedMesh>(null);
+  const capRef = useRef<THREE.InstancedMesh>(null);
   const packageRef = useRef<THREE.InstancedMesh>(null);
 
   const tempMatrix = useMemo(() => new THREE.Matrix4(), []);
@@ -110,6 +119,7 @@ const ProductFlow3D: React.FC<ProductFlow3DProps> = ({ path }) => {
   const tempQuat = useMemo(() => new THREE.Quaternion(), []);
   const tempPos = useMemo(() => new THREE.Vector3(), []);
   const hideMatrix = useMemo(() => new THREE.Matrix4().makeTranslation(0, -100, 0), []);
+  const unitScale = useMemo(() => new THREE.Vector3(1, 1, 1), []);
 
   const bottleGeo = useMemo(() => createBottleGeometry(), []);
   const preformGeo = useMemo(() => createPreformGeometry(), []);
@@ -140,10 +150,20 @@ const ProductFlow3D: React.FC<ProductFlow3DProps> = ({ path }) => {
       const stage = classifyStage(product.progress);
 
       // Hide products inside the blow molder tunnel — preform goes in,
-      // fully-formed bottle comes out the other side.
+      // empty bottle comes out the other side.
       if (
         product.progress >= FORMING_HIDE_START &&
         product.progress < FORMING_HIDE_END
+      ) {
+        continue;
+      }
+
+      // Hide bottles on the filling carousel — empty bottle goes in,
+      // dark cola-filled bottle comes out.
+      if (
+        stage === Stage.BOTTLE &&
+        product.progress >= FILLING_HIDE_START &&
+        product.progress < FILLING_HIDE_END
       ) {
         continue;
       }
@@ -194,11 +214,16 @@ const ProductFlow3D: React.FC<ProductFlow3DProps> = ({ path }) => {
           break;
         }
         case Stage.BOTTLE: {
-          // Final-form Coca-Cola bottle. The morph happens hidden inside the
-          // blow molder tunnel, so by the time a bottle becomes visible
-          // again it's already at full size and Coke red.
+          // Bottle appearance depends on whether it's been through the
+          // filling station (STAGE_CONVEYOR_T.mixing = 0.40).
+          // Before filling: clear/empty bottle (light blue transparent).
+          // After filling: dark cola-filled bottle (dark brown).
           sx = 0.18; sy = 0.20; sz = 0.18;
-          color = "#dc2626";
+          if (product.progress < 0.42) {
+            color = "#bfdbfe"; // clear empty PET bottle (light blue)
+          } else {
+            color = "#1c0a00"; // dark brown — cola inside clear PET
+          }
           break;
         }
         case Stage.PACKAGED: {
@@ -216,6 +241,28 @@ const ProductFlow3D: React.FC<ProductFlow3DProps> = ({ path }) => {
       mesh.setMatrixAt(idx, tempMatrix);
       tempColor.set(color);
       mesh.setColorAt(idx, tempColor);
+
+      // ── Bottle accessories: red label band + red cap ──
+      // Only shown on FILLED bottles (after the filling station at t=0.42).
+      // Empty clear bottles pre-filling don't have labels yet.
+      if (stage === Stage.BOTTLE && labelRef.current && capRef.current) {
+        if (product.progress >= 0.42) {
+          // Label band — centered at ~50% of bottle height
+          const savedX = tempPos.x, savedY = tempPos.y, savedZ = tempPos.z;
+          tempPos.set(savedX, savedY + 0.185, savedZ);
+          tempMatrix.compose(tempPos, tempQuat, unitScale);
+          labelRef.current.setMatrixAt(idx, tempMatrix);
+          // Cap — at top of bottle
+          tempPos.set(savedX, savedY + 0.355, savedZ);
+          tempMatrix.compose(tempPos, tempQuat, unitScale);
+          capRef.current.setMatrixAt(idx, tempMatrix);
+        } else {
+          // Pre-filling: hide label + cap
+          labelRef.current.setMatrixAt(idx, hideMatrix);
+          capRef.current.setMatrixAt(idx, hideMatrix);
+        }
+      }
+
       counts[stage]++;
     }
 
@@ -227,6 +274,17 @@ const ProductFlow3D: React.FC<ProductFlow3DProps> = ({ path }) => {
       }
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    }
+
+    // Hide unused label + cap instances (same count as bottles = index 2)
+    const bottleCount = counts[Stage.BOTTLE];
+    if (labelRef.current) {
+      for (let i = bottleCount; i < MAX_PRODUCTS; i++) labelRef.current.setMatrixAt(i, hideMatrix);
+      labelRef.current.instanceMatrix.needsUpdate = true;
+    }
+    if (capRef.current) {
+      for (let i = bottleCount; i < MAX_PRODUCTS; i++) capRef.current.setMatrixAt(i, hideMatrix);
+      capRef.current.instanceMatrix.needsUpdate = true;
     }
   });
 
@@ -261,15 +319,42 @@ const ProductFlow3D: React.FC<ProductFlow3DProps> = ({ path }) => {
         />
       </instancedMesh>
 
-      {/* Stage 3: Blown Bottle — Coca-Cola red bottle, visible from all angles */}
+      {/* Stage 3: Coca-Cola bottle body — color set per-instance:
+          clear blue (empty, pre-filling) or dark brown (filled with cola) */}
       <instancedMesh ref={bottleRef} args={[bottleGeo, undefined, MAX_PRODUCTS]} castShadow frustumCulled={false}>
         <meshStandardMaterial
-          color="#dc2626"
-          metalness={0.2}
-          roughness={0.2}
-          emissive="#7f1d1d"
-          emissiveIntensity={0.25}
+          color="#bfdbfe"
+          metalness={0.15}
+          roughness={0.15}
+          transparent
+          opacity={0.88}
           side={THREE.DoubleSide}
+        />
+      </instancedMesh>
+
+      {/* Coca-Cola red label band — cylinder wrapping around mid-body.
+          Radius 0.078 sits just outside the bottle body (0.076 at widest).
+          Height 0.10 covers roughly the label area. */}
+      <instancedMesh ref={labelRef} args={[undefined, undefined, MAX_PRODUCTS]} frustumCulled={false}>
+        <cylinderGeometry args={[0.078, 0.078, 0.10, 12]} />
+        <meshStandardMaterial
+          color="#dc2626"
+          emissive="#dc2626"
+          emissiveIntensity={0.35}
+          metalness={0.1}
+          roughness={0.4}
+        />
+      </instancedMesh>
+
+      {/* Red bottle cap — small cylinder at the top */}
+      <instancedMesh ref={capRef} args={[undefined, undefined, MAX_PRODUCTS]} frustumCulled={false}>
+        <cylinderGeometry args={[0.028, 0.028, 0.025, 8]} />
+        <meshStandardMaterial
+          color="#dc2626"
+          emissive="#991b1b"
+          emissiveIntensity={0.3}
+          metalness={0.3}
+          roughness={0.35}
         />
       </instancedMesh>
 

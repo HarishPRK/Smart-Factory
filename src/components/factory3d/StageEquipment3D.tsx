@@ -176,8 +176,11 @@ const IntakeEquipment: React.FC = () => (
   </group>
 );
 
-/* ── Mixing: Large Compounding Reactor (Coca-Cola red) ── */
-const MixingEquipment: React.FC = () => (
+/* ── Mixing (now "Filling"): replaced by RotaryFiller in ProcessPipeline3D ── */
+const MixingEquipment: React.FC = () => null;
+
+/* ── Mixing: Large Compounding Reactor (legacy, no longer rendered) ── */
+const _MixingEquipmentLegacy: React.FC = () => (
   <group>
     {/* Main reactor vessel */}
     <mesh position={[0, 1.0, -0.8]} castShadow>
