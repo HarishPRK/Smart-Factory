@@ -11,6 +11,7 @@ import FactoryWorker3D from "./FactoryWorker3D";
 import LidarScanner3D from "./LidarScanner3D";
 import StackLight3D from "./StackLight3D";
 import { BlowMolderTunnel, CoolingTunnelInline } from "./InlineMachine3D";
+import RotaryFiller3D from "./RotaryFiller3D";
 import { CONVEYOR_PATH } from "./factoryLayout";
 import { STAGE_POSITIONS, STAGE_CONVEYOR_T } from "./digitalTwinLayout";
 import type { ManufacturingStage } from "../../types/digitalTwin";
@@ -62,6 +63,10 @@ const ProcessPipeline3D: React.FC = () => {
 
   const formingTunnel = useMemo(
     () => placementAt(STAGE_CONVEYOR_T.forming),
+    [placementAt],
+  );
+  const fillingPlacement = useMemo(
+    () => placementAt(STAGE_CONVEYOR_T.mixing), // "mixing" ID = filling stage
     [placementAt],
   );
   const curingTunnel = useMemo(
@@ -151,6 +156,18 @@ const ProcessPipeline3D: React.FC = () => {
       <CoolingTunnelInline
         position={curingTunnel.position}
         rotationY={curingTunnel.rotationY}
+      />
+
+      {/* Rotary carousel filler — Coca-Cola filling station.
+          Positioned 2.5 units perpendicular to the belt at the filling
+          station's conveyorT. Scaled 1.4× so it reads prominently. */}
+      <RotaryFiller3D
+        position={[
+          fillingPlacement.position[0] + Math.cos(fillingPlacement.rotationY + Math.PI / 2) * 2.5,
+          0,
+          fillingPlacement.position[2] + Math.sin(fillingPlacement.rotationY + Math.PI / 2) * 2.5,
+        ]}
+        rotationY={fillingPlacement.rotationY}
       />
 
       {selectedStage && (

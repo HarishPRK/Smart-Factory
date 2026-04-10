@@ -3,18 +3,10 @@ import React from "react";
 import * as THREE from "three";
 
 /**
- * In-line machines that the conveyor belt threads THROUGH (rather than
- * sitting beside the belt). Belt enters local -Z, exits local +Z. The
- * caller computes position + rotationY from the conveyor curve so each
- * tunnel is perfectly aligned with the belt direction at its conveyorT.
- *
- * Local coordinate convention (after applying rotationY around world Y):
- *   +Z = downstream belt direction
- *   ±X = perpendicular to belt (sides)
- *   +Y = up
- *
- * Position should be at world belt height (y ≈ 0.5) so local y=0 is at
- * belt level — both side walls rise straight up from the belt surface.
+ * In-line machines that the conveyor belt threads THROUGH.
+ * Belt enters local -Z, exits local +Z. The caller computes
+ * position + rotationY from the conveyor curve so each tunnel
+ * aligns perfectly with the belt direction at its conveyorT.
  */
 
 interface TunnelProps {
@@ -22,203 +14,151 @@ interface TunnelProps {
   rotationY: number;
 }
 
-/* ── Blow Molder Tunnel (forming stage) ── */
+/* ── Blow Molder Tunnel (forming stage) ──
+   Open skeletal frame — 4 corner posts + top cross beams + hydraulic rams.
+   NOT solid walls — you can see the belt and bottles through the frame. */
 export const BlowMolderTunnel: React.FC<TunnelProps> = ({ position, rotationY }) => (
   <group position={position} rotation={[0, rotationY, 0]}>
-    {/* Side walls — outside belt's ~0.7-unit width so the belt passes through cleanly */}
-    {[-0.6, 0.6].map((x, i) => (
-      <mesh key={`wall-${i}`} position={[x, 0.7, 0]} castShadow>
-        <boxGeometry args={[0.1, 1.4, 3.0]} />
+    {/* 4 corner posts */}
+    {[
+      [-0.5, -0.8],
+      [0.5, -0.8],
+      [-0.5, 0.8],
+      [0.5, 0.8],
+    ].map(([x, z], i) => (
+      <mesh key={`post-${i}`} position={[x, 0.55, z]} castShadow>
+        <boxGeometry args={[0.06, 1.1, 0.06]} />
         <meshStandardMaterial color="#1e40af" metalness={0.7} roughness={0.3} />
       </mesh>
     ))}
 
-    {/* Top roof */}
-    <mesh position={[0, 1.5, 0]} castShadow>
-      <boxGeometry args={[1.4, 0.1, 3.0]} />
-      <meshStandardMaterial color="#1e40af" metalness={0.7} roughness={0.3} />
-    </mesh>
-
-    {/* Lintels above the open ends (front + back) */}
-    {[-1.55, 1.55].map((z, i) => (
-      <mesh key={`lintel-${i}`} position={[0, 1.4, z]}>
-        <boxGeometry args={[1.45, 0.18, 0.12]} />
-        <meshStandardMaterial color="#1e3a8a" metalness={0.7} roughness={0.3} />
+    {/* Top cross beams (X direction) — front + back */}
+    {[-0.8, 0.8].map((z, i) => (
+      <mesh key={`xbeam-${i}`} position={[0, 1.15, z]}>
+        <boxGeometry args={[1.1, 0.06, 0.06]} />
+        <meshStandardMaterial color="#1e40af" metalness={0.7} roughness={0.3} />
+      </mesh>
+    ))}
+    {/* Top cross beams (Z direction) — left + right */}
+    {[-0.5, 0.5].map((x, i) => (
+      <mesh key={`zbeam-${i}`} position={[x, 1.15, 0]}>
+        <boxGeometry args={[0.06, 0.06, 1.7]} />
+        <meshStandardMaterial color="#1e40af" metalness={0.7} roughness={0.3} />
       </mesh>
     ))}
 
-    {/* Tie bars — 4 vertical rods at the corners */}
-    {[
-      [-0.55, -1.3],
-      [0.55, -1.3],
-      [-0.55, 1.3],
-      [0.55, 1.3],
-    ].map(([x, z], i) => (
-      <mesh key={`tie-${i}`} position={[x, 0.7, z]}>
-        <cylinderGeometry args={[0.04, 0.04, 1.5, 8]} />
-        <meshStandardMaterial color="#e4e4e7" metalness={0.95} roughness={0.05} />
-      </mesh>
-    ))}
-
-    {/* Hydraulic rams on top — 4 vertical cylinders above the roof */}
-    {[
-      [-0.4, -0.9],
-      [0.4, -0.9],
-      [-0.4, 0.9],
-      [0.4, 0.9],
-    ].map(([x, z], i) => (
-      <group key={`ram-${i}`} position={[x, 1.85, z]}>
+    {/* 2 hydraulic rams on top */}
+    {[-0.25, 0.25].map((x, i) => (
+      <group key={`ram-${i}`} position={[x, 1.5, 0]}>
         <mesh castShadow>
-          <cylinderGeometry args={[0.1, 0.1, 0.5, 12]} />
+          <cylinderGeometry args={[0.08, 0.08, 0.5, 10]} />
           <meshStandardMaterial color="#a1a1aa" metalness={0.9} roughness={0.1} />
         </mesh>
-        {/* Inner shaft */}
-        <mesh position={[0, -0.15, 0]}>
-          <cylinderGeometry args={[0.04, 0.04, 0.5, 8]} />
+        <mesh position={[0, -0.12, 0]}>
+          <cylinderGeometry args={[0.03, 0.03, 0.45, 6]} />
           <meshStandardMaterial color="#e4e4e7" metalness={0.95} roughness={0.05} />
         </mesh>
       </group>
     ))}
 
-    {/* Internal blue glow strip — visible through open ends, looks like the
-        mold heating up */}
-    <mesh position={[0, 1.4, 0]}>
-      <boxGeometry args={[1.0, 0.04, 2.7]} />
+    {/* Internal blue glow strip on ceiling */}
+    <mesh position={[0, 1.1, 0]}>
+      <boxGeometry args={[0.8, 0.02, 1.4]} />
       <meshStandardMaterial color="#60a5fa" emissive="#3b82f6" emissiveIntensity={0.9} />
     </mesh>
 
-    {/* Yellow safety stripes near the bottom of each side wall */}
-    {[-0.61, 0.61].map((x, i) => (
-      <mesh key={`stripe-${i}`} position={[x, 0.15, 0]}>
-        <boxGeometry args={[0.025, 0.06, 2.85]} />
+    {/* Yellow safety stripes on the two front/back bottom edges */}
+    {[-0.82, 0.82].map((z, i) => (
+      <mesh key={`stripe-${i}`} position={[0, 0.04, z]}>
+        <boxGeometry args={[1.05, 0.04, 0.04]} />
         <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={0.3} />
       </mesh>
     ))}
 
-    {/* "Active" status sphere on top */}
-    <mesh position={[0, 2.4, 0]}>
-      <sphereGeometry args={[0.07, 10, 10]} />
-      <meshStandardMaterial
-        color="#60a5fa"
-        emissive="#3b82f6"
-        emissiveIntensity={1.0}
-      />
+    {/* Status sphere on top */}
+    <mesh position={[0, 2.0, 0]}>
+      <sphereGeometry args={[0.06, 8, 8]} />
+      <meshStandardMaterial color="#60a5fa" emissive="#3b82f6" emissiveIntensity={1.0} />
     </mesh>
 
-    {/* Pipe stub on top (compressed-air feed for blow molding) */}
-    <mesh position={[0, 1.7, -0.6]} rotation={[Math.PI / 2, 0, 0]}>
-      <cylinderGeometry args={[0.05, 0.05, 0.4, 8]} />
+    {/* Air pipe stub */}
+    <mesh position={[0.55, 0.9, 0]} rotation={[0, 0, Math.PI / 2]}>
+      <cylinderGeometry args={[0.04, 0.04, 0.3, 6]} />
       <meshStandardMaterial color="#f59e0b" metalness={0.8} roughness={0.2} />
-    </mesh>
-
-    {/* Identifier plate on the side */}
-    <mesh position={[0.66, 0.85, 0]} rotation={[0, Math.PI / 2, 0]}>
-      <planeGeometry args={[0.6, 0.18]} />
-      <meshStandardMaterial
-        color="#0f172a"
-        emissive="#3b82f6"
-        emissiveIntensity={0.4}
-      />
     </mesh>
   </group>
 );
 
-/* ── Cooling Tunnel (curing stage) ── */
+/* ── Cooling Tunnel (curing stage) ──
+   Compact enclosed tunnel with open front/back. Belt runs through the middle. */
 export const CoolingTunnelInline: React.FC<TunnelProps> = ({ position, rotationY }) => (
   <group position={position} rotation={[0, rotationY, 0]}>
     {/* Side walls */}
-    {[-0.6, 0.6].map((x, i) => (
-      <mesh key={`wall-${i}`} position={[x, 0.7, 0]} castShadow>
-        <boxGeometry args={[0.1, 1.4, 3.5]} />
+    {[-0.5, 0.5].map((x, i) => (
+      <mesh key={`wall-${i}`} position={[x, 0.5, 0]} castShadow>
+        <boxGeometry args={[0.08, 1.0, 2.0]} />
         <meshStandardMaterial color="#1e293b" metalness={0.7} roughness={0.4} />
       </mesh>
     ))}
 
-    {/* Top roof — slightly darker than walls, with a raised exhaust spine */}
-    <mesh position={[0, 1.5, 0]} castShadow>
-      <boxGeometry args={[1.4, 0.1, 3.5]} />
+    {/* Roof */}
+    <mesh position={[0, 1.05, 0]} castShadow>
+      <boxGeometry args={[1.1, 0.08, 2.0]} />
       <meshStandardMaterial color="#0f172a" metalness={0.7} roughness={0.4} />
     </mesh>
 
-    {/* Lintels above the open ends */}
-    {[-1.8, 1.8].map((z, i) => (
-      <mesh key={`lintel-${i}`} position={[0, 1.4, z]}>
-        <boxGeometry args={[1.45, 0.18, 0.12]} />
-        <meshStandardMaterial color="#0c4a6e" metalness={0.7} roughness={0.3} />
-      </mesh>
-    ))}
-
-    {/* Cooling fan grilles — 3 per side wall, facing outward */}
-    {[-0.66, 0.66].map((x, side) =>
-      [-1.0, 0, 1.0].map((z, fi) => (
-        <mesh
-          key={`fan-${side}-${fi}`}
-          position={[x, 0.85, z]}
-          rotation={[0, 0, Math.PI / 2]}
-        >
-          <circleGeometry args={[0.22, 12]} />
-          <meshStandardMaterial
-            color="#94a3b8"
-            metalness={0.6}
-            roughness={0.4}
-            side={THREE.DoubleSide}
-          />
-        </mesh>
-      )),
-    )}
-
-    {/* Tie bars — 4 vertical rods at corners */}
+    {/* Corner posts for strength */}
     {[
-      [-0.55, -1.5],
-      [0.55, -1.5],
-      [-0.55, 1.5],
-      [0.55, 1.5],
+      [-0.45, -0.9],
+      [0.45, -0.9],
+      [-0.45, 0.9],
+      [0.45, 0.9],
     ].map(([x, z], i) => (
-      <mesh key={`tie-${i}`} position={[x, 0.7, z]}>
-        <cylinderGeometry args={[0.035, 0.035, 1.5, 8]} />
+      <mesh key={`tp-${i}`} position={[x, 0.5, z]}>
+        <cylinderGeometry args={[0.03, 0.03, 1.0, 6]} />
         <meshStandardMaterial color="#94a3b8" metalness={0.9} roughness={0.1} />
       </mesh>
     ))}
 
-    {/* Internal cyan glow strip on the ceiling — "cooling lights" */}
-    <mesh position={[0, 1.4, 0]}>
-      <boxGeometry args={[1.0, 0.04, 3.2]} />
+    {/* Fan grilles — 2 per side */}
+    {[-0.55, 0.55].map((x) =>
+      [-0.4, 0.4].map((z, fi) => (
+        <mesh
+          key={`fan-${x}-${fi}`}
+          position={[x, 0.6, z]}
+          rotation={[0, 0, Math.PI / 2]}
+        >
+          <circleGeometry args={[0.18, 10]} />
+          <meshStandardMaterial color="#94a3b8" metalness={0.6} roughness={0.4} side={THREE.DoubleSide} />
+        </mesh>
+      )),
+    )}
+
+    {/* Ceiling cyan glow strip */}
+    <mesh position={[0, 1.0, 0]}>
+      <boxGeometry args={[0.8, 0.02, 1.8]} />
       <meshStandardMaterial color="#22d3ee" emissive="#06b6d4" emissiveIntensity={0.9} />
     </mesh>
-    {/* Floor glow — gives "cool light from below" look */}
-    <mesh position={[0, 0.06, 0]}>
-      <boxGeometry args={[1.0, 0.01, 3.2]} />
+    {/* Floor glow */}
+    <mesh position={[0, 0.04, 0]}>
+      <boxGeometry args={[0.8, 0.01, 1.8]} />
       <meshStandardMaterial color="#22d3ee" emissive="#06b6d4" emissiveIntensity={0.5} />
     </mesh>
 
-    {/* Exhaust stack on top */}
-    <mesh position={[0, 2.0, 0]} castShadow>
-      <cylinderGeometry args={[0.18, 0.15, 0.5, 10]} />
+    {/* Exhaust stack */}
+    <mesh position={[0, 1.4, 0]} castShadow>
+      <cylinderGeometry args={[0.12, 0.1, 0.4, 8]} />
       <meshStandardMaterial color="#52525b" metalness={0.8} roughness={0.2} />
     </mesh>
-    <mesh position={[0, 2.3, 0]}>
-      <cylinderGeometry args={[0.22, 0.22, 0.05, 10]} />
+    <mesh position={[0, 1.65, 0]}>
+      <cylinderGeometry args={[0.15, 0.15, 0.04, 8]} />
       <meshStandardMaterial color="#27272a" metalness={0.85} roughness={0.15} />
     </mesh>
 
-    {/* Status sphere on top */}
-    <mesh position={[0, 2.5, 0]}>
-      <sphereGeometry args={[0.07, 10, 10]} />
-      <meshStandardMaterial
-        color="#22d3ee"
-        emissive="#06b6d4"
-        emissiveIntensity={1.0}
-      />
-    </mesh>
-
-    {/* Identifier plate */}
-    <mesh position={[0.66, 0.85, 0]} rotation={[0, Math.PI / 2, 0]}>
-      <planeGeometry args={[0.6, 0.18]} />
-      <meshStandardMaterial
-        color="#0f172a"
-        emissive="#06b6d4"
-        emissiveIntensity={0.4}
-      />
+    {/* Status sphere */}
+    <mesh position={[0, 1.85, 0]}>
+      <sphereGeometry args={[0.06, 8, 8]} />
+      <meshStandardMaterial color="#22d3ee" emissive="#06b6d4" emissiveIntensity={1.0} />
     </mesh>
   </group>
 );

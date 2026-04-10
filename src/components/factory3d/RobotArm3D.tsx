@@ -344,20 +344,20 @@ const RobotArm3D: React.FC<RobotArm3DProps> = ({
 
                           {/* ── Held bottle (Coca-Cola, visible only when grip closed) ── */}
                           <group ref={heldBottleRef} position={[0, 0.07, 0]} visible={false}>
-                            {/* Bottle body — Coke red */}
+                            {/* Bottle body — dark cola brown (cola inside clear PET) */}
                             <mesh>
                               <cylinderGeometry args={[0.018, 0.018, 0.08, 10]} />
-                              <meshStandardMaterial color="#dc2626" metalness={0.2} roughness={0.25} emissive="#7f1d1d" emissiveIntensity={0.2} />
+                              <meshStandardMaterial color="#1c0a00" transparent opacity={0.88} metalness={0.15} roughness={0.15} />
                             </mesh>
-                            {/* White Coca-Cola label band */}
+                            {/* Red Coca-Cola label band */}
                             <mesh position={[0, 0, 0]}>
                               <cylinderGeometry args={[0.0185, 0.0185, 0.025, 10]} />
-                              <meshStandardMaterial color="#f8fafc" metalness={0.1} roughness={0.5} />
+                              <meshStandardMaterial color="#dc2626" emissive="#dc2626" emissiveIntensity={0.3} metalness={0.1} roughness={0.4} />
                             </mesh>
-                            {/* Bottle cap — red */}
+                            {/* Red bottle cap */}
                             <mesh position={[0, 0.045, 0]}>
                               <cylinderGeometry args={[0.012, 0.012, 0.012, 8]} />
-                              <meshStandardMaterial color="#b91c1c" metalness={0.5} roughness={0.35} />
+                              <meshStandardMaterial color="#dc2626" metalness={0.3} roughness={0.35} />
                             </mesh>
                           </group>
                         </group>

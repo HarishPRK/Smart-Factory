@@ -14,35 +14,39 @@ import type {
 
 // ── Stage positions along the zig-zag conveyor (x, y, z) ──
 //
-// Row 1 (z=8):  INTAKE ──── MIXING ─────┐
-//                                        │ turn
-// Row 2 (z=0):  FORMING ←── CURING ─────┘
-//   │
-//   └──── Row 3 (z=-8): QUALITY ── PACKAGING ── DISPATCH
+// Real Coca-Cola bottling sequence:
+//   INTAKE → BLOW MOLDING → FILLING → COOLING → QC → PACKING → DISPATCH
 //
-// Spread out (~2.1× the original tight layout) so the line is wide enough to
-// showcase comfortably without components feeling cramped.
+// Row 1 (z=8):  INTAKE ────── BLOW MOLDING ──────┐
+//                                                 │ turn
+// Row 2 (z=0):  COOLING ←──── FILLING ───────────┘
+//   │
+//   └──── Row 3 (z=-8): QC ── CASE PACKING ── DISPATCH
+//
+// Note: internal IDs stay "mixing"/"forming"/"curing" for sensor/scenario
+// backwards-compatibility. Only the physical positions + visual labels change.
 //
 export const STAGE_POSITIONS: Record<StageId, [number, number, number]> = {
-  intake:    [ -13,  0.5,  8],   // Row 1 left
-  mixing:    [   0,  0.5,  8],   // Row 1 center
-  forming:   [   6,  0.5,  0],   // Row 2 right (after turn 1)
-  curing:    [  -4,  0.5,  0],   // Row 2 left
-  quality:   [  -6,  0.5, -8],   // Row 3 left (after turn 2)
-  packaging: [   4,  0.5, -8],   // Row 3 center
-  dispatch:  [  14,  0.5, -8],   // Row 3 right
+  intake:    [ -13,  0.5,  8],   // Row 1 left — PET resin intake
+  forming:   [   0,  0.5,  8],   // Row 1 center — blow molding (was "mixing" position)
+  mixing:    [   6,  0.5,  0],   // Row 2 right — Coca-Cola filling (was "forming" position)
+  curing:    [  -4,  0.5,  0],   // Row 2 left — cooling tunnel
+  quality:   [  -6,  0.5, -8],   // Row 3 left — quality inspection
+  packaging: [   4,  0.5, -8],   // Row 3 center — case packing
+  dispatch:  [  14,  0.5, -8],   // Row 3 right — shipping dock
 };
 
-// Parametric t-values (0–1) along the zig-zag conveyor path
-// Total path: ~15 waypoints, so t-values are spread across the full path
+// Parametric t-values (0–1) along the zig-zag conveyor path.
+// Ordered by the REAL Coca-Cola bottling sequence:
+//   intake → forming(blow mold) → mixing(filling) → curing(cooling) → ...
 export const STAGE_CONVEYOR_T: Record<StageId, number> = {
-  intake:    0.04,   // near start of row 1
-  mixing:    0.18,   // middle of row 1
-  forming:   0.40,   // after turn 1, row 2 right
-  curing:    0.55,   // row 2 left
-  quality:   0.72,   // after turn 2, row 3 left
-  packaging: 0.85,   // row 3 center
-  dispatch:  0.96,   // near end of row 3
+  intake:    0.04,   // Row 1 left — pellets enter
+  forming:   0.18,   // Row 1 center — blow molding
+  mixing:    0.40,   // Row 2 right — Coca-Cola filling
+  curing:    0.55,   // Row 2 left — cooling tunnel
+  quality:   0.72,   // Row 3 left — quality inspection
+  packaging: 0.85,   // Row 3 center — case packing
+  dispatch:  0.96,   // Row 3 right — shipping dock
 };
 
 // ── Sensor offset positions relative to stage center ───────
