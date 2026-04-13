@@ -11,6 +11,7 @@ import FactoryWorker3D from "./FactoryWorker3D";
 import LidarScanner3D from "./LidarScanner3D";
 import StackLight3D from "./StackLight3D";
 import { BlowMolderTunnel, CoolingTunnelInline } from "./InlineMachine3D";
+import ColaFillingStation3D from "./ColaFillingStation3D";
 import { CONVEYOR_PATH } from "./factoryLayout";
 import { STAGE_POSITIONS, STAGE_CONVEYOR_T } from "./digitalTwinLayout";
 import type { ManufacturingStage } from "../../types/digitalTwin";
@@ -66,6 +67,10 @@ const ProcessPipeline3D: React.FC = () => {
 
   const formingTunnel = useMemo(
     () => placementAt(STAGE_CONVEYOR_T.forming),
+    [placementAt],
+  );
+  const fillingPlacement = useMemo(
+    () => placementAt(STAGE_CONVEYOR_T.mixing), // "mixing" ID = filling stage
     [placementAt],
   );
   const curingTunnel = useMemo(
@@ -155,6 +160,14 @@ const ProcessPipeline3D: React.FC = () => {
       <CoolingTunnelInline
         position={curingTunnel.position}
         rotationY={curingTunnel.rotationY}
+      />
+
+      {/* Coca-Cola filling station — inline filling machine.
+          Positioned directly on the belt at the filling/mixing stage.
+          Bottles pass through and get filled with Coca-Cola. */}
+      <ColaFillingStation3D
+        position={fillingPlacement.position}
+        rotationY={fillingPlacement.rotationY}
       />
 
       {selectedStage && (
