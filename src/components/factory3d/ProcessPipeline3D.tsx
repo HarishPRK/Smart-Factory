@@ -11,7 +11,6 @@ import FactoryWorker3D from "./FactoryWorker3D";
 import LidarScanner3D from "./LidarScanner3D";
 import StackLight3D from "./StackLight3D";
 import { BlowMolderTunnel, CoolingTunnelInline } from "./InlineMachine3D";
-import RotaryFiller3D from "./RotaryFiller3D";
 import { CONVEYOR_PATH } from "./factoryLayout";
 import { STAGE_POSITIONS, STAGE_CONVEYOR_T } from "./digitalTwinLayout";
 import type { ManufacturingStage } from "../../types/digitalTwin";
@@ -28,7 +27,9 @@ import { useDigitalTwinStore } from "../../stores/digitalTwinStore";
  */
 const ProcessPipeline3D: React.FC = () => {
   const active = useDigitalTwinStore((s) => s.simulationActive);
-  const [selectedStage, setSelectedStage] = useState<ManufacturingStage | null>(null);
+  const [selectedStage, setSelectedStage] = useState<ManufacturingStage | null>(
+    null,
+  );
 
   const stagesRef = useRef(useDigitalTwinStore.getState().stages);
   useFrame(() => {
@@ -36,14 +37,16 @@ const ProcessPipeline3D: React.FC = () => {
   });
 
   const handleStageClick = useCallback((stage: ManufacturingStage) => {
-    setSelectedStage((prev) => prev?.id === stage.id ? null : stage);
+    setSelectedStage((prev) => (prev?.id === stage.id ? null : stage));
   }, []);
 
   // ── Conveyor curve — used to compute exact in-line tunnel placements ──
   // Same CatmullRomCurve3 construction the belt + product flow use, so the
   // tunnels sit perfectly on the belt path regardless of layout scale.
   const curve = useMemo(() => {
-    const points = CONVEYOR_PATH.map((p) => new THREE.Vector3(p[0], p[1], p[2]));
+    const points = CONVEYOR_PATH.map(
+      (p) => new THREE.Vector3(p[0], p[1], p[2]),
+    );
     return new THREE.CatmullRomCurve3(points, false, "catmullrom", 0.3);
   }, []);
 
@@ -63,10 +66,6 @@ const ProcessPipeline3D: React.FC = () => {
 
   const formingTunnel = useMemo(
     () => placementAt(STAGE_CONVEYOR_T.forming),
-    [placementAt],
-  );
-  const fillingPlacement = useMemo(
-    () => placementAt(STAGE_CONVEYOR_T.mixing), // "mixing" ID = filling stage
     [placementAt],
   );
   const curingTunnel = useMemo(
@@ -158,18 +157,6 @@ const ProcessPipeline3D: React.FC = () => {
         rotationY={curingTunnel.rotationY}
       />
 
-      {/* Rotary carousel filler — Coca-Cola filling station.
-          Positioned 2.5 units perpendicular to the belt at the filling
-          station's conveyorT. Scaled 1.4× so it reads prominently. */}
-      <RotaryFiller3D
-        position={[
-          fillingPlacement.position[0] + Math.cos(fillingPlacement.rotationY + Math.PI / 2) * 2.5,
-          0,
-          fillingPlacement.position[2] + Math.sin(fillingPlacement.rotationY + Math.PI / 2) * 2.5,
-        ]}
-        rotationY={fillingPlacement.rotationY}
-      />
-
       {selectedStage && (
         <StageTooltip3D
           stage={selectedStage}
@@ -205,7 +192,11 @@ const ProcessPipeline3D: React.FC = () => {
         {/* Carton body — opaque cardboard brown */}
         <mesh position={[0, 0.22, 0]} castShadow>
           <boxGeometry args={[0.55, 0.44, 0.45]} />
-          <meshStandardMaterial color="#92400e" roughness={0.85} metalness={0.05} />
+          <meshStandardMaterial
+            color="#92400e"
+            roughness={0.85}
+            metalness={0.05}
+          />
         </mesh>
         {/* Inner cavity (top dark rectangle so it reads as "open box") */}
         <mesh position={[0, 0.435, 0]}>
@@ -215,7 +206,12 @@ const ProcessPipeline3D: React.FC = () => {
         {/* Coca-Cola red label panel — front */}
         <mesh position={[0, 0.22, 0.226]}>
           <planeGeometry args={[0.5, 0.3]} />
-          <meshStandardMaterial color="#dc2626" emissive="#7f1d1d" emissiveIntensity={0.2} roughness={0.5} />
+          <meshStandardMaterial
+            color="#dc2626"
+            emissive="#7f1d1d"
+            emissiveIntensity={0.2}
+            roughness={0.5}
+          />
         </mesh>
         {/* White Coke wave stripe */}
         <mesh position={[0, 0.22, 0.227]}>
@@ -225,7 +221,12 @@ const ProcessPipeline3D: React.FC = () => {
         {/* Coca-Cola red label panel — side */}
         <mesh position={[0.276, 0.22, 0]} rotation={[0, Math.PI / 2, 0]}>
           <planeGeometry args={[0.4, 0.3]} />
-          <meshStandardMaterial color="#dc2626" emissive="#7f1d1d" emissiveIntensity={0.2} roughness={0.5} />
+          <meshStandardMaterial
+            color="#dc2626"
+            emissive="#7f1d1d"
+            emissiveIntensity={0.2}
+            roughness={0.5}
+          />
         </mesh>
         <mesh position={[0.277, 0.22, 0]} rotation={[0, Math.PI / 2, 0]}>
           <planeGeometry args={[0.36, 0.05]} />
@@ -234,7 +235,11 @@ const ProcessPipeline3D: React.FC = () => {
         {/* Wooden pallet under carton */}
         <mesh position={[0, 0.015, 0]} castShadow>
           <boxGeometry args={[0.65, 0.03, 0.55]} />
-          <meshStandardMaterial color="#78350f" roughness={0.95} metalness={0.02} />
+          <meshStandardMaterial
+            color="#78350f"
+            roughness={0.95}
+            metalness={0.02}
+          />
         </mesh>
       </group>
 
@@ -243,13 +248,34 @@ const ProcessPipeline3D: React.FC = () => {
           live status from the store: green=running, amber=warning, red=faulted,
           blue base flash=blocked, all dim=idle. Positioned on a clear corner
           of each stage so they don't overlap equipment or workers. */}
-      <StackLight3D stageIndex={0} position={[intake[0]    + 1.0, intake[1]    - 0.5, intake[2]    - 1.0]} />
-      <StackLight3D stageIndex={1} position={[mixing[0]    - 1.0, mixing[1]    - 0.5, mixing[2]    + 1.0]} />
-      <StackLight3D stageIndex={2} position={[forming[0]   + 1.0, forming[1]   - 0.5, forming[2]   + 1.0]} />
-      <StackLight3D stageIndex={3} position={[curing[0]    + 1.0, curing[1]    - 0.5, curing[2]    + 1.0]} />
-      <StackLight3D stageIndex={4} position={[quality[0]   + 1.0, quality[1]   - 0.5, quality[2]   + 1.0]} />
-      <StackLight3D stageIndex={5} position={[packaging[0] + 1.4, packaging[1] - 0.5, packaging[2] + 1.0]} />
-      <StackLight3D stageIndex={6} position={[dispatch[0]  - 1.0, dispatch[1]  - 0.5, dispatch[2]  + 1.0]} />
+      <StackLight3D
+        stageIndex={0}
+        position={[intake[0] + 1.0, intake[1] - 0.5, intake[2] - 1.0]}
+      />
+      <StackLight3D
+        stageIndex={1}
+        position={[mixing[0] - 1.0, mixing[1] - 0.5, mixing[2] + 1.0]}
+      />
+      <StackLight3D
+        stageIndex={2}
+        position={[forming[0] + 1.0, forming[1] - 0.5, forming[2] + 1.0]}
+      />
+      <StackLight3D
+        stageIndex={3}
+        position={[curing[0] + 1.0, curing[1] - 0.5, curing[2] + 1.0]}
+      />
+      <StackLight3D
+        stageIndex={4}
+        position={[quality[0] + 1.0, quality[1] - 0.5, quality[2] + 1.0]}
+      />
+      <StackLight3D
+        stageIndex={5}
+        position={[packaging[0] + 1.4, packaging[1] - 0.5, packaging[2] + 1.0]}
+      />
+      <StackLight3D
+        stageIndex={6}
+        position={[dispatch[0] - 1.0, dispatch[1] - 0.5, dispatch[2] + 1.0]}
+      />
 
       {/* ── Human Workers / Operators ── */}
       {/* Intake — operator checking incoming resin (Row 1 left) */}
@@ -337,12 +363,22 @@ const ProcessPipeline3D: React.FC = () => {
           <group key={`pipe-${i}`}>
             <mesh position={[midX, y, midZ]} rotation={[0, -angle, 0]}>
               <boxGeometry args={[length, 0.025, 0.025]} />
-              <meshStandardMaterial color="#6b7280" metalness={0.7} roughness={0.3} emissive="#4b5563" emissiveIntensity={0.1} />
+              <meshStandardMaterial
+                color="#6b7280"
+                metalness={0.7}
+                roughness={0.3}
+                emissive="#4b5563"
+                emissiveIntensity={0.1}
+              />
             </mesh>
             {/* Joints at each end */}
             <mesh position={[x1, y, z1]}>
               <sphereGeometry args={[0.02, 6, 6]} />
-              <meshStandardMaterial color="#9ca3af" metalness={0.8} roughness={0.2} />
+              <meshStandardMaterial
+                color="#9ca3af"
+                metalness={0.8}
+                roughness={0.2}
+              />
             </mesh>
           </group>
         );
