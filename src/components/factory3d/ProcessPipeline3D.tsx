@@ -5,7 +5,7 @@ import { Html } from "@react-three/drei";
 import * as THREE from "three";
 import ManufacturingStage3D from "./ManufacturingStage3D";
 import ProductFlow3D from "./ProductFlow3D";
-import StageTooltip3D from "./StageTooltip3D";
+import ControlBoard3D from "./ControlBoard3D";
 import RobotArm3D from "./RobotArm3D";
 import FactoryWorker3D from "./FactoryWorker3D";
 import LidarScanner3D from "./LidarScanner3D";
@@ -90,60 +90,12 @@ const ProcessPipeline3D: React.FC = () => {
 
   return (
     <group>
-      {/* ── Coca-Cola Bottling Plant headline banner ──
-          Floats high above the factory so the brand is readable from any
-          camera angle, including the wide top-down view. drei <Html> always
-          faces the camera. */}
-      <Html
-        position={[0, 6, 0]}
-        center
-        distanceFactor={20}
-        style={{ pointerEvents: "none", willChange: "transform" }}
-      >
-        <div
-          style={{
-            background: "linear-gradient(180deg, #dc2626 0%, #991b1b 100%)",
-            border: "3px solid #ffffff",
-            borderRadius: "8px",
-            padding: "10px 28px",
-            textAlign: "center",
-            boxShadow:
-              "0 0 24px rgba(220,38,38,0.6), 0 4px 12px rgba(0,0,0,0.5)",
-            fontFamily: "'Inter', system-ui",
-          }}
-        >
-          <div
-            style={{
-              fontFamily: "'Brush Script MT', cursive, system-ui",
-              fontSize: "28px",
-              fontWeight: 900,
-              color: "#ffffff",
-              transform: "skewX(-6deg)",
-              letterSpacing: "0.02em",
-              lineHeight: 1,
-            }}
-          >
-            Coca-Cola
-          </div>
-          <div
-            style={{
-              fontSize: "9px",
-              fontWeight: 700,
-              color: "#fef2f2",
-              letterSpacing: "0.25em",
-              marginTop: "4px",
-            }}
-          >
-            BOTTLING PLANT — DIGITAL TWIN
-          </div>
-        </div>
-      </Html>
-
       {stagesRef.current.map((stage, index) => (
         <ManufacturingStage3D
           key={stage.id}
           stageIndex={index}
           onClick={handleStageClick}
+          isSelected={selectedStage?.id === stage.id}
         />
       ))}
 
@@ -170,20 +122,70 @@ const ProcessPipeline3D: React.FC = () => {
         rotationY={fillingPlacement.rotationY}
       />
 
-      {selectedStage && (
-        <StageTooltip3D
-          stage={selectedStage}
-          position={selectedStage.position}
-          onClose={() => setSelectedStage(null)}
-        />
-      )}
+      {/* ══════ CONTROL BOARDS - Billboard signs beside machines ══════ */}
+      {stagesRef.current.map((stage) => {
+        const pos = stage.position;
+        // Billboard signs far to the left of each machine
+        return (
+          <ControlBoard3D
+            key={`board-${stage.id}`}
+            stage={stage}
+            position={[pos[0] - 2.5, pos[1] - 0.5, pos[2]]}
+            visible={selectedStage?.id === stage.id}
+          />
+        );
+      })}
 
       {/* ── Robot Arms ──
-          Only the packaging cobot exists. Forming/Quality/Dispatch stages
-          are handled by fixed equipment + human operators; no cobots needed. */}
+          Quality control cobot removes defective bottles detected by LiDAR.
+          Packaging cobot packs good bottles into cartons. */}
 
       {/* Quality — LiDAR scanning laser + point cloud */}
       <LidarScanner3D position={[quality[0], quality[1] - 0.5, quality[2]]} />
+
+      {/* Quality Control — defect removal cobot.
+          Positioned beside the conveyor to pick up defective bottles detected
+          by the LiDAR scanner and place them in a reject bin. Uses amber color
+          to indicate quality control function. */}
+      <RobotArm3D
+        position={[quality[0] - 1.0, 0.45, quality[2] - 1.0]}
+        rotation={[0, -Math.PI / 4, 0]}
+        color="#f59e0b"
+        speed={5.5}
+        scale={2.2}
+        syncToConveyor
+      />
+
+      {/* Reject bin for defective bottles */}
+      <group position={[quality[0] - 2.0, 0, quality[2] - 1.8]}>
+        {/* Bin body */}
+        <mesh position={[0, 0.25, 0]} castShadow>
+          <boxGeometry args={[0.6, 0.5, 0.6]} />
+          <meshStandardMaterial
+            color="#ef4444"
+            metalness={0.4}
+            roughness={0.6}
+          />
+        </mesh>
+        {/* Warning label */}
+        <mesh position={[0, 0.35, 0.31]}>
+          <planeGeometry args={[0.4, 0.15]} />
+          <meshStandardMaterial
+            color="#fbbf24"
+            emissive="#f59e0b"
+            emissiveIntensity={0.3}
+          />
+        </mesh>
+        {/* Base */}
+        <mesh position={[0, 0.02, 0]}>
+          <boxGeometry args={[0.65, 0.04, 0.65]} />
+          <meshStandardMaterial
+            color="#1f2937"
+            metalness={0.6}
+            roughness={0.4}
+          />
+        </mesh>
+      </group>
 
       {/* Packaging — case-packing cobot.
           Positioned beside the conveyor at z=-2.74 so its pickup zone (local

@@ -42,7 +42,7 @@ const ColaFillingStation3D: React.FC<ColaFillingStation3DProps> = ({
     const t = clock.elapsedTime;
     const convSpeed = useDigitalTwinStore.getState().conveyorSpeedMultiplier;
 
-    // Animate filling streams — brown liquid droplets falling from nozzles
+    // Animate filling streams — continuous flow (high-speed production)
     if (streamRef.current && convSpeed > 0) {
       for (let i = 0; i < STREAM_COUNT; i++) {
         const nozzleIndex = i % NOZZLE_COUNT;

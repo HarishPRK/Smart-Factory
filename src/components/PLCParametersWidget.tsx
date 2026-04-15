@@ -1,13 +1,29 @@
 import React from "react";
 import type { PLCParameter } from "../types";
 import { usePLCContext } from "../context/PLCContext";
+import { usePLCStore } from "../stores/plcStore";
 
 /* ── Status badge ──────────────────────────────────────── */
 
 const statusConfig = {
-  normal: { label: "Normal", dot: "bg-emerald-400", glow: "shadow-[0_0_6px_rgba(52,211,153,0.5)]", text: "text-emerald-400" },
-  warning: { label: "Warning", dot: "bg-amber-400", glow: "shadow-[0_0_6px_rgba(251,191,36,0.5)]", text: "text-amber-400" },
-  critical: { label: "Critical", dot: "bg-red-500", glow: "shadow-[0_0_6px_rgba(239,68,68,0.5)]", text: "text-red-400" },
+  normal: {
+    label: "Normal",
+    dot: "bg-emerald-400",
+    glow: "shadow-[0_0_6px_rgba(52,211,153,0.5)]",
+    text: "text-emerald-400",
+  },
+  warning: {
+    label: "Warning",
+    dot: "bg-amber-400",
+    glow: "shadow-[0_0_6px_rgba(251,191,36,0.5)]",
+    text: "text-amber-400",
+  },
+  critical: {
+    label: "Critical",
+    dot: "bg-red-500",
+    glow: "shadow-[0_0_6px_rgba(239,68,68,0.5)]",
+    text: "text-red-400",
+  },
 };
 
 /* ── Analog card ──────────────────────────────────────── */
@@ -26,7 +42,9 @@ const AnalogCard: React.FC<{ param: PLCParameter }> = ({ param }) => {
         <span className="text-[11px] text-blue-200/80 uppercase tracking-[0.14em] font-medium">
           {param.label}
         </span>
-        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-white/[0.03] border border-white/[0.05] flex items-center gap-1 ${cfg.text}`}>
+        <span
+          className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-white/[0.03] border border-white/[0.05] flex items-center gap-1 ${cfg.text}`}
+        >
           <span className={`w-1 h-1 rounded-full ${cfg.dot} ${cfg.glow}`} />
           {cfg.label}
         </span>
@@ -58,11 +76,18 @@ const AnalogCard: React.FC<{ param: PLCParameter }> = ({ param }) => {
           />
         </div>
         <div className="flex justify-between mt-1">
-          <span className="text-[10px] text-blue-200/65 font-medium">{min}</span>
-          <span className="text-[9px] font-medium" style={{ color: `${param.accentHex}80` }}>
+          <span className="text-[10px] text-blue-200/65 font-medium">
+            {min}
+          </span>
+          <span
+            className="text-[9px] font-medium"
+            style={{ color: `${param.accentHex}80` }}
+          >
             {param.nominal?.toFixed(param.decimals ?? 1)} nom
           </span>
-          <span className="text-[10px] text-blue-200/65 font-medium">{max}</span>
+          <span className="text-[10px] text-blue-200/65 font-medium">
+            {max}
+          </span>
         </div>
       </div>
 
@@ -77,7 +102,10 @@ const AnalogCard: React.FC<{ param: PLCParameter }> = ({ param }) => {
 
 /* ── Digital card ─────────────────────────────────────── */
 
-const DigitalCard: React.FC<{ param: PLCParameter; onToggle?: () => void }> = ({ param, onToggle }) => {
+const DigitalCard: React.FC<{ param: PLCParameter; onToggle?: () => void }> = ({
+  param,
+  onToggle,
+}) => {
   const active = param.active ?? false;
   const hex = param.accentHex;
 
@@ -125,7 +153,9 @@ const DigitalCard: React.FC<{ param: PLCParameter; onToggle?: () => void }> = ({
           style={{
             borderColor: active ? hex : `${hex}30`,
             backgroundColor: active ? `${hex}18` : "transparent",
-            boxShadow: active ? `0 0 18px ${hex}40, 0 0 6px ${hex}20 inset` : "none",
+            boxShadow: active
+              ? `0 0 18px ${hex}40, 0 0 6px ${hex}20 inset`
+              : "none",
           }}
         >
           <div
@@ -151,7 +181,10 @@ const DigitalCard: React.FC<{ param: PLCParameter; onToggle?: () => void }> = ({
 
       {/* Bottom: signal bar */}
       <div className="relative z-10">
-        <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: `${hex}10` }}>
+        <div
+          className="w-full h-1.5 rounded-full overflow-hidden"
+          style={{ backgroundColor: `${hex}10` }}
+        >
           <div
             className="h-full rounded-full transition-all duration-500"
             style={{
@@ -245,25 +278,107 @@ const RelayCard: React.FC<{ param: PLCParameter }> = ({ param }) => {
 
 /* ── Main widget ───────────────────────────────────────── */
 
-const PLCParametersWidget: React.FC<{ className?: string }> = ({ className = "" }) => {
-  const { params, isConnected, sendCommand } = usePLCContext();
+const PLCParametersWidget: React.FC<{ className?: string }> = ({
+  className = "",
+}) => {
+  const params = usePLCStore((s) => s.params);
+  const { isConnected, sendCommand } = usePLCContext(false);
+  const displayParams = React.useMemo(
+    () =>
+      params.filter((p) =>
+        ["voltage", "current", "relay", "ph", "photoE", "metal"].includes(p.id),
+      ),
+    [params],
+  );
 
   return (
-    <div className={`card p-4 flex flex-col gap-2.5 animate-fade-in delay-2 ${className}`}>
+    <div
+      className={`card p-4 flex flex-col gap-2.5 animate-fade-in delay-2 ${className}`}
+    >
       {/* Header */}
       <div className="flex justify-between items-center flex-none">
         <div className="flex items-center gap-2.5">
           <div className="w-7 h-7 bg-gradient-to-br from-cyan-500/[0.12] to-blue-500/[0.06] rounded-lg flex items-center justify-center border border-cyan-400/[0.12] shadow-[0_0_10px_rgba(6,182,212,0.08)]">
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" className="opacity-70">
-              <rect x="4" y="4" width="8" height="8" rx="1" stroke="white" strokeWidth="1.2" />
-              <line x1="2" y1="6" x2="4" y2="6" stroke="white" strokeWidth="1" />
-              <line x1="2" y1="10" x2="4" y2="10" stroke="white" strokeWidth="1" />
-              <line x1="12" y1="6" x2="14" y2="6" stroke="white" strokeWidth="1" />
-              <line x1="12" y1="10" x2="14" y2="10" stroke="white" strokeWidth="1" />
-              <line x1="6" y1="2" x2="6" y2="4" stroke="white" strokeWidth="1" />
-              <line x1="10" y1="2" x2="10" y2="4" stroke="white" strokeWidth="1" />
-              <line x1="6" y1="12" x2="6" y2="14" stroke="white" strokeWidth="1" />
-              <line x1="10" y1="12" x2="10" y2="14" stroke="white" strokeWidth="1" />
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 16 16"
+              fill="none"
+              className="opacity-70"
+            >
+              <rect
+                x="4"
+                y="4"
+                width="8"
+                height="8"
+                rx="1"
+                stroke="white"
+                strokeWidth="1.2"
+              />
+              <line
+                x1="2"
+                y1="6"
+                x2="4"
+                y2="6"
+                stroke="white"
+                strokeWidth="1"
+              />
+              <line
+                x1="2"
+                y1="10"
+                x2="4"
+                y2="10"
+                stroke="white"
+                strokeWidth="1"
+              />
+              <line
+                x1="12"
+                y1="6"
+                x2="14"
+                y2="6"
+                stroke="white"
+                strokeWidth="1"
+              />
+              <line
+                x1="12"
+                y1="10"
+                x2="14"
+                y2="10"
+                stroke="white"
+                strokeWidth="1"
+              />
+              <line
+                x1="6"
+                y1="2"
+                x2="6"
+                y2="4"
+                stroke="white"
+                strokeWidth="1"
+              />
+              <line
+                x1="10"
+                y1="2"
+                x2="10"
+                y2="4"
+                stroke="white"
+                strokeWidth="1"
+              />
+              <line
+                x1="6"
+                y1="12"
+                x2="6"
+                y2="14"
+                stroke="white"
+                strokeWidth="1"
+              />
+              <line
+                x1="10"
+                y1="12"
+                x2="10"
+                y2="14"
+                stroke="white"
+                strokeWidth="1"
+              />
             </svg>
           </div>
           <h3 className="text-[13px] font-semibold text-blue-100/90 uppercase tracking-[0.15em]">
@@ -281,7 +396,7 @@ const PLCParametersWidget: React.FC<{ className?: string }> = ({ className = "" 
 
       {/* 2×3 grid */}
       <div className="grid grid-cols-2 gap-2 flex-grow overflow-hidden">
-        {params.map((p) =>
+        {displayParams.map((p) =>
           p.kind === "analog" ? (
             <AnalogCard key={p.id} param={p} />
           ) : p.kind === "relay" ? (
@@ -296,7 +411,7 @@ const PLCParametersWidget: React.FC<{ className?: string }> = ({ className = "" 
                   : undefined
               }
             />
-          )
+          ),
         )}
       </div>
 
@@ -305,11 +420,13 @@ const PLCParametersWidget: React.FC<{ className?: string }> = ({ className = "" 
         <span className="text-[11px] text-blue-200/65 uppercase tracking-[0.12em] font-medium">
           Modbus RTU · RS485 · 8-ch relay
         </span>
-        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${
-          isConnected
-            ? "bg-emerald-500/[0.06] border border-emerald-500/[0.10] text-emerald-400/80"
-            : "bg-amber-500/[0.06] border border-amber-500/[0.10] text-amber-400/80"
-        }`}>
+        <span
+          className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${
+            isConnected
+              ? "bg-emerald-500/[0.06] border border-emerald-500/[0.10] text-emerald-400/80"
+              : "bg-amber-500/[0.06] border border-amber-500/[0.10] text-amber-400/80"
+          }`}
+        >
           {isConnected ? "Online" : "Connecting..."}
         </span>
       </div>

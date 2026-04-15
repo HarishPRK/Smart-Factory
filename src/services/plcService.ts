@@ -4,15 +4,64 @@ import { plcParameters } from "../data/mockData";
 /* ── Raw MQTT payload from plc/data topic ────────────── */
 
 export interface RawPLCPayload {
-  voltage_pot: [number];
-  current_pot: [number];
-  photoE_sensor: [number];
-  metal_sensor: [number];
-  alerts: number[];
-  "8ch_relay_1": number[];
-  push_button: [number];
-  temperature: [number];
-  pH: [number];
+  [key: string]: number | number[] | [number] | undefined;
+  // New flat payload format
+  boardA_voltage_pot_1?: number;
+  boardA_current_pot?: number;
+  boardA_temperature?: number;
+  boardA_photoelectric_sensor?: number;
+  boardA_metal_sensor?: number;
+  boardA_green_push_button?: number;
+  boardA_alert_relays_red?: number;
+  boardA_alert_relays_yellow?: number;
+  boardA_alert_relays_green?: number;
+  boardA_alert_relays_buzzer?: number;
+  boardA_8ch_relay_motor?: number;
+  boardA_8ch_relay_alarm?: number;
+  boardA_voltage_pot_2?: number;
+  boardA_8ch_analog_1_pressure_sensor?: number;
+  boardA_8ch_analog_1_microwave_motion_sensor?: number;
+  boardA_8ch_analog_1_ph_sensor?: number;
+  boardA_8ch_analog_1_metaloxide_sensor?: number;
+  boardA_8ch_analog_1_turbidity_sensor?: number;
+  boardA_8ch_analog_1_light_sensor?: number;
+  boardA_8ch_analog_1_orp_sensor?: number;
+  boardB_8ch_io_metal_sensor?: number;
+  boardB_8ch_io_green_button?: number;
+  boardB_8ch_io_push_lock_button?: number;
+  boardB_8ch_io_output_red?: number;
+  boardB_8ch_io_output_yellow?: number;
+  boardB_8ch_io_output_green?: number;
+  boardB_8ch_io_output_buzzer?: number;
+  boardB_esp32_temperature?: number;
+  boardB_esp32_humidity?: number;
+  boardB_esp32_pressure?: number;
+  boardB_esp32_bme_gas?: number;
+  boardB_esp32_water?: number;
+  boardB_esp32_no2?: number;
+  boardB_esp32_alcohol?: number;
+  boardB_esp32_voc?: number;
+  boardB_esp32_co?: number;
+  boardB_esp32_finger_id?: number;
+  boardB_esp32_finger_conf?: number;
+  boardB_esp32_finger_match?: number;
+  boardB_esp32_touch_raw?: number;
+  boardB_esp32_touch_decoded?: number;
+  boardB_esp32_touch_event?: number;
+  boardB_esp32_distance_cm?: number;
+  boardB_esp32_lidar_strength?: number;
+  boardB_esp32_lidar_temp_c?: number;
+  boardB_esp32_oxygen_percent?: number;
+  // Legacy payload format (kept for compatibility)
+  voltage_pot?: [number];
+  current_pot?: [number];
+  photoE_sensor?: [number];
+  metal_sensor?: [number];
+  alerts?: number[];
+  "8ch_relay_1"?: number[];
+  push_button?: [number];
+  temperature?: [number];
+  pH?: [number];
 }
 
 /* ── Shared types ──────────────────────────────────────── */
@@ -21,6 +70,7 @@ export interface PLCOutputs {
   motorFanOn: boolean;
   emergencyLightOn: boolean;
   photoESensor: boolean;
+  metalSensor: boolean;
   relay: boolean[];
   pushButton: boolean;
   alerts: boolean[];
@@ -35,10 +85,26 @@ export const DEFAULT_OUTPUTS: PLCOutputs = {
   motorFanOn: false,
   emergencyLightOn: false,
   photoESensor: false,
+  metalSensor: false,
   relay: [false, false, false, false, false, false, false, false],
   pushButton: false,
   alerts: [false, false, false, false],
 };
+
+const PLC_DEBUG = import.meta.env.DEV || import.meta.env.VITE_PLC_DEBUG === "true";
+let lastPLCParseLogAt = 0;
+
+function plcDebug(message: string, details?: unknown) {
+  if (!PLC_DEBUG) return;
+  if (details === undefined) console.debug(`[PLC] ${message}`);
+  else console.debug(`[PLC] ${message}`, details);
+}
+
+function plcWarn(message: string, details?: unknown) {
+  if (!PLC_DEBUG) return;
+  if (details === undefined) console.warn(`[PLC] ${message}`);
+  else console.warn(`[PLC] ${message}`, details);
+}
 
 /* ── Payload parser ───────────────────────────────────── */
 
@@ -62,119 +128,905 @@ export function deriveRelayColor(photoEActive: boolean): string {
   return "#10b981";                     // green — idle
 }
 
-// Safe accessors for payload fields that might be null/undefined/missing
-function num(arr: unknown, fallback: number): number {
-  if (Array.isArray(arr) && arr.length > 0 && typeof arr[0] === "number") return arr[0];
-  return fallback;
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
 }
 
-function bit(arr: unknown, fallback: boolean): boolean {
-  if (Array.isArray(arr) && arr.length > 0) return arr[0] === 1;
-  return fallback;
+function scaleLinear(
+  value: number,
+  inMin: number,
+  inMax: number,
+  outMin: number,
+  outMax: number,
+): number {
+  if (inMax === inMin) return outMin;
+  const normalized = (value - inMin) / (inMax - inMin);
+  return outMin + clamp(normalized, 0, 1) * (outMax - outMin);
 }
 
-function bits(arr: unknown, len: number): boolean[] {
-  if (Array.isArray(arr)) return Array.from({ length: len }, (_, i) => arr[i] === 1);
-  return Array(len).fill(false);
+function scalar(rawValue: unknown): number | null {
+  if (typeof rawValue === "number" && Number.isFinite(rawValue)) return rawValue;
+  if (
+    Array.isArray(rawValue) &&
+    rawValue.length > 0 &&
+    typeof rawValue[0] === "number" &&
+    Number.isFinite(rawValue[0])
+  ) {
+    return rawValue[0];
+  }
+  return null;
 }
 
-/** Helper to look up the last value of an analog param by id. */
+function prevParam(prev: PLCState | null, id: string) {
+  return prev?.params.find((p) => p.id === id);
+}
+
 function prevNum(prev: PLCState | null, id: string, fallback: number): number {
-  const p = prev?.params.find((p) => p.id === id);
-  return p?.value ?? fallback;
+  return prevParam(prev, id)?.value ?? fallback;
 }
 
 function prevBit(prev: PLCState | null, id: string, fallback: boolean): boolean {
-  const p = prev?.params.find((p) => p.id === id);
-  return p?.active ?? fallback;
+  return prevParam(prev, id)?.active ?? fallback;
+}
+
+function prevKnown(prev: PLCState | null, id: string): boolean {
+  const param = prevParam(prev, id);
+  return !!param && !param.placeholder;
+}
+
+function readSignal(
+  raw: RawPLCPayload,
+  keys: string[],
+  prevValue: number,
+  prevHasReal = false,
+): { value: number; hasReal: boolean } {
+  for (const key of keys) {
+    const value = scalar(raw[key]);
+    if (value == null || value === -1) continue;
+    return { value, hasReal: true };
+  }
+  return { value: prevHasReal ? prevValue : 0, hasReal: prevHasReal };
+}
+
+function readScaledSignal(
+  raw: RawPLCPayload,
+  keys: string[],
+  prevValue: number,
+  prevHasReal: boolean,
+  mapper: (value: number, key: string) => number,
+): { value: number; hasReal: boolean } {
+  for (const key of keys) {
+    const value = scalar(raw[key]);
+    if (value == null || value === -1) continue;
+    return { value: mapper(value, key), hasReal: true };
+  }
+  return { value: prevHasReal ? prevValue : 0, hasReal: prevHasReal };
+}
+
+function readBitSignal(
+  raw: RawPLCPayload,
+  keys: string[],
+  prevValue: boolean,
+  prevHasReal = false,
+): { value: boolean; hasReal: boolean } {
+  const resolved = readSignal(raw, keys, prevValue ? 1 : 0, prevHasReal);
+  return { value: resolved.value >= 0.5, hasReal: resolved.hasReal };
+}
+
+function readArrayBitSignal(
+  raw: RawPLCPayload,
+  arrayKey: string,
+  index: number,
+  prevValue: boolean,
+  prevHasReal = false,
+): { value: boolean; hasReal: boolean } {
+  const arr = raw[arrayKey];
+  if (
+    Array.isArray(arr) &&
+    arr.length > index &&
+    typeof arr[index] === "number" &&
+    Number.isFinite(arr[index]) &&
+    arr[index] !== -1
+  ) {
+    return { value: arr[index] >= 0.5, hasReal: true };
+  }
+  return { value: prevHasReal ? prevValue : false, hasReal: prevHasReal };
+}
+
+function collectFallbackDebug(
+  raw: RawPLCPayload,
+  label: string,
+  keys: string[],
+  hasReal: boolean,
+  value: number | boolean,
+  debugEvents: string[],
+) {
+  if (hasReal) return;
+  const touchedKeys = keys.filter((key) => raw[key] !== undefined);
+  if (touchedKeys.length === 0) return;
+  const usedUnsetValue = touchedKeys.some((key) => scalar(raw[key]) === -1);
+  debugEvents.push(
+    `${label}: ${usedUnsetValue ? "unset(-1)" : "missing/invalid"} from ${touchedKeys.join(", ")} -> fallback ${value}`,
+  );
+}
+
+function analogParam(config: {
+  id: string;
+  label: string;
+  value: number;
+  hasReal: boolean;
+  unit: string;
+  min: number;
+  max: number;
+  nominal: number;
+  decimals: number;
+  accentHex: string;
+}): PLCParameter {
+  return {
+    id: config.id,
+    label: config.label,
+    kind: "analog",
+    value: config.value,
+    unit: config.unit,
+    min: config.min,
+    max: config.max,
+    nominal: config.nominal,
+    decimals: config.decimals,
+    accentHex: config.accentHex,
+    status: config.hasReal
+      ? deriveStatus(config.value, config.nominal, config.min, config.max)
+      : "normal",
+    placeholder: !config.hasReal,
+  };
+}
+
+function digitalParam(config: {
+  id: string;
+  label: string;
+  active: boolean;
+  hasReal: boolean;
+  accentHex: string;
+}): PLCParameter {
+  return {
+    id: config.id,
+    label: config.label,
+    kind: "digital",
+    active: config.active,
+    accentHex: config.accentHex,
+    status: "normal",
+    placeholder: !config.hasReal,
+  };
+}
+
+export function isRawPLCPayload(data: unknown): data is RawPLCPayload {
+  if (!data || typeof data !== "object") return false;
+  const raw = data as Record<string, unknown>;
+  return [
+    "boardA_voltage_pot_1",
+    "boardA_current_pot",
+    "boardA_photoelectric_sensor",
+    "boardA_8ch_analog_1_ph_sensor",
+    "voltage_pot",
+    "current_pot",
+    "photoE_sensor",
+    "pH",
+  ].some((key) => raw[key] !== undefined);
 }
 
 /** Map the raw MQTT JSON from plc/data into our frontend PLCState. */
 export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLCState {
-  const relay = bits(raw["8ch_relay_1"], 8);
+  const prevState = prev ?? null;
+  const debugEvents: string[] = [];
 
-  const v = num(raw.voltage_pot, prevNum(prev ?? null, "voltage", 0));
-  const c = num(raw.current_pot, prevNum(prev ?? null, "current", 0));
-  const ph = num(raw.pH, prevNum(prev ?? null, "ph", 7));
-  const photoEActive = bit(raw.photoE_sensor, prevBit(prev ?? null, "photoE", false));
-  const metalActive = bit(raw.metal_sensor, prevBit(prev ?? null, "metal", false));
-  const sensorTriggered = photoEActive || metalActive;
+  const voltage = readSignal(
+    raw,
+    ["boardA_voltage_pot_1", "voltage_pot"],
+    prevNum(prevState, "voltage", 0),
+    prevKnown(prevState, "voltage"),
+  );
+  const current = readSignal(
+    raw,
+    ["boardA_current_pot", "current_pot"],
+    prevNum(prevState, "current", 0),
+    prevKnown(prevState, "current"),
+  );
+  const temperature = readSignal(
+    raw,
+    ["boardA_temperature", "boardB_esp32_temperature", "temperature"],
+    prevNum(prevState, "temperature", 0),
+    prevKnown(prevState, "temperature"),
+  );
+  const ph = readSignal(
+    raw,
+    ["boardA_8ch_analog_1_ph_sensor", "pH"],
+    prevNum(prevState, "ph", 7),
+    prevKnown(prevState, "ph"),
+  );
+  const photoE = readBitSignal(
+    raw,
+    ["boardA_photoelectric_sensor", "photoE_sensor"],
+    prevBit(prevState, "photoE", false),
+    prevKnown(prevState, "photoE"),
+  );
+  const metal = readBitSignal(
+    raw,
+    ["boardA_metal_sensor", "boardB_8ch_io_metal_sensor", "metal_sensor"],
+    prevBit(prevState, "metal", false),
+    prevKnown(prevState, "metal"),
+  );
+  const pushButton = readBitSignal(
+    raw,
+    [
+      "boardA_green_push_button",
+      "boardB_8ch_io_green_button",
+      "boardB_8ch_io_push_lock_button",
+      "push_button",
+    ],
+    prevState?.outputs.pushButton ?? false,
+    prevState?.outputs.pushButton !== undefined,
+  );
+  const motorRelay = (() => {
+    const direct = readBitSignal(
+      raw,
+      ["boardA_8ch_relay_motor"],
+      prevState?.outputs.motorFanOn ?? false,
+      prevState != null,
+    );
+    return direct.hasReal
+      ? direct
+      : readArrayBitSignal(
+          raw,
+          "8ch_relay_1",
+          0,
+          prevState?.outputs.motorFanOn ?? false,
+          prevState != null,
+        );
+  })();
+  const alarmRelay = (() => {
+    const direct = readBitSignal(
+      raw,
+      ["boardA_8ch_relay_alarm"],
+      prevState?.outputs.relay?.[1] ?? false,
+      prevState != null,
+    );
+    if (direct.hasReal) return direct;
+    const legacyRelay = readArrayBitSignal(
+      raw,
+      "8ch_relay_1",
+      1,
+      prevState?.outputs.relay?.[1] ?? false,
+      prevState != null,
+    );
+    return legacyRelay.hasReal
+      ? legacyRelay
+      : readArrayBitSignal(
+          raw,
+          "alerts",
+          3,
+          prevState?.outputs.alerts?.[3] ?? false,
+          prevState != null,
+        );
+  })();
+  const alertRed = (() => {
+    const direct = readBitSignal(
+      raw,
+      ["boardA_alert_relays_red", "boardB_8ch_io_output_red"],
+      prevState?.outputs.alerts?.[0] ?? false,
+      prevState != null,
+    );
+    return direct.hasReal
+      ? direct
+      : readArrayBitSignal(
+          raw,
+          "alerts",
+          0,
+          prevState?.outputs.alerts?.[0] ?? false,
+          prevState != null,
+        );
+  })();
+  const alertYellow = (() => {
+    const direct = readBitSignal(
+      raw,
+      ["boardA_alert_relays_yellow", "boardB_8ch_io_output_yellow"],
+      prevState?.outputs.alerts?.[1] ?? false,
+      prevState != null,
+    );
+    return direct.hasReal
+      ? direct
+      : readArrayBitSignal(
+          raw,
+          "alerts",
+          1,
+          prevState?.outputs.alerts?.[1] ?? false,
+          prevState != null,
+        );
+  })();
+  const alertGreen = readBitSignal(
+    raw,
+    ["boardA_alert_relays_green", "boardB_8ch_io_output_green"],
+    prevState?.outputs.relay?.[4] ?? false,
+    prevState != null,
+  );
+  const alertBuzzer = (() => {
+    const direct = readBitSignal(
+      raw,
+      ["boardA_alert_relays_buzzer", "boardB_8ch_io_output_buzzer"],
+      prevState?.outputs.alerts?.[2] ?? false,
+      prevState != null,
+    );
+    return direct.hasReal
+      ? direct
+      : readArrayBitSignal(
+          raw,
+          "alerts",
+          2,
+          prevState?.outputs.alerts?.[2] ?? false,
+          prevState != null,
+        );
+  })();
+
+  const formingPressure = readScaledSignal(
+    raw,
+    ["boardA_8ch_analog_1_pressure_sensor", "boardB_esp32_pressure"],
+    prevNum(prevState, "forming_pressure", 0),
+    prevKnown(prevState, "forming_pressure"),
+    (value, key) =>
+      key === "boardB_esp32_pressure" && value <= 200
+        ? value
+        : scaleLinear(value, 0, 3200, 0, 200),
+  );
+  const microwaveMotion = readScaledSignal(
+    raw,
+    ["boardA_8ch_analog_1_microwave_motion_sensor", "boardB_esp32_touch_event"],
+    prevNum(prevState, "curing_motion", 0),
+    prevKnown(prevState, "curing_motion"),
+    (value) => (value <= 1 ? value : scaleLinear(value, 0, 4095, 0, 1)),
+  );
+  const mqGas = readScaledSignal(
+    raw,
+    [
+      "boardA_8ch_analog_1_metaloxide_sensor",
+      "boardB_esp32_bme_gas",
+      "boardB_esp32_voc",
+      "boardB_esp32_co",
+      "boardB_esp32_no2",
+      "boardB_esp32_alcohol",
+    ],
+    prevNum(prevState, "mixing_mq", 0),
+    prevKnown(prevState, "mixing_mq"),
+    (value, key) => {
+      if (key.startsWith("boardB_esp32_") && value <= 1000) return value;
+      if (value <= 100) return value;
+      return scaleLinear(value, 0, 5000, 0, 100);
+    },
+  );
+  const turbidity = readScaledSignal(
+    raw,
+    ["boardA_8ch_analog_1_turbidity_sensor"],
+    prevNum(prevState, "mixing_turbidity", 0),
+    prevKnown(prevState, "mixing_turbidity"),
+    (value) => (value <= 100 ? value : scaleLinear(value, 0, 5000, 0, 50)),
+  );
+  const light = readScaledSignal(
+    raw,
+    ["boardA_8ch_analog_1_light_sensor"],
+    prevNum(prevState, "forming_light", 0),
+    prevKnown(prevState, "forming_light"),
+    (value) => (value <= 1000 ? value : scaleLinear(value, 0, 5000, 0, 1000)),
+  );
+  const orp = readScaledSignal(
+    raw,
+    ["boardA_8ch_analog_1_orp_sensor"],
+    prevNum(prevState, "mixing_orp", 0),
+    prevKnown(prevState, "mixing_orp"),
+    (value) =>
+      value >= -500 && value <= 500 ? value : scaleLinear(value, 0, 5000, 0, 400),
+  );
+  const oxygen = readScaledSignal(
+    raw,
+    ["boardB_esp32_oxygen_percent"],
+    prevNum(prevState, "curing_o2", 0),
+    prevKnown(prevState, "curing_o2"),
+    (value) => (value <= 25 ? value : scaleLinear(value, 0, 5000, 0, 25)),
+  );
+  const lidar = readScaledSignal(
+    raw,
+    ["boardB_esp32_distance_cm"],
+    prevNum(prevState, "quality_lidar", 0),
+    prevKnown(prevState, "quality_lidar"),
+    (value) => (value <= 50 ? value : scaleLinear(value, 0, 100, 0, 50)),
+  );
+  const fingerprint = readScaledSignal(
+    raw,
+    ["boardB_esp32_finger_match", "boardB_esp32_finger_conf", "boardB_esp32_finger_id"],
+    prevNum(prevState, "intake_fingerprint", 0),
+    prevKnown(prevState, "intake_fingerprint"),
+    (value) => (value <= 1 ? value : value > 0 ? 1 : 0),
+  );
+  const water = readScaledSignal(
+    raw,
+    ["boardB_esp32_water"],
+    prevNum(prevState, "pkg_water", 0),
+    prevKnown(prevState, "pkg_water"),
+    (value) => (value <= 1 ? value : scaleLinear(value, 0, 5000, 0, 1)),
+  );
+  const auxGps = readScaledSignal(
+    raw,
+    ["boardA_voltage_pot_2"],
+    prevNum(prevState, "intake_gps", 0),
+    prevKnown(prevState, "intake_gps"),
+    (value) => (value <= 5 ? scaleLinear(value, 0, 5, 0, 100) : scaleLinear(value, 0, 5000, 0, 100)),
+  );
+
+  collectFallbackDebug(
+    raw,
+    "voltage",
+    ["boardA_voltage_pot_1", "voltage_pot"],
+    voltage.hasReal,
+    voltage.value,
+    debugEvents,
+  );
+  collectFallbackDebug(
+    raw,
+    "current",
+    ["boardA_current_pot", "current_pot"],
+    current.hasReal,
+    current.value,
+    debugEvents,
+  );
+  collectFallbackDebug(
+    raw,
+    "temperature",
+    ["boardA_temperature", "boardB_esp32_temperature", "temperature"],
+    temperature.hasReal,
+    temperature.value,
+    debugEvents,
+  );
+  collectFallbackDebug(
+    raw,
+    "photoelectric",
+    ["boardA_photoelectric_sensor", "photoE_sensor"],
+    photoE.hasReal,
+    photoE.value,
+    debugEvents,
+  );
+  collectFallbackDebug(
+    raw,
+    "metal",
+    ["boardA_metal_sensor", "boardB_8ch_io_metal_sensor", "metal_sensor"],
+    metal.hasReal,
+    metal.value,
+    debugEvents,
+  );
+  collectFallbackDebug(
+    raw,
+    "push_button",
+    [
+      "boardA_green_push_button",
+      "boardB_8ch_io_green_button",
+      "boardB_8ch_io_push_lock_button",
+      "push_button",
+    ],
+    pushButton.hasReal,
+    pushButton.value,
+    debugEvents,
+  );
+  collectFallbackDebug(
+    raw,
+    "forming_pressure",
+    ["boardA_8ch_analog_1_pressure_sensor", "boardB_esp32_pressure"],
+    formingPressure.hasReal,
+    formingPressure.value,
+    debugEvents,
+  );
+  collectFallbackDebug(
+    raw,
+    "mixing_ph",
+    ["boardA_8ch_analog_1_ph_sensor", "pH"],
+    ph.hasReal,
+    ph.value,
+    debugEvents,
+  );
+  collectFallbackDebug(
+    raw,
+    "mixing_mq",
+    [
+      "boardA_8ch_analog_1_metaloxide_sensor",
+      "boardB_esp32_bme_gas",
+      "boardB_esp32_voc",
+      "boardB_esp32_co",
+      "boardB_esp32_no2",
+      "boardB_esp32_alcohol",
+    ],
+    mqGas.hasReal,
+    mqGas.value,
+    debugEvents,
+  );
+  collectFallbackDebug(
+    raw,
+    "quality_lidar",
+    ["boardB_esp32_distance_cm"],
+    lidar.hasReal,
+    lidar.value,
+    debugEvents,
+  );
+
+  const relayAccent = alertRed.value || alertBuzzer.value || alarmRelay.value
+    ? "#ef4444"
+    : alertYellow.value
+      ? "#f59e0b"
+      : alertGreen.value
+        ? "#10b981"
+        : "#64748b";
+  const relayStatus = alertRed.value || alertBuzzer.value || alarmRelay.value
+    ? "critical"
+    : alertYellow.value
+      ? "warning"
+      : "normal";
 
   const params: PLCParameter[] = [
-    {
+    analogParam({
       id: "voltage",
       label: "Voltage",
-      kind: "analog",
-      value: v,
+      value: voltage.value,
+      hasReal: voltage.hasReal,
       unit: "V",
       min: 0,
       max: 12,
       nominal: 5.0,
       decimals: 1,
       accentHex: "#f59e0b",
-      status: deriveStatus(v, 5.0, 0, 12),
-    },
-    {
+    }),
+    analogParam({
       id: "current",
       label: "Current",
-      kind: "analog",
-      value: c,
+      value: current.value,
+      hasReal: current.hasReal,
       unit: "A",
       min: 0,
       max: 10,
       nominal: 6.0,
       decimals: 1,
       accentHex: "#06b6d4",
-      status: deriveStatus(c, 6.0, 0, 10),
-    },
+    }),
     {
       id: "relay",
       label: "Relay",
       kind: "relay",
       active: true,
-      accentHex: deriveRelayColor(sensorTriggered),
-      status: "normal",
+      accentHex: relayAccent,
+      status: relayStatus,
+      placeholder: false,
     },
-    {
+    analogParam({
       id: "ph",
       label: "pH",
-      kind: "analog",
-      value: ph,
+      value: ph.value,
+      hasReal: ph.hasReal,
       unit: "",
       min: 0,
       max: 14,
       nominal: 7.0,
       decimals: 1,
       accentHex: "#8b5cf6",
-      status: deriveStatus(ph, 7.0, 0, 14),
-    },
-    {
+    }),
+    digitalParam({
       id: "photoE",
       label: "Photo-E",
-      kind: "digital",
-      active: photoEActive,
+      active: photoE.value,
+      hasReal: photoE.hasReal,
       accentHex: "#10b981",
-      status: "normal",
-    },
-    {
+    }),
+    digitalParam({
       id: "metal",
       label: "Metal Det.",
-      kind: "digital",
-      active: metalActive,
+      active: metal.value,
+      hasReal: metal.hasReal,
       accentHex: "#f97316",
-      status: "normal",
-    },
+    }),
+    analogParam({
+      id: "temperature",
+      label: "Temperature",
+      value: temperature.value,
+      hasReal: temperature.hasReal,
+      unit: "°C",
+      min: 0,
+      max: 100,
+      nominal: 25,
+      decimals: 1,
+      accentHex: "#ef4444",
+    }),
+    analogParam({
+      id: "mixing_ph",
+      label: "Mixing pH",
+      value: ph.value,
+      hasReal: ph.hasReal,
+      unit: "",
+      min: 0,
+      max: 14,
+      nominal: 7,
+      decimals: 1,
+      accentHex: "#8b5cf6",
+    }),
+    analogParam({
+      id: "mixing_orp",
+      label: "Mixing ORP",
+      value: orp.value,
+      hasReal: orp.hasReal,
+      unit: "mV",
+      min: -500,
+      max: 500,
+      nominal: 200,
+      decimals: 0,
+      accentHex: "#22c55e",
+    }),
+    analogParam({
+      id: "mixing_turbidity",
+      label: "Mixing Turbidity",
+      value: turbidity.value,
+      hasReal: turbidity.hasReal,
+      unit: "NTU",
+      min: 0,
+      max: 100,
+      nominal: 15,
+      decimals: 1,
+      accentHex: "#06b6d4",
+    }),
+    analogParam({
+      id: "mixing_mq",
+      label: "Mixing MQ Gas",
+      value: mqGas.value,
+      hasReal: mqGas.hasReal,
+      unit: "ppm",
+      min: 0,
+      max: 1000,
+      nominal: 50,
+      decimals: 1,
+      accentHex: "#f97316",
+    }),
+    analogParam({
+      id: "forming_pressure",
+      label: "Forming Pressure",
+      value: formingPressure.value,
+      hasReal: formingPressure.hasReal,
+      unit: "bar",
+      min: 0,
+      max: 200,
+      nominal: 65,   // Normal operating range is 60–80 bar
+      decimals: 1,
+      accentHex: "#3b82f6",
+    }),
+    analogParam({
+      id: "forming_light",
+      label: "Forming Light",
+      value: light.value,
+      hasReal: light.hasReal,
+      unit: "lux",
+      min: 0,
+      max: 1000,
+      nominal: 500,
+      decimals: 0,
+      accentHex: "#eab308",
+    }),
+    analogParam({
+      id: "curing_o2",
+      label: "Curing O2",
+      value: oxygen.value,
+      hasReal: oxygen.hasReal,
+      unit: "%",
+      min: 0,
+      max: 25,
+      nominal: 20.9,
+      decimals: 1,
+      accentHex: "#10b981",
+    }),
+    analogParam({
+      id: "curing_mq",
+      label: "Curing MQ Gas",
+      value: mqGas.value,
+      hasReal: mqGas.hasReal,
+      unit: "ppm",
+      min: 0,
+      max: 1000,
+      nominal: 30,
+      decimals: 1,
+      accentHex: "#f59e0b",
+    }),
+    analogParam({
+      id: "curing_motion",
+      label: "Curing Motion",
+      value: microwaveMotion.value,
+      hasReal: microwaveMotion.hasReal,
+      unit: "",
+      min: 0,
+      max: 1,
+      nominal: 0,
+      decimals: 1,
+      accentHex: "#22c55e",
+    }),
+    analogParam({
+      id: "quality_lidar",
+      label: "Quality LiDAR",
+      value: lidar.value,
+      hasReal: lidar.hasReal,
+      unit: "mm",
+      min: 0,
+      max: 50,
+      nominal: 0.5,
+      decimals: 1,
+      accentHex: "#f59e0b",
+    }),
+    analogParam({
+      id: "quality_light",
+      label: "Quality Light",
+      value: light.value,
+      hasReal: light.hasReal,
+      unit: "lux",
+      min: 0,
+      max: 1000,
+      nominal: 600,
+      decimals: 0,
+      accentHex: "#eab308",
+    }),
+    analogParam({
+      id: "quality_turbidity",
+      label: "Quality Turbidity",
+      value: turbidity.value,
+      hasReal: turbidity.hasReal,
+      unit: "NTU",
+      min: 0,
+      max: 100,
+      nominal: 5,
+      decimals: 1,
+      accentHex: "#06b6d4",
+    }),
+    analogParam({
+      id: "pkg_motion",
+      label: "Packaging Motion",
+      value: microwaveMotion.value,
+      hasReal: microwaveMotion.hasReal,
+      unit: "",
+      min: 0,
+      max: 1,
+      nominal: 0,
+      decimals: 1,
+      accentHex: "#22c55e",
+    }),
+    analogParam({
+      id: "pkg_pressure",
+      label: "Packaging Pressure",
+      value: formingPressure.value,
+      hasReal: formingPressure.hasReal,
+      unit: "bar",
+      min: 0,
+      max: 100,
+      nominal: 65,   // Normal operating range is 60–80 bar
+      decimals: 1,
+      accentHex: "#3b82f6",
+    }),
+    analogParam({
+      id: "pkg_water",
+      label: "Packaging Water",
+      value: water.value,
+      hasReal: water.hasReal,
+      unit: "",
+      min: 0,
+      max: 1,
+      nominal: 0,
+      decimals: 1,
+      accentHex: "#0ea5e9",
+    }),
+    analogParam({
+      id: "intake_gps",
+      label: "Intake GPS",
+      value: auxGps.value,
+      hasReal: auxGps.hasReal,
+      unit: "m",
+      min: 0,
+      max: 100,
+      nominal: 50,
+      decimals: 1,
+      accentHex: "#22c55e",
+    }),
+    analogParam({
+      id: "dispatch_gps",
+      label: "Dispatch GPS",
+      value: auxGps.value,
+      hasReal: auxGps.hasReal,
+      unit: "m",
+      min: 0,
+      max: 100,
+      nominal: 50,
+      decimals: 1,
+      accentHex: "#22c55e",
+    }),
+    analogParam({
+      id: "intake_lidar",
+      label: "Intake LiDAR",
+      value: lidar.value,
+      hasReal: lidar.hasReal,
+      unit: "mm",
+      min: 0,
+      max: 50,
+      nominal: 25,
+      decimals: 1,
+      accentHex: "#f59e0b",
+    }),
+    analogParam({
+      id: "intake_fingerprint",
+      label: "Intake Fingerprint",
+      value: fingerprint.value,
+      hasReal: fingerprint.hasReal,
+      unit: "",
+      min: 0,
+      max: 1,
+      nominal: 1,
+      decimals: 1,
+      accentHex: "#10b981",
+    }),
+    analogParam({
+      id: "dispatch_fingerprint",
+      label: "Dispatch Fingerprint",
+      value: fingerprint.value,
+      hasReal: fingerprint.hasReal,
+      unit: "",
+      min: 0,
+      max: 1,
+      nominal: 1,
+      decimals: 1,
+      accentHex: "#10b981",
+    }),
   ];
+
+  const relay = [
+    motorRelay.value,
+    alarmRelay.value,
+    alertRed.value,
+    alertYellow.value,
+    alertGreen.value,
+    alertBuzzer.value,
+    pushButton.value,
+    metal.value,
+  ];
+
+  if (debugEvents.length > 0) {
+    plcWarn("Fallbacks applied for plc/data payload", debugEvents);
+  }
+
+  const now = Date.now();
+  if (PLC_DEBUG && now - lastPLCParseLogAt > 1000) {
+    lastPLCParseLogAt = now;
+    plcDebug("Parsed plc/data payload", {
+      keys: Object.keys(raw),
+      analog: {
+        voltage: voltage.value,
+        current: current.value,
+        temperature: temperature.value,
+        ph: ph.value,
+        pressure: formingPressure.value,
+        mqGas: mqGas.value,
+      },
+      outputs: {
+        motorFanOn: motorRelay.value,
+        emergencyLightOn: alarmRelay.value || alertRed.value || alertBuzzer.value,
+        photoESensor: photoE.value,
+        metalSensor: metal.value,
+        pushButton: pushButton.value,
+        alerts: [alertRed.value, alertYellow.value, alertBuzzer.value, alarmRelay.value],
+      },
+    });
+  }
 
   return {
     params,
     outputs: {
-      motorFanOn: relay[0] || sensorTriggered,
-      emergencyLightOn: relay[1],
-      photoESensor: photoEActive,
+      motorFanOn: motorRelay.value,
+      emergencyLightOn: alarmRelay.value || alertRed.value || alertBuzzer.value,
+      photoESensor: photoE.value,
+      metalSensor: metal.value,
       relay,
-      pushButton: bit(raw.push_button, prev?.outputs.pushButton ?? false),
-      alerts: bits(raw.alerts, 4),
+      pushButton: pushButton.value,
+      alerts: [alertRed.value, alertYellow.value, alertBuzzer.value, alarmRelay.value],
     },
   };
 }
@@ -196,6 +1048,7 @@ export class MockPLCService implements PLCService {
     // Derive initial motor fan state from Photo-E default
     motorFanOn: plcParameters.find((p) => p.id === "photoE")?.active ?? false,
     photoESensor: plcParameters.find((p) => p.id === "photoE")?.active ?? false,
+    metalSensor: plcParameters.find((p) => p.id === "metal")?.active ?? false,
   };
   private listeners: Set<(state: PLCState) => void> = new Set();
 
@@ -236,6 +1089,8 @@ export class MockPLCService implements PLCService {
             i === relayIdx ? { ...p, accentHex: deriveRelayColor(newActive) } : p
           );
         }
+      } else if (deviceId === "metal") {
+        this.outputs = { ...this.outputs, metalSensor: newActive };
       }
 
       this.notify();
@@ -549,7 +1404,7 @@ export class AWSPLCService implements PLCService {
     this.ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        const isRaw = data.voltage_pot !== undefined;
+        const isRaw = isRawPLCPayload(data);
         this.pendingData = data;
         this.pendingIsRaw = isRaw;
 
@@ -649,7 +1504,9 @@ export class MosquittoPLCService implements PLCService {
     if (rawPayload) {
       this.ws.send(JSON.stringify({ topic, payload: rawPayload }));
     } else {
-      const { _topic, ...rest } = command;
+      const rest = { ...command };
+      delete (rest as { _topic?: unknown })._topic;
+      delete (rest as { _rawPayload?: unknown })._rawPayload;
       this.ws.send(JSON.stringify({ topic, payload: { deviceId, ...rest } }));
     }
   }

@@ -14,15 +14,75 @@ let _onTargetReached: (() => void) | null = null;
 let _autoTourActive = false;
 let _autoTourStep = 0;
 
-const TOUR_STOPS: { position: [number, number, number]; lookAt: [number, number, number]; dwell: number; label: string }[] = [
+const TOUR_STOPS: {
+  position: [number, number, number];
+  lookAt: [number, number, number];
+  dwell: number;
+  label: string;
+}[] = [
   { position: [18, 14, 18], lookAt: [0, 0, 0], dwell: 3, label: "Overview" },
-  { position: [STAGE_POSITIONS.intake[0] - 6, 3, STAGE_POSITIONS.intake[2] + 5], lookAt: STAGE_POSITIONS.intake, dwell: 4, label: "Raw Material Intake" },
-  { position: [STAGE_POSITIONS.mixing[0] + 3, 2.5, STAGE_POSITIONS.mixing[2] + 3], lookAt: STAGE_POSITIONS.mixing, dwell: 4, label: "Chemical Mixing" },
-  { position: [STAGE_POSITIONS.forming[0] - 2, 3, STAGE_POSITIONS.forming[2] + 4], lookAt: STAGE_POSITIONS.forming, dwell: 4, label: "Blow Molding" },
-  { position: [STAGE_POSITIONS.curing[0] + 3, 2, STAGE_POSITIONS.curing[2] + 3], lookAt: STAGE_POSITIONS.curing, dwell: 4, label: "Cooling & Curing" },
-  { position: [STAGE_POSITIONS.quality[0] - 3, 2.5, STAGE_POSITIONS.quality[2] + 4], lookAt: STAGE_POSITIONS.quality, dwell: 4, label: "Quality Inspection" },
-  { position: [STAGE_POSITIONS.packaging[0] + 3, 3, STAGE_POSITIONS.packaging[2] + 3], lookAt: STAGE_POSITIONS.packaging, dwell: 3, label: "Packaging" },
-  { position: [STAGE_POSITIONS.dispatch[0] + 5, 4, STAGE_POSITIONS.dispatch[2] + 5], lookAt: STAGE_POSITIONS.dispatch, dwell: 4, label: "Dispatch" },
+  {
+    position: [STAGE_POSITIONS.intake[0] - 6, 3, STAGE_POSITIONS.intake[2] + 5],
+    lookAt: STAGE_POSITIONS.intake,
+    dwell: 4,
+    label: "Raw Material Intake",
+  },
+  {
+    position: [
+      STAGE_POSITIONS.forming[0] - 2,
+      3,
+      STAGE_POSITIONS.forming[2] + 4,
+    ],
+    lookAt: STAGE_POSITIONS.forming,
+    dwell: 4,
+    label: "Bottle Blow Molding",
+  },
+  {
+    position: [
+      STAGE_POSITIONS.mixing[0] + 3,
+      2.5,
+      STAGE_POSITIONS.mixing[2] + 3,
+    ],
+    lookAt: STAGE_POSITIONS.mixing,
+    dwell: 4,
+    label: "Coca-Cola Filling",
+  },
+  {
+    position: [STAGE_POSITIONS.curing[0] + 3, 2, STAGE_POSITIONS.curing[2] + 3],
+    lookAt: STAGE_POSITIONS.curing,
+    dwell: 4,
+    label: "Cooling Tunnel",
+  },
+  {
+    position: [
+      STAGE_POSITIONS.quality[0] - 3,
+      2.5,
+      STAGE_POSITIONS.quality[2] + 4,
+    ],
+    lookAt: STAGE_POSITIONS.quality,
+    dwell: 4,
+    label: "Quality Inspection",
+  },
+  {
+    position: [
+      STAGE_POSITIONS.packaging[0] + 3,
+      3,
+      STAGE_POSITIONS.packaging[2] + 3,
+    ],
+    lookAt: STAGE_POSITIONS.packaging,
+    dwell: 3,
+    label: "Packaging",
+  },
+  {
+    position: [
+      STAGE_POSITIONS.dispatch[0] + 5,
+      4,
+      STAGE_POSITIONS.dispatch[2] + 5,
+    ],
+    lookAt: STAGE_POSITIONS.dispatch,
+    dwell: 4,
+    label: "Dispatch",
+  },
   { position: [0, 22, 1], lookAt: [0, 0, 0], dwell: 3, label: "Bird's Eye" },
   { position: [-12, 6, 10], lookAt: [0, 0, 0], dwell: 3, label: "Cinematic" },
 ];

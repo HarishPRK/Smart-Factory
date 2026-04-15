@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { usePLCContext } from "../context/PLCContext";
+import { usePLCStore } from "../stores/plcStore";
 
 /* ── Web Audio motor hum generator ───────────────────── */
 
@@ -76,21 +77,33 @@ interface MotorFanWidgetProps {
 }
 
 const MotorFanWidget: React.FC<MotorFanWidgetProps> = ({ className = "" }) => {
-  const { outputs, sendCommand } = usePLCContext();
+  const { sendCommand } = usePLCContext(false);
+  const motorFanOn = usePLCStore((s) => s.motorFanOn);
   const [manualOn, setManualOn] = useState(false);
   // ON if manually toggled OR PLC says motor is on (Photo-E triggered)
-  const isOn = manualOn || outputs.motorFanOn;
-  const [showBanner, setShowBanner] = useState(false);
+  const isOn = manualOn || motorFanOn;
+  const [bannerEpoch, setBannerEpoch] = useState(0);
+  const [dismissedBannerEpoch, setDismissedBannerEpoch] = useState(0);
   const motorSoundRef = useRef<{ stop: () => void } | null>(null);
+
+  const showBanner = isOn && dismissedBannerEpoch !== bannerEpoch;
+
+  useEffect(() => {
+    if (!isOn) return;
+
+    const frameId = requestAnimationFrame(() => {
+      setBannerEpoch((current) => current + 1);
+    });
+
+    return () => cancelAnimationFrame(frameId);
+  }, [isOn]);
 
   useEffect(() => {
     if (isOn) {
-      setShowBanner(true);
       if (!motorSoundRef.current) {
         motorSoundRef.current = startMotorSound();
       }
     } else {
-      setShowBanner(false);
       if (motorSoundRef.current) {
         motorSoundRef.current.stop();
         motorSoundRef.current = null;
@@ -108,12 +121,10 @@ const MotorFanWidget: React.FC<MotorFanWidgetProps> = ({ className = "" }) => {
     const turningOn = !manualOn;
     setManualOn(turningOn);
     // Publish to plc/control with relay payload
-    const relayState = turningOn
-      ? [1, 0, 0, 0, 0, 0, 0, 0]
-      : [0, 0, 0, 0, 0, 0, 0, 0];
+    const relayState = turningOn ? 1 : 0;
     sendCommand("motor_fan", {
       _topic: "plc/control",
-      _rawPayload: { "8ch_relay_1": relayState },
+      _rawPayload: { boardA_8ch_relay_motor: relayState },
     }).catch(() => {});
   };
 
@@ -131,9 +142,11 @@ const MotorFanWidget: React.FC<MotorFanWidgetProps> = ({ className = "" }) => {
     return () => clearInterval(id);
   }, [isOn]);
 
-  const spinMs = rpm > 50 ? Math.max(200, Math.round(60000 / (rpm * 0.8))) : undefined;
+  const spinMs =
+    rpm > 50 ? Math.max(200, Math.round(60000 / (rpm * 0.8))) : undefined;
   const speedFactor = Math.min(1, rpm / 1750);
-  const discOpacity = speedFactor > 0.35 ? ((speedFactor - 0.35) / 0.65) * 0.22 : 0;
+  const discOpacity =
+    speedFactor > 0.35 ? ((speedFactor - 0.35) / 0.65) * 0.22 : 0;
 
   return (
     <div
@@ -144,10 +157,19 @@ const MotorFanWidget: React.FC<MotorFanWidgetProps> = ({ className = "" }) => {
       <div className="flex justify-between items-center flex-none">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 bg-gradient-to-br from-cyan-500/[0.12] to-blue-500/[0.06] rounded-lg flex items-center justify-center border border-cyan-400/[0.12] shadow-[0_0_8px_rgba(103,232,249,0.08)]">
-            <svg width="10" height="10" viewBox="0 0 16 16" fill="none" className="opacity-75">
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 16 16"
+              fill="none"
+              className="opacity-75"
+            >
               <path
                 d="M8 2C5.8 3.2 5 6 6.5 7.5C5 5.8 2 6 2 8C2 10.2 5.2 11 6.5 9.5C5.3 11 6 14 8 14C10.2 12.8 11 10 9.5 8.5C11 10.2 14 10 14 8C14 5.8 10.8 5 9.5 6.5C10.7 5 10 2 8 2Z"
-                stroke="white" strokeWidth="1.1" fill="none" strokeLinejoin="round"
+                stroke="white"
+                strokeWidth="1.1"
+                fill="none"
+                strokeLinejoin="round"
               />
               <circle cx="8" cy="8" r="1.5" fill="white" opacity="0.55" />
             </svg>
@@ -156,11 +178,13 @@ const MotorFanWidget: React.FC<MotorFanWidgetProps> = ({ className = "" }) => {
             Motor
           </h3>
         </div>
-        <span className={`text-[12px] font-medium flex items-center gap-1.5 px-2 py-0.5 rounded-md border transition-all duration-700 ${
-          isOn
-            ? "text-cyan-400/80 bg-cyan-500/[0.07] border-cyan-500/[0.12]"
-            : "text-blue-200/60 bg-blue-500/[0.04] border-blue-400/[0.06]"
-        }`}>
+        <span
+          className={`text-[12px] font-medium flex items-center gap-1.5 px-2 py-0.5 rounded-md border transition-all duration-700 ${
+            isOn
+              ? "text-cyan-400/80 bg-cyan-500/[0.07] border-cyan-500/[0.12]"
+              : "text-blue-200/60 bg-blue-500/[0.04] border-blue-400/[0.06]"
+          }`}
+        >
           <span
             className={`w-1.5 h-1.5 rounded-full transition-all duration-700 ${isOn ? "bg-cyan-400 animate-pulse-glow" : "bg-blue-400/30"}`}
             style={isOn ? { color: "#67e8f9" } : undefined}
@@ -176,46 +200,86 @@ const MotorFanWidget: React.FC<MotorFanWidgetProps> = ({ className = "" }) => {
             <div
               className="absolute rounded-full animate-pulse-glow"
               style={{
-                width: 90, height: 90,
-                background: "radial-gradient(circle, rgba(103,232,249,0.18) 0%, transparent 70%)",
+                width: 90,
+                height: 90,
+                background:
+                  "radial-gradient(circle, rgba(103,232,249,0.18) 0%, transparent 70%)",
                 filter: "blur(10px)",
                 color: "#67e8f9",
               }}
             />
           )}
-          <svg viewBox="0 0 40 40" width="80" height="80" style={{ overflow: "visible" }}>
-            <circle cx="20" cy="20" r="18.5"
-              stroke="#06b6d4" strokeWidth="0.6" fill="none"
-              opacity={isOn ? 0.22 : 0.06} style={{ transition: "opacity 0.6s" }}
+          <svg
+            viewBox="0 0 40 40"
+            width="80"
+            height="80"
+            style={{ overflow: "visible" }}
+          >
+            <circle
+              cx="20"
+              cy="20"
+              r="18.5"
+              stroke="#06b6d4"
+              strokeWidth="0.6"
+              fill="none"
+              opacity={isOn ? 0.22 : 0.06}
+              style={{ transition: "opacity 0.6s" }}
             />
-            <circle cx="20" cy="20" r="17"
-              stroke="#0e7490" strokeWidth="0.3" strokeDasharray="2 3" fill="none"
-              opacity={isOn ? 0.12 : 0.03} style={{ transition: "opacity 0.6s" }}
+            <circle
+              cx="20"
+              cy="20"
+              r="17"
+              stroke="#0e7490"
+              strokeWidth="0.3"
+              strokeDasharray="2 3"
+              fill="none"
+              opacity={isOn ? 0.12 : 0.03}
+              style={{ transition: "opacity 0.6s" }}
             />
-            <circle cx="20" cy="20" r="15.5"
-              fill="#67e8f9" opacity={discOpacity} style={{ transition: "opacity 0.9s" }}
+            <circle
+              cx="20"
+              cy="20"
+              r="15.5"
+              fill="#67e8f9"
+              opacity={discOpacity}
+              style={{ transition: "opacity 0.9s" }}
             />
-            <g style={{
-              transformOrigin: "20px 20px",
-              transformBox: "view-box",
-              animation: spinMs ? `fan-spin ${spinMs}ms linear infinite` : "none",
-              filter: isOn ? "drop-shadow(0 0 4px rgba(103,232,249,0.75))" : "none",
-            } as React.CSSProperties}>
+            <g
+              style={
+                {
+                  transformOrigin: "20px 20px",
+                  transformBox: "view-box",
+                  animation: spinMs
+                    ? `fan-spin ${spinMs}ms linear infinite`
+                    : "none",
+                  filter: isOn
+                    ? "drop-shadow(0 0 4px rgba(103,232,249,0.75))"
+                    : "none",
+                } as React.CSSProperties
+              }
+            >
               {BLADE_ANGLES.map((angle) => (
                 <path
                   key={`b${angle}`}
                   d={BLADE_PATH}
                   fill={isOn ? "#67e8f9" : "#3b5272"}
                   transform={`rotate(${angle} 20 20)`}
-                  opacity={isOn ? 0.92 : 0.30}
+                  opacity={isOn ? 0.92 : 0.3}
                   style={{ transition: "fill 0.6s, opacity 0.6s" }}
                 />
               ))}
             </g>
-            <circle cx="20" cy="20" r="4.5"
-              fill={isOn ? "#0e7490" : "#0b1a30"} style={{ transition: "fill 0.6s" }}
+            <circle
+              cx="20"
+              cy="20"
+              r="4.5"
+              fill={isOn ? "#0e7490" : "#0b1a30"}
+              style={{ transition: "fill 0.6s" }}
             />
-            <circle cx="20" cy="20" r="2.5"
+            <circle
+              cx="20"
+              cy="20"
+              r="2.5"
               fill={isOn ? "#22d3ee" : "#1e3a5f"}
               opacity={isOn ? 0.55 : 0.25}
               style={{ transition: "fill 0.6s, opacity 0.6s" }}
@@ -229,13 +293,20 @@ const MotorFanWidget: React.FC<MotorFanWidgetProps> = ({ className = "" }) => {
       {createPortal(
         <div
           className={`fixed top-0 left-0 right-0 z-[9998] flex items-center justify-center transition-all duration-500 ${
-            showBanner ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0 pointer-events-none"
+            showBanner
+              ? "translate-y-0 opacity-100"
+              : "-translate-y-full opacity-0 pointer-events-none"
           }`}
         >
           <div className="mx-4 mt-3 w-full max-w-2xl rounded-xl border border-cyan-500/30 bg-cyan-950/90 backdrop-blur-md shadow-[0_4px_30px_rgba(6,182,212,0.3)] px-5 py-3 flex items-center gap-4">
             <div className="flex-shrink-0 w-10 h-10 rounded-full bg-cyan-500/20 border border-cyan-400/30 flex items-center justify-center animate-pulse">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <path d="M12 2C5.8 3.2 5 6 6.5 7.5C5 5.8 2 6 2 8C2 10.2 5.2 11 6.5 9.5C5.3 11 6 14 8 14C10.2 12.8 11 10 9.5 8.5C11 10.2 14 10 14 8C14 5.8 10.8 5 9.5 6.5C10.7 5 10 2 8 2Z" fill="#22d3ee" opacity="0.9" transform="translate(4 4) scale(1.2)" />
+                <path
+                  d="M12 2C5.8 3.2 5 6 6.5 7.5C5 5.8 2 6 2 8C2 10.2 5.2 11 6.5 9.5C5.3 11 6 14 8 14C10.2 12.8 11 10 9.5 8.5C11 10.2 14 10 14 8C14 5.8 10.8 5 9.5 6.5C10.7 5 10 2 8 2Z"
+                  fill="#22d3ee"
+                  opacity="0.9"
+                  transform="translate(4 4) scale(1.2)"
+                />
               </svg>
             </div>
             <div className="flex-grow min-w-0">
@@ -243,23 +314,29 @@ const MotorFanWidget: React.FC<MotorFanWidgetProps> = ({ className = "" }) => {
                 Motor Activated
               </div>
               <div className="text-[11px] text-cyan-200/60 mt-0.5">
-                Motor fan is now running. Sensor triggered or manual override active.
+                Motor fan is now running. Sensor triggered or manual override
+                active.
               </div>
             </div>
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                setShowBanner(false);
+                setDismissedBannerEpoch(bannerEpoch);
               }}
               className="flex-shrink-0 w-7 h-7 rounded-lg bg-cyan-500/10 border border-cyan-400/20 flex items-center justify-center hover:bg-cyan-500/20 transition-colors"
             >
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path d="M2 2l8 8M10 2l-8 8" stroke="#67e8f9" strokeWidth="1.5" strokeLinecap="round" />
+                <path
+                  d="M2 2l8 8M10 2l-8 8"
+                  stroke="#67e8f9"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
               </svg>
             </button>
           </div>
         </div>,
-        document.body
+        document.body,
       )}
     </div>
   );

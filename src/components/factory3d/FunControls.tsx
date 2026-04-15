@@ -1,8 +1,18 @@
 "use no memo";
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useDigitalTwinStore } from "../../stores/digitalTwinStore";
-import { runDigitalTwinScenario, DT_SCENARIOS } from "../../stores/digitalTwinSimulation";
-import { resetCameraView, setCameraTarget, startAutoTour, stopAutoTour, isAutoTourActive, getAutoTourLabel } from "./CameraController";
+import {
+  runDigitalTwinScenario,
+  DT_SCENARIOS,
+} from "../../stores/digitalTwinSimulation";
+import {
+  resetCameraView,
+  setCameraTarget,
+  startAutoTour,
+  stopAutoTour,
+  isAutoTourActive,
+  getAutoTourLabel,
+} from "./CameraController";
 import { STAGE_POSITIONS } from "./digitalTwinLayout";
 
 /**
@@ -17,16 +27,78 @@ import { STAGE_POSITIONS } from "./digitalTwinLayout";
  *  - Keyboard shortcuts guide
  */
 
-const CAMERA_PRESETS: { label: string; icon: string; position: [number, number, number]; target: [number, number, number] }[] = [
-  { label: "Overview", icon: "\uD83C\uDFED", position: [18, 14, 18], target: [0, 0, 0] },
-  { label: "Intake Close-up", icon: "\uD83D\uDCE6", position: [STAGE_POSITIONS.intake[0] + 2, 3, STAGE_POSITIONS.intake[2] + 3], target: STAGE_POSITIONS.intake },
-  { label: "Mixing Tank", icon: "\u2697\uFE0F", position: [STAGE_POSITIONS.mixing[0] + 3, 3, STAGE_POSITIONS.mixing[2] + 2], target: STAGE_POSITIONS.mixing },
-  { label: "Blow Molding", icon: "\uD83C\uDFAF", position: [STAGE_POSITIONS.forming[0] - 2, 3, STAGE_POSITIONS.forming[2] + 3], target: STAGE_POSITIONS.forming },
-  { label: "Curing Oven", icon: "\uD83D\uDD25", position: [STAGE_POSITIONS.curing[0] + 3, 2, STAGE_POSITIONS.curing[2] + 3], target: STAGE_POSITIONS.curing },
-  { label: "Quality Lab", icon: "\uD83D\uDD2C", position: [STAGE_POSITIONS.quality[0] - 2, 3, STAGE_POSITIONS.quality[2] + 3], target: STAGE_POSITIONS.quality },
-  { label: "Dispatch Dock", icon: "\uD83D\uDE9A", position: [STAGE_POSITIONS.dispatch[0] + 4, 4, STAGE_POSITIONS.dispatch[2] + 5], target: STAGE_POSITIONS.dispatch },
-  { label: "Bird's Eye", icon: "\uD83E\uDD85", position: [0, 25, 0.1], target: [0, 0, 0] },
-  { label: "Cinematic", icon: "\uD83C\uDFAC", position: [-15, 8, 12], target: [0, 0, 0] },
+const CAMERA_PRESETS: {
+  label: string;
+  icon: string;
+  position: [number, number, number];
+  target: [number, number, number];
+}[] = [
+  {
+    label: "Overview",
+    icon: "\uD83C\uDFED",
+    position: [18, 14, 18],
+    target: [0, 0, 0],
+  },
+  {
+    label: "Intake Close-up",
+    icon: "\uD83D\uDCE6",
+    position: [STAGE_POSITIONS.intake[0] + 2, 3, STAGE_POSITIONS.intake[2] + 3],
+    target: STAGE_POSITIONS.intake,
+  },
+  {
+    label: "Blow Molding",
+    icon: "\uD83C\uDFAF",
+    position: [
+      STAGE_POSITIONS.forming[0] - 2,
+      3,
+      STAGE_POSITIONS.forming[2] + 3,
+    ],
+    target: STAGE_POSITIONS.forming,
+  },
+  {
+    label: "Filling Station",
+    icon: "\uD83E\uDD64",
+    position: [STAGE_POSITIONS.mixing[0] + 3, 3, STAGE_POSITIONS.mixing[2] + 2],
+    target: STAGE_POSITIONS.mixing,
+  },
+  {
+    label: "Cooling Tunnel",
+    icon: "\u2744\uFE0F",
+    position: [STAGE_POSITIONS.curing[0] + 3, 2, STAGE_POSITIONS.curing[2] + 3],
+    target: STAGE_POSITIONS.curing,
+  },
+  {
+    label: "Quality Lab",
+    icon: "\uD83D\uDD2C",
+    position: [
+      STAGE_POSITIONS.quality[0] - 2,
+      3,
+      STAGE_POSITIONS.quality[2] + 3,
+    ],
+    target: STAGE_POSITIONS.quality,
+  },
+  {
+    label: "Dispatch Dock",
+    icon: "\uD83D\uDE9A",
+    position: [
+      STAGE_POSITIONS.dispatch[0] + 4,
+      4,
+      STAGE_POSITIONS.dispatch[2] + 5,
+    ],
+    target: STAGE_POSITIONS.dispatch,
+  },
+  {
+    label: "Bird's Eye",
+    icon: "\uD83E\uDD85",
+    position: [0, 25, 0.1],
+    target: [0, 0, 0],
+  },
+  {
+    label: "Cinematic",
+    icon: "\uD83C\uDFAC",
+    position: [-15, 8, 12],
+    target: [0, 0, 0],
+  },
 ];
 
 const FunControls: React.FC<{
@@ -57,32 +129,73 @@ const FunControls: React.FC<{
     onDayNightToggle?.(next);
   }, [isNight, onDayNightToggle]);
 
-  const handleCameraPreset = useCallback((preset: typeof CAMERA_PRESETS[0]) => {
-    setCameraTarget(preset.position, preset.target);
-  }, []);
+  const handleCameraPreset = useCallback(
+    (preset: (typeof CAMERA_PRESETS)[0]) => {
+      setCameraTarget(preset.position, preset.target);
+    },
+    [],
+  );
 
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      )
+        return;
 
       switch (e.key) {
-        case "1": handleCameraPreset(CAMERA_PRESETS[0]); break;
-        case "2": handleCameraPreset(CAMERA_PRESETS[1]); break;
-        case "3": handleCameraPreset(CAMERA_PRESETS[2]); break;
-        case "4": handleCameraPreset(CAMERA_PRESETS[3]); break;
-        case "5": handleCameraPreset(CAMERA_PRESETS[4]); break;
-        case "6": handleCameraPreset(CAMERA_PRESETS[5]); break;
-        case "7": handleCameraPreset(CAMERA_PRESETS[6]); break;
-        case "8": handleCameraPreset(CAMERA_PRESETS[7]); break;
-        case "9": handleCameraPreset(CAMERA_PRESETS[8]); break;
-        case "+": case "=": handleSpeedChange(Math.min(3, speed + 0.25)); break;
-        case "-": case "_": handleSpeedChange(Math.max(0.1, speed - 0.25)); break;
-        case " ": e.preventDefault(); handleSpeedChange(speed > 0.1 ? 0 : 1.0); break;
-        case "n": handleDayNight(); break;
-        case "r": resetCameraView(); break;
-        case "?": setShowShortcuts(s => !s); break;
-        default: break;
+        case "1":
+          handleCameraPreset(CAMERA_PRESETS[0]);
+          break;
+        case "2":
+          handleCameraPreset(CAMERA_PRESETS[1]);
+          break;
+        case "3":
+          handleCameraPreset(CAMERA_PRESETS[2]);
+          break;
+        case "4":
+          handleCameraPreset(CAMERA_PRESETS[3]);
+          break;
+        case "5":
+          handleCameraPreset(CAMERA_PRESETS[4]);
+          break;
+        case "6":
+          handleCameraPreset(CAMERA_PRESETS[5]);
+          break;
+        case "7":
+          handleCameraPreset(CAMERA_PRESETS[6]);
+          break;
+        case "8":
+          handleCameraPreset(CAMERA_PRESETS[7]);
+          break;
+        case "9":
+          handleCameraPreset(CAMERA_PRESETS[8]);
+          break;
+        case "+":
+        case "=":
+          handleSpeedChange(Math.min(3, speed + 0.25));
+          break;
+        case "-":
+        case "_":
+          handleSpeedChange(Math.max(0.1, speed - 0.25));
+          break;
+        case " ":
+          e.preventDefault();
+          handleSpeedChange(speed > 0.1 ? 0 : 1.0);
+          break;
+        case "n":
+          handleDayNight();
+          break;
+        case "r":
+          resetCameraView();
+          break;
+        case "?":
+          setShowShortcuts((s) => !s);
+          break;
+        default:
+          break;
       }
     };
     window.addEventListener("keydown", handler);
@@ -103,23 +216,44 @@ const FunControls: React.FC<{
     <>
       {/* Shortcuts overlay */}
       {showShortcuts && (
-        <div style={{
-          position: "absolute",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          zIndex: 40,
-          background: "rgba(10, 22, 40, 0.95)",
-          border: "1px solid rgba(59,130,246,0.3)",
-          borderRadius: "12px",
-          padding: "20px",
-          fontFamily: "'Inter', system-ui, sans-serif",
-          color: "#e2e8f0",
-          minWidth: "280px",
-        }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px" }}>
-            <span style={{ fontWeight: 700, fontSize: "14px" }}>Keyboard Shortcuts</span>
-            <button onClick={() => setShowShortcuts(false)} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: "16px" }}>x</button>
+        <div
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            zIndex: 40,
+            background: "rgba(10, 22, 40, 0.95)",
+            border: "1px solid rgba(59,130,246,0.3)",
+            borderRadius: "12px",
+            padding: "20px",
+            fontFamily: "'Inter', system-ui, sans-serif",
+            color: "#e2e8f0",
+            minWidth: "280px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              marginBottom: "12px",
+            }}
+          >
+            <span style={{ fontWeight: 700, fontSize: "14px" }}>
+              Keyboard Shortcuts
+            </span>
+            <button
+              onClick={() => setShowShortcuts(false)}
+              style={{
+                background: "none",
+                border: "none",
+                color: "#94a3b8",
+                cursor: "pointer",
+                fontSize: "16px",
+              }}
+            >
+              x
+            </button>
           </div>
           {[
             ["1-9", "Camera presets"],
@@ -129,8 +263,26 @@ const FunControls: React.FC<{
             ["R", "Reset camera to overview"],
             ["?", "Show/hide shortcuts"],
           ].map(([key, desc], i) => (
-            <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid rgba(100,116,139,0.15)" }}>
-              <kbd style={{ background: "rgba(100,116,139,0.2)", padding: "2px 8px", borderRadius: "4px", fontSize: "11px", fontFamily: "monospace" }}>{key}</kbd>
+            <div
+              key={i}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "4px 0",
+                borderBottom: "1px solid rgba(100,116,139,0.15)",
+              }}
+            >
+              <kbd
+                style={{
+                  background: "rgba(100,116,139,0.2)",
+                  padding: "2px 8px",
+                  borderRadius: "4px",
+                  fontSize: "11px",
+                  fontFamily: "monospace",
+                }}
+              >
+                {key}
+              </kbd>
               <span style={{ fontSize: "11px", color: "#94a3b8" }}>{desc}</span>
             </div>
           ))}
@@ -140,7 +292,7 @@ const FunControls: React.FC<{
       <div style={panelStyle}>
         {/* Toggle button */}
         <button
-          onClick={() => setExpanded(e => !e)}
+          onClick={() => setExpanded((e) => !e)}
           style={{
             background: "rgba(10, 22, 40, 0.9)",
             border: "1px solid rgba(59,130,246,0.3)",
@@ -156,24 +308,56 @@ const FunControls: React.FC<{
             gap: "6px",
           }}
         >
-          <span style={{ fontSize: "14px" }}>{expanded ? "\u25BC" : "\u25B2"}</span>
+          <span style={{ fontSize: "14px" }}>
+            {expanded ? "\u25BC" : "\u25B2"}
+          </span>
           CONTROLS
-          <span style={{ fontSize: "9px", color: "#64748b", marginLeft: "4px" }}>Press ? for shortcuts</span>
+          <span
+            style={{ fontSize: "9px", color: "#64748b", marginLeft: "4px" }}
+          >
+            Press ? for shortcuts
+          </span>
         </button>
 
         {expanded && (
-          <div style={{
-            background: "rgba(10, 22, 40, 0.92)",
-            border: "1px solid rgba(59,130,246,0.2)",
-            borderRadius: "10px",
-            padding: "12px",
-            width: "260px",
-          }}>
+          <div
+            style={{
+              background: "rgba(10, 22, 40, 0.92)",
+              border: "1px solid rgba(59,130,246,0.2)",
+              borderRadius: "10px",
+              padding: "12px",
+              width: "260px",
+            }}
+          >
             {/* ── Speed Control ── */}
             <div style={{ marginBottom: "10px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                <span style={{ color: "#94a3b8", fontSize: "9px", fontWeight: 600, letterSpacing: "0.08em" }}>BELT SPEED</span>
-                <span style={{ color: "#10b981", fontSize: "12px", fontWeight: 700 }}>{speed.toFixed(1)}x</span>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "6px",
+                }}
+              >
+                <span
+                  style={{
+                    color: "#94a3b8",
+                    fontSize: "9px",
+                    fontWeight: 600,
+                    letterSpacing: "0.08em",
+                  }}
+                >
+                  BELT SPEED
+                </span>
+                <span
+                  style={{
+                    color: "#10b981",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                  }}
+                >
+                  {speed.toFixed(1)}x
+                </span>
               </div>
               <input
                 type="range"
@@ -182,7 +366,11 @@ const FunControls: React.FC<{
                 step="0.1"
                 value={speed}
                 onChange={(e) => handleSpeedChange(parseFloat(e.target.value))}
-                style={{ width: "100%", accentColor: "#10b981", cursor: "pointer" }}
+                style={{
+                  width: "100%",
+                  accentColor: "#10b981",
+                  cursor: "pointer",
+                }}
               />
               <div style={{ display: "flex", gap: "4px", marginTop: "4px" }}>
                 {[0, 0.5, 1, 2, 3].map((s) => (
@@ -191,8 +379,14 @@ const FunControls: React.FC<{
                     onClick={() => handleSpeedChange(s)}
                     style={{
                       flex: 1,
-                      background: speed === s ? "rgba(16,185,129,0.2)" : "rgba(100,116,139,0.1)",
-                      border: speed === s ? "1px solid #10b981" : "1px solid rgba(100,116,139,0.2)",
+                      background:
+                        speed === s
+                          ? "rgba(16,185,129,0.2)"
+                          : "rgba(100,116,139,0.1)",
+                      border:
+                        speed === s
+                          ? "1px solid #10b981"
+                          : "1px solid rgba(100,116,139,0.2)",
                       borderRadius: "4px",
                       color: speed === s ? "#10b981" : "#94a3b8",
                       fontSize: "9px",
@@ -209,16 +403,38 @@ const FunControls: React.FC<{
 
             {/* ── Scenario Triggers ── */}
             <div style={{ marginBottom: "10px" }}>
-              <span style={{ color: "#94a3b8", fontSize: "9px", fontWeight: 600, letterSpacing: "0.08em" }}>SCENARIOS</span>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px", marginTop: "6px" }}>
+              <span
+                style={{
+                  color: "#94a3b8",
+                  fontSize: "9px",
+                  fontWeight: 600,
+                  letterSpacing: "0.08em",
+                }}
+              >
+                SCENARIOS
+              </span>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "4px",
+                  marginTop: "6px",
+                }}
+              >
                 {DT_SCENARIOS.map((sc) => (
                   <button
                     key={sc.id}
                     onClick={() => handleScenario(sc.id)}
                     title={sc.description}
                     style={{
-                      background: activeScenario === sc.id ? `${sc.color}20` : "rgba(100,116,139,0.08)",
-                      border: activeScenario === sc.id ? `1px solid ${sc.color}` : "1px solid rgba(100,116,139,0.15)",
+                      background:
+                        activeScenario === sc.id
+                          ? `${sc.color}20`
+                          : "rgba(100,116,139,0.08)",
+                      border:
+                        activeScenario === sc.id
+                          ? `1px solid ${sc.color}`
+                          : "1px solid rgba(100,116,139,0.15)",
                       borderRadius: "6px",
                       color: activeScenario === sc.id ? sc.color : "#94a3b8",
                       fontSize: "9px",
@@ -230,7 +446,15 @@ const FunControls: React.FC<{
                     }}
                   >
                     <div>{sc.label}</div>
-                    <div style={{ fontSize: "7px", color: "#64748b", marginTop: "2px" }}>{sc.duration}</div>
+                    <div
+                      style={{
+                        fontSize: "7px",
+                        color: "#64748b",
+                        marginTop: "2px",
+                      }}
+                    >
+                      {sc.duration}
+                    </div>
                   </button>
                 ))}
               </div>
@@ -238,8 +462,24 @@ const FunControls: React.FC<{
 
             {/* ── Camera Presets ── */}
             <div style={{ marginBottom: "10px" }}>
-              <span style={{ color: "#94a3b8", fontSize: "9px", fontWeight: 600, letterSpacing: "0.08em" }}>CAMERA VIEWS</span>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", marginTop: "6px" }}>
+              <span
+                style={{
+                  color: "#94a3b8",
+                  fontSize: "9px",
+                  fontWeight: 600,
+                  letterSpacing: "0.08em",
+                }}
+              >
+                CAMERA VIEWS
+              </span>
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "3px",
+                  marginTop: "6px",
+                }}
+              >
                 {CAMERA_PRESETS.map((preset, i) => (
                   <button
                     key={preset.label}
@@ -258,8 +498,16 @@ const FunControls: React.FC<{
                       gap: "3px",
                       transition: "all 0.15s",
                     }}
-                    onMouseEnter={(e) => { (e.target as HTMLElement).style.background = "rgba(59,130,246,0.15)"; (e.target as HTMLElement).style.color = "#e2e8f0"; }}
-                    onMouseLeave={(e) => { (e.target as HTMLElement).style.background = "rgba(100,116,139,0.08)"; (e.target as HTMLElement).style.color = "#94a3b8"; }}
+                    onMouseEnter={(e) => {
+                      (e.target as HTMLElement).style.background =
+                        "rgba(59,130,246,0.15)";
+                      (e.target as HTMLElement).style.color = "#e2e8f0";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.target as HTMLElement).style.background =
+                        "rgba(100,116,139,0.08)";
+                      (e.target as HTMLElement).style.color = "#94a3b8";
+                    }}
                   >
                     <span style={{ fontSize: "11px" }}>{preset.icon}</span>
                     <span>{preset.label}</span>
@@ -271,13 +519,19 @@ const FunControls: React.FC<{
             {/* ── Auto Tour ── */}
             <button
               onClick={() => {
-                if (isAutoTourActive()) { stopAutoTour(); resetCameraView(); }
-                else startAutoTour();
+                if (isAutoTourActive()) {
+                  stopAutoTour();
+                  resetCameraView();
+                } else startAutoTour();
               }}
               style={{
                 width: "100%",
-                background: isAutoTourActive() ? "rgba(59,130,246,0.2)" : "rgba(100,116,139,0.08)",
-                border: isAutoTourActive() ? "1px solid #3b82f6" : "1px solid rgba(100,116,139,0.15)",
+                background: isAutoTourActive()
+                  ? "rgba(59,130,246,0.2)"
+                  : "rgba(100,116,139,0.08)",
+                border: isAutoTourActive()
+                  ? "1px solid #3b82f6"
+                  : "1px solid rgba(100,116,139,0.15)",
                 borderRadius: "6px",
                 color: isAutoTourActive() ? "#3b82f6" : "#94a3b8",
                 fontSize: "10px",
@@ -291,8 +545,12 @@ const FunControls: React.FC<{
                 gap: "6px",
               }}
             >
-              <span style={{ fontSize: "14px" }}>{isAutoTourActive() ? "\u23F9" : "\u25B6"}</span>
-              {isAutoTourActive() ? `TOURING: ${getAutoTourLabel()}` : "START FACTORY TOUR"}
+              <span style={{ fontSize: "14px" }}>
+                {isAutoTourActive() ? "\u23F9" : "\u25B6"}
+              </span>
+              {isAutoTourActive()
+                ? `TOURING: ${getAutoTourLabel()}`
+                : "START FACTORY TOUR"}
             </button>
 
             {/* ── Day/Night Toggle ── */}
@@ -301,8 +559,12 @@ const FunControls: React.FC<{
                 onClick={handleDayNight}
                 style={{
                   flex: 1,
-                  background: isNight ? "rgba(100,116,139,0.1)" : "rgba(251,191,36,0.15)",
-                  border: isNight ? "1px solid rgba(100,116,139,0.2)" : "1px solid #fbbf24",
+                  background: isNight
+                    ? "rgba(100,116,139,0.1)"
+                    : "rgba(251,191,36,0.15)",
+                  border: isNight
+                    ? "1px solid rgba(100,116,139,0.2)"
+                    : "1px solid #fbbf24",
                   borderRadius: "6px",
                   color: isNight ? "#94a3b8" : "#fbbf24",
                   fontSize: "10px",
@@ -318,7 +580,7 @@ const FunControls: React.FC<{
                 {isNight ? "\uD83C\uDF19 Night Mode" : "\u2600\uFE0F Day Mode"}
               </button>
               <button
-                onClick={() => setShowShortcuts(s => !s)}
+                onClick={() => setShowShortcuts((s) => !s)}
                 style={{
                   background: "rgba(100,116,139,0.1)",
                   border: "1px solid rgba(100,116,139,0.2)",

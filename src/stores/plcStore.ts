@@ -31,6 +31,7 @@ interface PLCStore {
     motorFanOn: boolean;
     emergencyLightOn: boolean;
     photoESensor: boolean;
+    metalSensor: boolean;
     pushButton: boolean;
     relay: boolean[];
     alerts: boolean[];
@@ -57,6 +58,7 @@ export const usePLCStore = create<PLCStore>((set) => ({
     motorFanOn: outputs.motorFanOn,
     emergencyLightOn: outputs.emergencyLightOn,
     photoESensor: outputs.photoESensor,
+    metalSensor: outputs.metalSensor,
     pushButton: outputs.pushButton,
     relays: outputs.relay ?? [],
     alerts: outputs.alerts ?? [],

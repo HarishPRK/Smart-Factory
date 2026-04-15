@@ -1,0 +1,193 @@
+"use no memo";
+import React, { useRef } from "react";
+import { useFrame } from "@react-three/fiber";
+import { Html } from "@react-three/drei";
+import * as THREE from "three";
+import type { ManufacturingStage } from "../../types/digitalTwin";
+
+interface ControlBoard3DProps {
+  stage: ManufacturingStage;
+  position: [number, number, number];
+  visible?: boolean;
+}
+
+const ControlBoard3D: React.FC<ControlBoard3DProps> = ({
+  stage,
+  position,
+  visible = false,
+}) => {
+  const screenRef = useRef<THREE.Mesh>(null);
+
+  useFrame(({ clock }) => {
+    if (!screenRef.current) return;
+    const mat = screenRef.current.material as THREE.MeshStandardMaterial;
+    if (stage.status === "running") {
+      mat.emissiveIntensity = 0.15 + Math.sin(clock.elapsedTime * 0.5) * 0.05;
+    } else if (stage.status === "faulted") {
+      mat.emissiveIntensity = 0.3 + Math.sin(clock.elapsedTime * 4) * 0.2;
+    } else {
+      mat.emissiveIntensity = 0.1;
+    }
+  });
+
+  const statusColor =
+    stage.status === "running"
+      ? "#10b981"
+      : stage.status === "faulted"
+        ? "#ef4444"
+        : stage.status === "warning"
+          ? "#f59e0b"
+          : "#64748b";
+
+  return (
+    <group position={position}>
+      {/* Two support poles going into the ground */}
+      <mesh position={[-0.18, 0.35, 0]} castShadow>
+        <cylinderGeometry args={[0.015, 0.015, 0.7, 6]} />
+        <meshStandardMaterial color="#4b5563" metalness={0.8} roughness={0.2} />
+      </mesh>
+      <mesh position={[0.18, 0.35, 0]} castShadow>
+        <cylinderGeometry args={[0.015, 0.015, 0.7, 6]} />
+        <meshStandardMaterial color="#4b5563" metalness={0.8} roughness={0.2} />
+      </mesh>
+
+      {/* Billboard board at top of poles */}
+      <mesh position={[0, 0.72, 0]} castShadow>
+        <boxGeometry args={[0.5, 0.35, 0.02]} />
+        <meshStandardMaterial color="#1e293b" metalness={0.6} roughness={0.4} />
+      </mesh>
+
+      {/* Screen surface */}
+      <mesh ref={screenRef} position={[0, 0.72, 0.011]}>
+        <planeGeometry args={[0.48, 0.33]} />
+        <meshStandardMaterial
+          color="#0f172a"
+          emissive="#1e40af"
+          emissiveIntensity={0.1}
+          metalness={0.3}
+          roughness={0.7}
+        />
+      </mesh>
+
+      {/* Display content — only mount heavy DOM overlays for the selected stage */}
+      {visible && (
+        <Html
+          position={[0, 0.72, 0.015]}
+          center
+          distanceFactor={2.5}
+          transform
+          style={{ pointerEvents: "none" }}
+        >
+          <div
+            style={{
+              width: "150px",
+              background: "#0a1628",
+              border: `1px solid ${statusColor}`,
+              borderRadius: "6px",
+              padding: "8px",
+              fontFamily: "'Inter', system-ui",
+              fontSize: "9px",
+            }}
+          >
+            <div
+              style={{
+                fontWeight: 800,
+                color: "#e2e8f0",
+                fontSize: "10px",
+                marginBottom: "4px",
+              }}
+            >
+              {stage.label}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                marginBottom: "6px",
+              }}
+            >
+              <div
+                style={{
+                  width: "6px",
+                  height: "6px",
+                  borderRadius: "50%",
+                  backgroundColor: statusColor,
+                  boxShadow: `0 0 4px ${statusColor}`,
+                }}
+              />
+              <span
+                style={{
+                  color: statusColor,
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  fontSize: "8px",
+                }}
+              >
+                {stage.status}
+              </span>
+              <span
+                style={{
+                  marginLeft: "auto",
+                  color: "#94a3b8",
+                  fontSize: "8px",
+                }}
+              >
+                Q: {stage.qualityScore}%
+              </span>
+            </div>
+            {stage.sensors.map((s) => (
+              <div
+                key={s.sensorId}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  padding: "2px 0",
+                  borderBottom: "1px solid #1e293b",
+                }}
+              >
+                <span style={{ color: "#94a3b8" }}>{s.label}</span>
+                <span
+                  style={{
+                    color:
+                      s.status === "critical"
+                        ? "#ef4444"
+                        : s.status === "warning"
+                          ? "#f59e0b"
+                          : "#10b981",
+                    fontWeight: 700,
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  {s.value.toFixed(1)} {s.unit}
+                </span>
+              </div>
+            ))}
+            {stage.outputDevices.map((d) => (
+              <div
+                key={d.deviceId}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  padding: "2px 0",
+                }}
+              >
+                <span style={{ color: "#94a3b8" }}>{d.label}</span>
+                <span
+                  style={{
+                    color: d.active ? "#10b981" : "#ef4444",
+                    fontWeight: 700,
+                  }}
+                >
+                  {d.active ? (d.rpm ? `${d.rpm} RPM` : "ON") : "OFF"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </Html>
+      )}
+    </group>
+  );
+};
+
+export default ControlBoard3D;
