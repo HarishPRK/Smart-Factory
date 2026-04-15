@@ -90,7 +90,9 @@ const MIXING_SENSORS: SensorConfig[] = [
 ];
 
 const FORMING_SENSORS: SensorConfig[] = [
-  { sensorId: "forming_pressure", type: "pressure",        label: "Pressure",        unit: "bar", min: 0,   max: 200, nominal: 80,   warningThreshold: 130,  criticalThreshold: 150,  volatility: 3.0 },
+  // Normal operating range is 60–80 bar. Warning triggers below 50 bar, critical below 30 bar.
+  // Only "below" thresholds are active — high pressure does NOT stop production.
+  { sensorId: "forming_pressure", type: "pressure",        label: "Pressure",        unit: "bar", min: 0,   max: 200, nominal: 65,   warningThreshold: 50,   criticalThreshold: 30,   volatility: 3.0 },
   { sensorId: "forming_light",    type: "light_intensity", label: "Light Intensity",  unit: "lux", min: 0,   max: 1000, nominal: 500, warningThreshold: 200,  criticalThreshold: 100,  volatility: 10.0 },
 ];
 
@@ -108,7 +110,9 @@ const QUALITY_SENSORS: SensorConfig[] = [
 
 const PACKAGING_SENSORS: SensorConfig[] = [
   { sensorId: "pkg_motion",   type: "microwave_motion", label: "Motion",    unit: "",    min: 0,   max: 1,    nominal: 0,   warningThreshold: 0.7, criticalThreshold: 0.9, volatility: 0.15 },
-  { sensorId: "pkg_pressure", type: "pressure",         label: "Pressure",  unit: "bar", min: 0,   max: 100,  nominal: 30,  warningThreshold: 60,  criticalThreshold: 80,  volatility: 2.0 },
+  // Normal operating range is 60–80 bar. Warning triggers below 50 bar, critical below 30 bar.
+  // Only "below" thresholds are active — high pressure does NOT stop production.
+  { sensorId: "pkg_pressure", type: "pressure",         label: "Pressure",  unit: "bar", min: 0,   max: 100,  nominal: 65,  warningThreshold: 50,  criticalThreshold: 30,  volatility: 2.0 },
   { sensorId: "pkg_water",    type: "water",            label: "Water",     unit: "",    min: 0,   max: 1,    nominal: 0,   warningThreshold: 0.3, criticalThreshold: 0.6, volatility: 0.08 },
 ];
 
@@ -165,9 +169,10 @@ const MIXING_EFFECTS: ThresholdEffect[] = [
 ];
 
 const FORMING_EFFECTS: ThresholdEffect[] = [
-  { sensorId: "forming_pressure", condition: "above_critical", effect: "emergency_stop", description: "Overpressure — emergency stop all motors", qualityPenalty: 30 },
-  { sensorId: "forming_pressure", condition: "above_warning",  effect: "slowdown",       description: "High pressure — reduce speed",             qualityPenalty: 5 },
-  { sensorId: "forming_light",    condition: "below_warning",  effect: "quality_degrade", description: "Low light — inspection failure",           qualityPenalty: 15 },
+  // Pressure: normal range is 60–80 bar. Only low pressure triggers inspection — never a stop.
+  { sensorId: "forming_pressure", condition: "below_warning",  effect: "quality_degrade", description: "Pressure below 50 bar — inspection required",      qualityPenalty: 15 },
+  { sensorId: "forming_pressure", condition: "below_critical", effect: "quality_degrade", description: "Pressure critically low — escalated inspection",    qualityPenalty: 25 },
+  { sensorId: "forming_light",    condition: "below_warning",  effect: "quality_degrade", description: "Low light — inspection failure",                    qualityPenalty: 15 },
 ];
 
 const CURING_EFFECTS: ThresholdEffect[] = [
@@ -184,9 +189,10 @@ const QUALITY_EFFECTS: ThresholdEffect[] = [
 ];
 
 const PACKAGING_EFFECTS: ThresholdEffect[] = [
-  { sensorId: "pkg_water",    condition: "above_critical", effect: "stop",            description: "Moisture detected — stop packaging", qualityPenalty: 20 },
-  { sensorId: "pkg_pressure", condition: "above_warning",  effect: "slowdown",        description: "Seal pressure high — slow down",     qualityPenalty: 5 },
-  { sensorId: "pkg_pressure", condition: "above_critical", effect: "emergency_stop",  description: "Seal pressure critical — stop",      qualityPenalty: 25 },
+  { sensorId: "pkg_water",    condition: "above_critical", effect: "stop",            description: "Moisture detected — stop packaging",               qualityPenalty: 20 },
+  // Pressure: normal range is 60–80 bar. Only low pressure triggers inspection — never a stop.
+  { sensorId: "pkg_pressure", condition: "below_warning",  effect: "quality_degrade", description: "Pressure below 50 bar — inspection required",      qualityPenalty: 15 },
+  { sensorId: "pkg_pressure", condition: "below_critical", effect: "quality_degrade", description: "Pressure critically low — escalated inspection",    qualityPenalty: 25 },
 ];
 
 // ── Full Stage Configurations ──────────────────────────────
@@ -204,20 +210,9 @@ export const STAGE_CONFIGS: StageConfig[] = [
     thresholdEffects: [],
   },
   {
-    id: "mixing",
-    label: "Chemical Mixing",
-    description: "Raw materials blended to specification",
-    position: STAGE_POSITIONS.mixing,
-    conveyorT: STAGE_CONVEYOR_T.mixing,
-    dwellTimeSec: 12,
-    sensorConfigs: MIXING_SENSORS,
-    outputDeviceConfigs: MIXING_DEVICES,
-    thresholdEffects: MIXING_EFFECTS,
-  },
-  {
     id: "forming",
-    label: "Forming / Molding",
-    description: "Material shaped under pressure",
+    label: "Bottle Blow Molding",
+    description: "PET preforms heated and blown into bottle shape",
     position: STAGE_POSITIONS.forming,
     conveyorT: STAGE_CONVEYOR_T.forming,
     dwellTimeSec: 15,
@@ -226,9 +221,20 @@ export const STAGE_CONFIGS: StageConfig[] = [
     thresholdEffects: FORMING_EFFECTS,
   },
   {
+    id: "mixing",
+    label: "Coca-Cola Filling",
+    description: "Empty bottles filled with carbonated Coca-Cola syrup mixture",
+    position: STAGE_POSITIONS.mixing,
+    conveyorT: STAGE_CONVEYOR_T.mixing,
+    dwellTimeSec: 12,
+    sensorConfigs: MIXING_SENSORS,
+    outputDeviceConfigs: MIXING_DEVICES,
+    thresholdEffects: MIXING_EFFECTS,
+  },
+  {
     id: "curing",
-    label: "Thermal Curing",
-    description: "Heat treatment and chemical curing",
+    label: "Cooling Tunnel",
+    description: "Filled bottles cooled and carbonation stabilized",
     position: STAGE_POSITIONS.curing,
     conveyorT: STAGE_CONVEYOR_T.curing,
     dwellTimeSec: 20,

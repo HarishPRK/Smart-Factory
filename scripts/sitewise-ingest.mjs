@@ -29,6 +29,7 @@ const MQTT_PORT = Number(process.env.MQTT_PORT ?? 1883);
 const REGION = process.env.AWS_REGION ?? "us-east-1";
 const PREFIX = process.env.SITEWISE_PREFIX ?? "/smart-factory/plc-1";
 const BATCH_MS = Number(process.env.SITEWISE_BATCH_MS ?? 1000);
+const DEBUG_INGEST = process.env.DEBUG_PLC_INGEST === "true";
 
 const sitewise = new IoTSiteWiseClient({ region: REGION });
 
@@ -38,6 +39,13 @@ const sitewise = new IoTSiteWiseClient({ region: REGION });
 
 /** @type {Map<string, object>} */
 const pending = new Map();
+const lastKnownValues = new Map();
+
+function ingestDebug(message, details) {
+  if (!DEBUG_INGEST) return;
+  if (details === undefined) console.log(`[sitewise][debug] ${message}`);
+  else console.log(`[sitewise][debug] ${message}`, details);
+}
 
 // Monotonic nanosecond offset to guarantee unique timestamps per property
 let lastEpochSec = 0;
@@ -54,71 +62,147 @@ function uniqueTimestamp() {
   return { timeInSeconds: sec, offsetInNanos: nanoCounter };
 }
 
+function scalar(rawValue) {
+  if (typeof rawValue === "number" && Number.isFinite(rawValue)) return rawValue;
+  if (Array.isArray(rawValue) && rawValue.length > 0 && typeof rawValue[0] === "number" && Number.isFinite(rawValue[0])) {
+    return rawValue[0];
+  }
+  return null;
+}
+
+function resolveValue(raw, keys, alias, fallback = 0) {
+  for (const key of keys) {
+    const value = scalar(raw[key]);
+    if (value == null || value === -1) continue;
+    lastKnownValues.set(alias, Number(value));
+    return Number(value);
+  }
+
+  if (lastKnownValues.has(alias)) return lastKnownValues.get(alias);
+  lastKnownValues.set(alias, fallback);
+  return fallback;
+}
+
+function resolveBit(raw, keys, alias, fallback = 0) {
+  const value = resolveValue(raw, keys, alias, fallback);
+  return value >= 0.5 ? 1 : 0;
+}
+
 // ── Payload → SiteWise mapping ──────────────────────────
 
 function mapPayload(raw) {
   const ts = uniqueTimestamp();
+  const debugSummary = {
+    analog: {},
+    digital: {},
+    relays: [],
+    alerts: [],
+  };
 
   // Analog sensors (DOUBLE)
   const analogMap = {
-    voltage_pot: "voltage",
-    current_pot: "current",
-    temperature: "temperature",
-    pH: "pH",
+    voltage: ["boardA_voltage_pot_1", "voltage_pot"],
+    current: ["boardA_current_pot", "current_pot"],
+    temperature: ["boardA_temperature", "boardB_esp32_temperature", "temperature"],
+    pH: ["boardA_8ch_analog_1_ph_sensor", "pH"],
   };
 
-  for (const [mqttKey, swName] of Object.entries(analogMap)) {
-    const arr = raw[mqttKey];
-    if (Array.isArray(arr) && arr.length > 0 && arr[0] != null) {
-      pending.set(`${PREFIX}/${swName}/raw_value`, {
-        doubleValue: Number(arr[0]),
-        ...ts,
-      });
-    }
+  for (const [swName, mqttKeys] of Object.entries(analogMap)) {
+    const value = resolveValue(raw, mqttKeys, `${PREFIX}/${swName}/raw_value`, 0);
+    debugSummary.analog[swName] = value;
+    pending.set(`${PREFIX}/${swName}/raw_value`, {
+      doubleValue: value,
+      ...ts,
+    });
   }
 
   // Digital sensors (INTEGER)
   const digitalMap = {
-    photoE_sensor: "photoE_sensor",
-    metal_sensor: "metal_sensor",
-    push_button: "push_button",
+    photoE_sensor: ["boardA_photoelectric_sensor", "photoE_sensor"],
+    metal_sensor: ["boardA_metal_sensor", "boardB_8ch_io_metal_sensor", "metal_sensor"],
+    push_button: [
+      "boardA_green_push_button",
+      "boardB_8ch_io_green_button",
+      "boardB_8ch_io_push_lock_button",
+      "push_button",
+    ],
+    motor: ["boardA_8ch_relay_motor"],
   };
 
-  for (const [mqttKey, swName] of Object.entries(digitalMap)) {
-    const arr = raw[mqttKey];
-    if (Array.isArray(arr) && arr.length > 0 && arr[0] != null) {
-      pending.set(`${PREFIX}/${swName}/state`, {
-        integerValue: Number(arr[0]),
-        ...ts,
-      });
-    }
+  for (const [swName, mqttKeys] of Object.entries(digitalMap)) {
+    const value = resolveBit(raw, mqttKeys, `${PREFIX}/${swName}/state`, 0);
+    debugSummary.digital[swName] = value;
+    pending.set(`${PREFIX}/${swName}/state`, {
+      integerValue: value,
+      ...ts,
+    });
   }
 
   // 8-channel relay (INTEGER)
-  const relays = raw["8ch_relay_1"];
-  if (Array.isArray(relays)) {
-    for (let i = 0; i < Math.min(relays.length, 8); i++) {
-      if (relays[i] != null) {
-        pending.set(`${PREFIX}/relay_ch${i}/state`, {
-          integerValue: Number(relays[i]),
-          ...ts,
-        });
+  const relays = [
+    resolveBit(raw, ["boardA_8ch_relay_motor"], `${PREFIX}/relay_ch0/state`, 0),
+    resolveBit(raw, ["boardA_8ch_relay_alarm"], `${PREFIX}/relay_ch1/state`, 0),
+    resolveBit(raw, ["boardA_alert_relays_red", "boardB_8ch_io_output_red"], `${PREFIX}/relay_ch2/state`, 0),
+    resolveBit(raw, ["boardA_alert_relays_yellow", "boardB_8ch_io_output_yellow"], `${PREFIX}/relay_ch3/state`, 0),
+    resolveBit(raw, ["boardA_alert_relays_green", "boardB_8ch_io_output_green"], `${PREFIX}/relay_ch4/state`, 0),
+    resolveBit(raw, ["boardA_alert_relays_buzzer", "boardB_8ch_io_output_buzzer"], `${PREFIX}/relay_ch5/state`, 0),
+    resolveBit(raw, ["boardA_green_push_button"], `${PREFIX}/relay_ch6/state`, 0),
+    resolveBit(raw, ["boardA_metal_sensor", "boardB_8ch_io_metal_sensor"], `${PREFIX}/relay_ch7/state`, 0),
+  ];
+
+  const legacyRelays = raw["8ch_relay_1"];
+  if (Array.isArray(legacyRelays)) {
+    for (let i = 0; i < Math.min(legacyRelays.length, 8); i++) {
+      if (typeof legacyRelays[i] === "number" && legacyRelays[i] !== -1) {
+        relays[i] = Number(legacyRelays[i]);
+        lastKnownValues.set(`${PREFIX}/relay_ch${i}/state`, relays[i]);
       }
     }
   }
 
+  for (let i = 0; i < relays.length; i++) {
+    debugSummary.relays[i] = Number(relays[i]);
+    pending.set(`${PREFIX}/relay_ch${i}/state`, {
+      integerValue: Number(relays[i]),
+      ...ts,
+    });
+  }
+
+  pending.set(`${PREFIX}/motor/state`, {
+    integerValue: Number(relays[0]),
+    ...ts,
+  });
+
   // Alerts (INTEGER)
-  const alerts = raw.alerts;
-  if (Array.isArray(alerts)) {
-    for (let i = 0; i < Math.min(alerts.length, 4); i++) {
-      if (alerts[i] != null) {
-        pending.set(`${PREFIX}/alert_${i}`, {
-          integerValue: Number(alerts[i]),
-          ...ts,
-        });
+  const alerts = [
+    resolveBit(raw, ["boardA_alert_relays_red", "boardB_8ch_io_output_red"], `${PREFIX}/alert_0`, 0),
+    resolveBit(raw, ["boardA_alert_relays_yellow", "boardB_8ch_io_output_yellow"], `${PREFIX}/alert_1`, 0),
+    resolveBit(raw, ["boardA_alert_relays_buzzer", "boardB_8ch_io_output_buzzer"], `${PREFIX}/alert_2`, 0),
+    resolveBit(raw, ["boardA_8ch_relay_alarm"], `${PREFIX}/alert_3`, 0),
+  ];
+
+  const legacyAlerts = raw.alerts;
+  if (Array.isArray(legacyAlerts)) {
+    for (let i = 0; i < Math.min(legacyAlerts.length, 4); i++) {
+      if (typeof legacyAlerts[i] === "number" && legacyAlerts[i] !== -1) {
+        alerts[i] = Number(legacyAlerts[i]);
+        lastKnownValues.set(`${PREFIX}/alert_${i}`, alerts[i]);
       }
     }
   }
+
+  for (let i = 0; i < alerts.length; i++) {
+    debugSummary.alerts[i] = Number(alerts[i]);
+    pending.set(`${PREFIX}/alert_${i}`, {
+      integerValue: Number(alerts[i]),
+      ...ts,
+    });
+  }
+
+  ingestDebug("Mapped plc/data payload to SiteWise aliases", {
+    keys: Object.keys(raw),
+    summary: debugSummary,
+  });
 }
 
 // ── Flush to SiteWise ───────────────────────────────────

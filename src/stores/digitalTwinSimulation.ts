@@ -7,6 +7,8 @@
  */
 import { useDigitalTwinStore, pushSensorHistory, commitTick } from "./digitalTwinStore";
 import { STAGE_CONFIGS } from "../components/factory3d/digitalTwinLayout";
+import type { PLCParameter } from "../types";
+import type { PLCOutputs } from "../services/plcService";
 import type {
   ManufacturingStage,
   ProductOnBelt,
@@ -57,6 +59,142 @@ let rejectedCount = 0;
 const recentProducedTimestamps: number[] = [];
 let activeScenario: string | null = null;
 let scenarioStartTime = 0;
+
+type DigitalTwinPLCFeed = {
+  active: boolean;
+  paramValues: Record<string, number>;
+  outputs: PLCOutputs | null;
+};
+
+let plcFeed: DigitalTwinPLCFeed = {
+  active: false,
+  paramValues: {},
+  outputs: null,
+};
+const DT_PLC_DEBUG = import.meta.env.DEV || import.meta.env.VITE_PLC_DEBUG === "true";
+let lastPLCOperationSnapshot = "";
+
+function digitalTwinDebug(message: string, details?: unknown) {
+  if (!DT_PLC_DEBUG) return;
+  if (details === undefined) console.debug(`[DigitalTwin][PLC] ${message}`);
+  else console.debug(`[DigitalTwin][PLC] ${message}`, details);
+}
+
+const CORE_PLC_IDS = new Set(["voltage", "current", "relay", "ph", "photoE", "metal"]);
+
+const SENSOR_FALLBACKS: Record<string, string[]> = {
+  intake_gps: ["intake_gps"],
+  intake_fingerprint: ["intake_fingerprint"],
+  intake_lidar: ["intake_lidar"],
+  mixing_ph: ["mixing_ph", "ph"],
+  mixing_orp: ["mixing_orp"],
+  mixing_turbidity: ["mixing_turbidity"],
+  mixing_mq: ["mixing_mq"],
+  forming_pressure: ["forming_pressure"],
+  forming_light: ["forming_light"],
+  curing_o2: ["curing_o2"],
+  curing_mq: ["curing_mq"],
+  curing_motion: ["curing_motion"],
+  quality_lidar: ["quality_lidar"],
+  quality_light: ["quality_light"],
+  quality_turbidity: ["quality_turbidity"],
+  pkg_motion: ["pkg_motion"],
+  pkg_pressure: ["pkg_pressure"],
+  pkg_water: ["pkg_water"],
+  dispatch_gps: ["dispatch_gps", "intake_gps"],
+  dispatch_fingerprint: ["dispatch_fingerprint", "intake_fingerprint"],
+};
+
+function getPLCOverride(sensorId: string): number | undefined {
+  if (!plcFeed.active) return undefined;
+  const keys = SENSOR_FALLBACKS[sensorId] ?? [sensorId];
+  for (const key of keys) {
+    const value = plcFeed.paramValues[key];
+    if (value !== undefined) return value;
+  }
+  return undefined;
+}
+
+function defaultMotorRpm(stageId: StageId, deviceId: string): number {
+  return (
+    STAGE_CONFIGS.find((stage) => stage.id === stageId)
+      ?.outputDeviceConfigs.find((device) => device.deviceId === deviceId)?.defaultRpm ??
+    60
+  );
+}
+
+function applyPLCOperationalOverrides(stages: ManufacturingStage[], thresholdSpeed: number): number {
+  if (!plcFeed.active || !plcFeed.outputs) return thresholdSpeed;
+
+  const outputs = plcFeed.outputs;
+
+  const operationSnapshot = JSON.stringify({
+    photoESensor: outputs.photoESensor,
+    metalSensor: outputs.metalSensor,
+    thresholdSpeed,
+  });
+
+  if (operationSnapshot !== lastPLCOperationSnapshot) {
+    lastPLCOperationSnapshot = operationSnapshot;
+    digitalTwinDebug("Factory operation override updated", {
+      photoESensor: outputs.photoESensor,
+      metalSensor: outputs.metalSensor,
+      thresholdSpeed,
+    });
+  }
+
+  for (const stage of stages) {
+    let stageFaulted = stage.status === "faulted";
+    // Treat "warning" as running — a warning stage is still producing, just degraded.
+    // Only "idle" and "faulted" are non-running states.
+    let stageRunning = stage.status === "running" || stage.status === "warning";
+
+    // Map specific PLC sensors to specific stages.
+    // NOTE: photoESensor is a MOMENTARY product-detection pulse, not a continuous
+    // "conveyor running" signal. Do NOT use it to control the intake running state —
+    // doing so causes intake to flicker idle whenever no product is passing the beam.
+    // The intake stage stays running as long as the system is connected.
+    if (stage.id === "quality") {
+      if (outputs.metalSensor) {
+        stageFaulted = true;
+        stageRunning = false;
+      }
+    }
+
+    if (stageFaulted) {
+      stage.status = "faulted";
+    } else if (!stageRunning) {
+      if (stage.status !== "faulted") {
+        stage.status = "idle";
+      }
+    } else if (stageRunning && stage.status !== "faulted") {
+      // Preserve "warning" status if that's what threshold evaluation set
+      if (stage.status !== "warning") stage.status = "running";
+    }
+
+    // Apply motor states for THIS stage based on its updated status.
+    // Motors keep running for both "running" and "warning" stages — warning means
+    // degraded quality, not a production halt.
+    for (const device of stage.outputDevices) {
+      if (device.type === "emergency_light") {
+        device.active = stage.status === "faulted";
+      }
+      if (device.type === "motor") {
+        if (stage.status === "running" || stage.status === "warning") {
+          device.active = true;
+          device.rpm = defaultMotorRpm(stage.id, device.deviceId);
+          device.direction = "forward";
+        } else {
+          device.active = false;
+          device.rpm = 0;
+          device.direction = "stopped";
+        }
+      }
+    }
+  }
+
+  return thresholdSpeed;
+}
 
 /* ── Initialize stages from config ────────────────────── */
 
@@ -125,7 +263,10 @@ function tickSensors(stages: ManufacturingStage[], dt: number) {
       const sensor = stage.sensors[i];
       const sc = config.sensorConfigs[i];
 
-      const newValue = drift(sensorValues[sc.sensorId], sc.nominal, sc.min, sc.max, sc.volatility, dt);
+      const externalValue = getPLCOverride(sc.sensorId);
+      const newValue = externalValue !== undefined
+        ? clamp(externalValue, sc.min, sc.max)
+        : drift(sensorValues[sc.sensorId], sc.nominal, sc.min, sc.max, sc.volatility, dt);
       sensorValues[sc.sensorId] = newValue;
 
       // Mutate in place
@@ -158,10 +299,17 @@ function evaluateThresholds(stages: ManufacturingStage[]): number {
 
       if (!isEffectTriggered(sensor.value, sc.nominal, effect)) continue;
 
-      switch (effect.effect) {
+      // When live PLC feed is active, downgrade hard-stop effects (emergency_stop / stop)
+      // to quality_degrade so that sensors still being calibrated/developed don't halt
+      // production. Hard stops remain fully active in simulation-scenario mode only.
+      const effectiveEffect =
+        plcFeed.active && (effect.effect === "emergency_stop" || effect.effect === "stop")
+          ? "quality_degrade"
+          : effect.effect;
+
+      switch (effectiveEffect) {
         case "emergency_stop":
           stageStatus = "faulted";
-          minSpeed = 0;
           for (const d of stage.outputDevices) {
             if (d.type === "emergency_light") d.active = true;
             if (d.type === "motor") { d.active = false; d.rpm = 0; d.direction = "stopped"; }
@@ -169,7 +317,6 @@ function evaluateThresholds(stages: ManufacturingStage[]): number {
           break;
         case "stop":
           if (stageStatus !== "faulted") stageStatus = "faulted";
-          minSpeed = 0;
           for (const d of stage.outputDevices) {
             if (d.type === "motor" && d.deviceId === effect.targetDeviceId) {
               d.active = false; d.rpm = 0; d.direction = "stopped";
@@ -424,7 +571,8 @@ let lastTime = Date.now();
 
 function tick() {
   const now = Date.now();
-  const dt = (now - lastTime) / 1000;
+  let dt = (now - lastTime) / 1000;
+  if (dt > 0.1) dt = 0.1; // clamp dt to prevent massive jumps when tab is inactive
   lastTime = now;
 
   const store = useDigitalTwinStore.getState();
@@ -435,7 +583,8 @@ function tick() {
   tickSensors(stages, dt);
 
   // Scenario overrides AFTER normal drift — so scenario values stick
-  if (activeScenario && scenarioFns[activeScenario]) {
+  // When live PLC feed is active, it takes precedence over manual scenarios.
+  if (!plcFeed.active && activeScenario && scenarioFns[activeScenario]) {
     const elapsed = (now - scenarioStartTime) / 1000;
     if (scenarioFns[activeScenario](elapsed, dt)) {
       activeScenario = null;
@@ -453,7 +602,10 @@ function tick() {
     }
   }
 
-  const thresholdSpeed = evaluateThresholds(stages);
+  const thresholdSpeed = applyPLCOperationalOverrides(
+    stages,
+    evaluateThresholds(stages),
+  );
   const userSpeed = useDigitalTwinStore.getState().userSpeedMultiplier;
   const combinedSpeed = thresholdSpeed * userSpeed;
   const throughput = tickProducts(stages, products, dt, combinedSpeed);
@@ -503,6 +655,55 @@ export function runDigitalTwinScenario(name: string) {
   activeScenario = name;
   scenarioStartTime = Date.now();
   useDigitalTwinStore.setState({ activeScenario: name });
+}
+
+export function setDigitalTwinPLCFeed(
+  params: PLCParameter[],
+  outputs: PLCOutputs,
+) {
+  const isLivePayload =
+    params.length > 6 ||
+    params.some((param) => param.id === "temperature" || !CORE_PLC_IDS.has(param.id));
+
+  if (!isLivePayload) {
+    if (plcFeed.active) {
+      digitalTwinDebug("PLC feed disconnected from digital twin; reverting to simulation mode");
+    }
+    plcFeed = {
+      active: false,
+      paramValues: {},
+      outputs: null,
+    };
+    return;
+  }
+
+  const paramValues: Record<string, number> = {};
+
+  for (const param of params) {
+    if (param.placeholder) continue;
+    if (param.kind === "analog" && typeof param.value === "number") {
+      paramValues[param.id] = param.value;
+    } else if (param.kind === "digital" && typeof param.active === "boolean") {
+      paramValues[param.id] = param.active ? 1 : 0;
+    }
+  }
+
+  plcFeed = {
+    active: Object.keys(paramValues).length > 0,
+    paramValues,
+    outputs,
+  };
+
+  digitalTwinDebug("PLC feed snapshot applied to digital twin", {
+    paramCount: Object.keys(paramValues).length,
+    sampleParams: Object.entries(paramValues)
+      .slice(0, 8)
+      .reduce<Record<string, number>>((acc, [key, value]) => {
+        acc[key] = value;
+        return acc;
+      }, {}),
+    outputs,
+  });
 }
 
 export function isDigitalTwinRunning() {

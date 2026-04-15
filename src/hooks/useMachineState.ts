@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { usePLCContext } from "../context/PLCContext";
 import type { MachineState } from "../types";
 
@@ -11,66 +11,61 @@ export interface UseMachineStateResult {
 
 export function useMachineState(): UseMachineStateResult {
   const { outputs, isConnected } = usePLCContext();
-  const [state, setState] = useState<MachineState>("idle");
   const [runTimeSec, setRunTimeSec] = useState(0);
   const [cycleCount, setCycleCount] = useState(0);
   const [rejectCount, setRejectCount] = useState(0);
 
+  const outputsRef = useRef(outputs);
+  const isConnectedRef = useRef(isConnected);
   const prevPhotoE = useRef(false);
   const prevMetal = useRef(false);
-  const lastTickRef = useRef(Date.now());
+  const lastTickRef = useRef(0);
 
-  // Derive machine state from motor/relay signals
   useEffect(() => {
-    if (!isConnected) {
-      setState("idle");
-      return;
-    }
+    outputsRef.current = outputs;
+  }, [outputs]);
 
-    const motorOn = outputs.motorFanOn;
+  useEffect(() => {
+    isConnectedRef.current = isConnected;
+  }, [isConnected]);
+
+  const state = useMemo<MachineState>(() => {
+    if (!isConnected) return "idle";
     const relayOn = outputs.relay?.[0] ?? false;
+    return outputs.motorFanOn || relayOn ? "running" : "idle";
+  }, [isConnected, outputs.motorFanOn, outputs.relay]);
 
-    if (motorOn || relayOn) {
-      setState("running");
-    } else {
-      setState("idle");
-    }
-  }, [outputs.motorFanOn, outputs.relay, isConnected]);
-
-  // Track run time when running
   useEffect(() => {
-    if (state !== "running") return;
-
+    lastTickRef.current = Date.now();
     const interval = setInterval(() => {
       const now = Date.now();
-      const delta = (now - lastTickRef.current) / 1000;
+      const currentOutputs = outputsRef.current;
+      const relayOn = currentOutputs.relay?.[0] ?? false;
+      const running =
+        isConnectedRef.current && (currentOutputs.motorFanOn || relayOn);
+
+      if (running) {
+        const delta = (now - lastTickRef.current) / 1000;
+        setRunTimeSec((prev) => prev + delta);
+      }
+
+      const currentPhotoE = currentOutputs.photoESensor;
+      if (currentPhotoE && !prevPhotoE.current) {
+        setCycleCount((count) => count + 1);
+      }
+
+      const currentMetal = currentOutputs.metalSensor;
+      if (currentMetal && !prevMetal.current) {
+        setRejectCount((count) => count + 1);
+      }
+
+      prevPhotoE.current = currentPhotoE;
+      prevMetal.current = currentMetal;
       lastTickRef.current = now;
-      setRunTimeSec((prev) => prev + delta);
-    }, 1000);
+    }, 250);
 
-    lastTickRef.current = Date.now();
     return () => clearInterval(interval);
-  }, [state]);
-
-  // Count photo-electric rising edges (cycle completions)
-  useEffect(() => {
-    const currentPhotoE = outputs.photoESensor;
-    if (currentPhotoE && !prevPhotoE.current) {
-      setCycleCount((c) => c + 1);
-    }
-    prevPhotoE.current = currentPhotoE;
-  }, [outputs.photoESensor]);
-
-  // Count metal detector rising edges (rejects)
-  useEffect(() => {
-    // Metal detector state comes from params, not outputs
-    // Check if there's a metal detection active in relay/alert signals
-    const metalActive = outputs.alerts?.[0] ?? false;
-    if (metalActive && !prevMetal.current) {
-      setRejectCount((c) => c + 1);
-    }
-    prevMetal.current = metalActive;
-  }, [outputs.alerts]);
+  }, []);
 
   return { state, runTimeSec, cycleCount, rejectCount };
 }

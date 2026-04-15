@@ -110,6 +110,14 @@ export interface ProductOnBelt {
   enteredAt: number;
   /** Visual color based on quality */
   color: string;
+  
+  /** Filling station state (optional) */
+  fillingState?: {
+    isLocked: boolean;          // true when bottle is stopped for filling
+    lockedPosition: number;     // the exact progress value where it's locked
+    fillStartTime: number;      // when filling started
+    nozzleIndex: number;        // which nozzle (0-3) is filling this bottle
+  };
 }
 
 // ── Sensor Config (for simulation) ─────────────────────────

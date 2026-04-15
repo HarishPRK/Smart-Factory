@@ -34,18 +34,20 @@ const MaterialFlow: React.FC<MaterialFlowProps> = ({ path, active }) => {
   const glowMatrix = useMemo(() => new THREE.Matrix4(), []);
   const zeroMatrix = useMemo(() => new THREE.Matrix4().makeScale(0, 0, 0), []);
   const tempPos = useMemo(() => new THREE.Vector3(), []);
+  const glowScale = useMemo(() => new THREE.Vector3(2.5, 2.5, 2.5), []);
 
   useFrame((_, delta) => {
     if (!instanceRef.current || !glowRef.current) return;
 
     for (let i = 0; i < PARTICLE_COUNT; i++) {
       if (active) {
-        progressRef.current[i] = (progressRef.current[i] + (delta * FLOW_SPEED) / curveLength) % 1;
+        progressRef.current[i] =
+          (progressRef.current[i] + (delta * FLOW_SPEED) / curveLength) % 1;
         curve.getPointAt(progressRef.current[i], tempPos);
         tempPos.y += 0.2; // Slightly above belt
         tempMatrix.makeTranslation(tempPos.x, tempPos.y, tempPos.z);
         glowMatrix.makeTranslation(tempPos.x, tempPos.y, tempPos.z);
-        glowMatrix.scale(new THREE.Vector3(2.5, 2.5, 2.5));
+        glowMatrix.scale(glowScale);
       } else {
         tempMatrix.copy(zeroMatrix);
         glowMatrix.copy(zeroMatrix);
@@ -60,12 +62,24 @@ const MaterialFlow: React.FC<MaterialFlowProps> = ({ path, active }) => {
   return (
     <group>
       {/* Core particles */}
-      <instancedMesh ref={instanceRef} args={[undefined, undefined, PARTICLE_COUNT]}>
+      <instancedMesh
+        ref={instanceRef}
+        args={[undefined, undefined, PARTICLE_COUNT]}
+      >
         <boxGeometry args={[0.12, 0.08, 0.12]} />
-        <meshStandardMaterial color="#fbbf24" emissive="#f59e0b" emissiveIntensity={1.2} metalness={0.9} roughness={0.1} />
+        <meshStandardMaterial
+          color="#fbbf24"
+          emissive="#f59e0b"
+          emissiveIntensity={1.2}
+          metalness={0.9}
+          roughness={0.1}
+        />
       </instancedMesh>
       {/* Glow halos */}
-      <instancedMesh ref={glowRef} args={[undefined, undefined, PARTICLE_COUNT]}>
+      <instancedMesh
+        ref={glowRef}
+        args={[undefined, undefined, PARTICLE_COUNT]}
+      >
         <sphereGeometry args={[0.06, 6, 6]} />
         <meshBasicMaterial color="#22d3ee" transparent opacity={0.25} />
       </instancedMesh>

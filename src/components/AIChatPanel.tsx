@@ -1,6 +1,11 @@
 import React, { useState, useRef, useEffect } from "react";
 import { usePLCContext, useMqttBufferContext } from "../context/PLCContext";
-import { isSiteWiseConfigured, fetchAlarms, fetchMetrics, type SiteWiseProperty } from "../services/siteWiseService";
+import {
+  isSiteWiseConfigured,
+  fetchAlarms,
+  fetchMetrics,
+  type SiteWiseProperty,
+} from "../services/siteWiseService";
 
 interface Message {
   role: "user" | "assistant";
@@ -29,9 +34,13 @@ async function buildSiteWiseContext(): Promise<string> {
         const avg = metrics.avg_1h?.value;
         const max = metrics.max_1h?.value;
         if (avg != null || max != null) {
-          lines.push(`${prop.label} (1h): avg=${avg?.toFixed(1) ?? "?"} ${prop.unit}, max=${max?.toFixed(1) ?? "?"} ${prop.unit}`);
+          lines.push(
+            `${prop.label} (1h): avg=${avg?.toFixed(1) ?? "?"} ${prop.unit}, max=${max?.toFixed(1) ?? "?"} ${prop.unit}`,
+          );
         }
-      } catch { /* skip */ }
+      } catch {
+        /* skip */
+      }
     }
 
     // Fetch alarm states
@@ -41,13 +50,19 @@ async function buildSiteWiseContext(): Promise<string> {
       if (active.length > 0) {
         lines.push(`\nACTIVE ALARMS (${active.length}):`);
         for (const a of active) {
-          lines.push(`  - ${a.label}: ${a.property} is ${a.currentValue?.toFixed(1)} (threshold: ${a.threshold.operator} ${a.threshold.value})`);
+          lines.push(
+            `  - ${a.label}: ${a.property} is ${a.currentValue?.toFixed(1)} (threshold: ${a.threshold.operator} ${a.threshold.value})`,
+          );
         }
       } else {
         lines.push(`\nAlarms: All clear (${alarmResp.total} rules monitored)`);
       }
-    } catch { /* skip */ }
-  } catch { /* skip */ }
+    } catch {
+      /* skip */
+    }
+  } catch {
+    /* skip */
+  }
 
   return lines.length > 1 ? lines.join("\n") : "";
 }
@@ -55,17 +70,24 @@ async function buildSiteWiseContext(): Promise<string> {
 function buildPLCContext(
   params: ReturnType<typeof usePLCContext>["params"],
   outputs: ReturnType<typeof usePLCContext>["outputs"],
-  bufferSummary: string
+  bufferSummary: string,
 ): string {
   const lines: string[] = ["--- Live PLC Data ---"];
 
   for (const p of params) {
     if (p.kind === "analog") {
-      lines.push(`${p.label}: ${p.value?.toFixed(p.decimals ?? 1)} ${p.unit ?? ""} (range ${p.min}–${p.max}, nominal ${p.nominal}, status: ${p.status})`);
+      lines.push(
+        `${p.label}: ${p.value?.toFixed(p.decimals ?? 1)} ${p.unit ?? ""} (range ${p.min}–${p.max}, nominal ${p.nominal}, status: ${p.status})`,
+      );
     } else if (p.kind === "digital") {
       lines.push(`${p.label}: ${p.active ? "ACTIVE" : "INACTIVE"}`);
     } else if (p.kind === "relay") {
-      const color = p.accentHex === "#ef4444" ? "RED (sensor triggered)" : "#10b981" ? "GREEN (healthy)" : "UNKNOWN";
+      const color =
+        p.accentHex === "#ef4444"
+          ? "RED (sensor triggered)"
+          : p.accentHex === "#10b981"
+            ? "GREEN (healthy)"
+            : "UNKNOWN";
       lines.push(`Relay: ${color}`);
     }
   }
@@ -87,7 +109,7 @@ interface AIChatPanelProps {
 }
 
 const AIChatPanel: React.FC<AIChatPanelProps> = ({ open, onClose }) => {
-  const { params, outputs } = usePLCContext();
+  const { params, outputs } = usePLCContext(open);
   const buffer = useMqttBufferContext();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -127,7 +149,9 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({ open, onClose }) => {
             const vals = pts.map((p) => p.value);
             const avg = vals.reduce((s, v) => s + v, 0) / vals.length;
             const trend = vals[vals.length - 1] - vals[0];
-            lines.push(`${prop.label}: avg=${avg.toFixed(1)}${prop.unit}, trend=${trend > 0 ? "+" : ""}${trend.toFixed(2)}${prop.unit} (${pts.length} samples)`);
+            lines.push(
+              `${prop.label}: avg=${avg.toFixed(1)}${prop.unit}, trend=${trend > 0 ? "+" : ""}${trend.toFixed(2)}${prop.unit} (${pts.length} samples)`,
+            );
           }
         }
         bufferSummary = lines.join("\n");
@@ -141,19 +165,38 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({ open, onClose }) => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
+          messages: newMessages.map((m) => ({
+            role: m.role,
+            content: m.content,
+          })),
           plcContext: fullContext,
         }),
       });
 
       const data = await res.json();
       if (data.reply) {
-        setMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: data.reply },
+        ]);
       } else {
-        setMessages((prev) => [...prev, { role: "assistant", content: "Sorry, I couldn't process that request." }]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: "Sorry, I couldn't process that request.",
+          },
+        ]);
       }
     } catch {
-      setMessages((prev) => [...prev, { role: "assistant", content: "Connection to AI proxy failed. Make sure `npm run ai-proxy` is running." }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            "Connection to AI proxy failed. Make sure `npm run ai-proxy` is running.",
+        },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -181,13 +224,27 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({ open, onClose }) => {
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500/20 to-cyan-500/20 border border-violet-400/20 flex items-center justify-center">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="none" stroke="#a78bfa" strokeWidth="1.5" />
-                  <path d="M8 12h8M12 8v8" stroke="#67e8f9" strokeWidth="1.5" strokeLinecap="round" />
+                  <path
+                    d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"
+                    fill="none"
+                    stroke="#a78bfa"
+                    strokeWidth="1.5"
+                  />
+                  <path
+                    d="M8 12h8M12 8v8"
+                    stroke="#67e8f9"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
                 </svg>
               </div>
               <div>
-                <div className="text-[13px] font-semibold text-cyan-50 tracking-wide">Factory AI Assistant</div>
-                <div className="text-[10px] text-cyan-300/50">Powered by Claude · Live PLC Context</div>
+                <div className="text-[13px] font-semibold text-cyan-50 tracking-wide">
+                  Factory AI Assistant
+                </div>
+                <div className="text-[10px] text-cyan-300/50">
+                  Powered by Claude · Live PLC Context
+                </div>
               </div>
             </div>
             <button
@@ -195,7 +252,12 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({ open, onClose }) => {
               className="w-8 h-8 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center hover:bg-white/[0.08] transition-colors"
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M3 3l8 8M11 3l-8 8" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" />
+                <path
+                  d="M3 3l8 8M11 3l-8 8"
+                  stroke="#94a3b8"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
               </svg>
             </button>
           </div>
@@ -206,14 +268,27 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({ open, onClose }) => {
               <div className="flex flex-col items-center justify-center h-full gap-4 text-center py-12">
                 <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500/10 to-cyan-500/10 border border-violet-400/10 flex items-center justify-center">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="none" stroke="#a78bfa" strokeWidth="1.2" />
-                    <path d="M8 12h8M12 8v8" stroke="#67e8f9" strokeWidth="1.2" strokeLinecap="round" />
+                    <path
+                      d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"
+                      fill="none"
+                      stroke="#a78bfa"
+                      strokeWidth="1.2"
+                    />
+                    <path
+                      d="M8 12h8M12 8v8"
+                      stroke="#67e8f9"
+                      strokeWidth="1.2"
+                      strokeLinecap="round"
+                    />
                   </svg>
                 </div>
                 <div>
-                  <div className="text-[13px] text-blue-200/60 font-medium">Ask me about the factory</div>
+                  <div className="text-[13px] text-blue-200/60 font-medium">
+                    Ask me about the factory
+                  </div>
                   <div className="text-[11px] text-blue-300/30 mt-1.5 leading-relaxed max-w-[260px]">
-                    I can see live PLC data. Try asking about sensor values, machine status, or anomalies.
+                    I can see live PLC data. Try asking about sensor values,
+                    machine status, or anomalies.
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 mt-2 justify-center">
@@ -225,7 +300,9 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({ open, onClose }) => {
                   ].map((q) => (
                     <button
                       key={q}
-                      onClick={() => { setInput(q); }}
+                      onClick={() => {
+                        setInput(q);
+                      }}
                       className="text-[10px] px-3 py-1.5 rounded-lg bg-cyan-500/[0.06] border border-cyan-400/10 text-cyan-300/60 hover:bg-cyan-500/[0.12] hover:text-cyan-200/80 transition-all"
                     >
                       {q}
@@ -248,7 +325,9 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({ open, onClose }) => {
                   }`}
                 >
                   {msg.role === "assistant" && (
-                    <div className="text-[9px] text-violet-400/60 font-semibold uppercase tracking-wider mb-1.5">Claude</div>
+                    <div className="text-[9px] text-violet-400/60 font-semibold uppercase tracking-wider mb-1.5">
+                      Claude
+                    </div>
                   )}
                   <div className="whitespace-pre-wrap">{msg.content}</div>
                 </div>
@@ -259,11 +338,22 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({ open, onClose }) => {
               <div className="flex justify-start">
                 <div className="bg-white/[0.04] border border-white/[0.06] rounded-xl px-4 py-3 flex items-center gap-2">
                   <div className="flex gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-violet-400/60 animate-bounce" style={{ animationDelay: "0ms" }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-violet-400/60 animate-bounce" style={{ animationDelay: "150ms" }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-violet-400/60 animate-bounce" style={{ animationDelay: "300ms" }} />
+                    <span
+                      className="w-1.5 h-1.5 rounded-full bg-violet-400/60 animate-bounce"
+                      style={{ animationDelay: "0ms" }}
+                    />
+                    <span
+                      className="w-1.5 h-1.5 rounded-full bg-violet-400/60 animate-bounce"
+                      style={{ animationDelay: "150ms" }}
+                    />
+                    <span
+                      className="w-1.5 h-1.5 rounded-full bg-violet-400/60 animate-bounce"
+                      style={{ animationDelay: "300ms" }}
+                    />
                   </div>
-                  <span className="text-[10px] text-blue-300/40">Analyzing factory data...</span>
+                  <span className="text-[10px] text-blue-300/40">
+                    Analyzing factory data...
+                  </span>
                 </div>
               </div>
             )}
@@ -290,7 +380,13 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({ open, onClose }) => {
                 className="w-8 h-8 rounded-lg bg-cyan-500/[0.12] border border-cyan-400/15 flex items-center justify-center hover:bg-cyan-500/[0.2] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                  <path d="M5 12h14M13 6l6 6-6 6" stroke="#67e8f9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path
+                    d="M5 12h14M13 6l6 6-6 6"
+                    stroke="#67e8f9"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
               </button>
             </div>

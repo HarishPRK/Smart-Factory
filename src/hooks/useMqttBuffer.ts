@@ -7,7 +7,7 @@
  * Buffer holds up to 600 entries (~10 minutes at 1 msg/sec).
  */
 
-import { useEffect, useRef, useCallback } from "react";
+import { useRef, useCallback, useMemo } from "react";
 import type { PLCParameter } from "../types";
 import type { PLCOutputs } from "../services/plcService";
 
@@ -30,6 +30,7 @@ function extractValues(params: PLCParameter[], outputs: PLCOutputs): Record<stri
   for (const p of params) {
     if (p.kind === "analog" && p.value !== undefined) {
       values[p.id] = p.value;
+      if (p.id === "ph") values.pH = p.value;
     } else if (p.kind === "digital" && p.active !== undefined) {
       values[p.id] = p.active ? 1 : 0;
     }
@@ -47,6 +48,8 @@ function extractValues(params: PLCParameter[], outputs: PLCOutputs): Record<stri
 
   // Motor & emergency
   values.motor = outputs.motorFanOn ? 1 : 0;
+  values.photoE_sensor = outputs.photoESensor ? 1 : 0;
+  values.metal_sensor = outputs.metalSensor ? 1 : 0;
   values.push_button = outputs.pushButton ? 1 : 0;
 
   return values;
@@ -96,7 +99,10 @@ export function useMqttBuffer() {
 
   const getBufferSize = useCallback(() => bufferRef.current.length, []);
 
-  return { push, getHistory, getBufferSize };
+  return useMemo(
+    () => ({ push, getHistory, getBufferSize }),
+    [push, getHistory, getBufferSize],
+  );
 }
 
 export type MqttBuffer = ReturnType<typeof useMqttBuffer>;
