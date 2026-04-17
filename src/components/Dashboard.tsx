@@ -1,12 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense, lazy } from "react";
 import KPIBar from "./KPIBar";
-import ActiveMachinery from "./ActiveMachinery";
-import CurrentConsumption from "./CurrentConsumption";
 import ZoneTabs from "./ZoneTabs";
 import FilterBar from "./FilterBar";
 import workerIcon from "../assets/icons/worker.svg";
-import FactoryScene from "./factory3d/FactoryScene";
-import PLCControlRoom from "./factory3d/PLCControlRoom";
 import capgeminiLogo from "../assets/capgemini-logo.jpeg";
 import alertWarning from "../assets/icons/alert_warning.svg";
 import gearIcon from "../assets/icons/Gear.svg";
@@ -17,13 +13,17 @@ import { computeOverviewChips } from "../data/mockData";
 import PLCParametersWidget from "./PLCParametersWidget";
 import MotorFanWidget from "./MotorFanWidget";
 import EmergencyLightWidget from "./EmergencyLightWidget";
-import AIAssistantModal, { AIFloatingButton } from "./AIAssistantModal";
-import NotificationDrawer from "./NotificationDrawer";
-import KPIAnalyticsPanel from "./KPIAnalyticsPanel";
-import OEEPanel from "./OEEPanel";
-import PredictivePanel from "./PredictivePanel";
-import DigitalTwinPanel from "./DigitalTwinPanel";
+import { AIFloatingButton } from "./AIAssistantModal";
 import { usePredictionStore } from "../stores/predictionStore";
+
+const FactoryScene = lazy(() => import("./factory3d/FactoryScene"));
+const PLCControlRoom = lazy(() => import("./factory3d/PLCControlRoom"));
+const AIAssistantModal = lazy(() => import("./AIAssistantModal"));
+const NotificationDrawer = lazy(() => import("./NotificationDrawer"));
+const KPIAnalyticsPanel = lazy(() => import("./KPIAnalyticsPanel"));
+const OEEPanel = lazy(() => import("./OEEPanel"));
+const PredictivePanel = lazy(() => import("./PredictivePanel"));
+const DigitalTwinPanel = lazy(() => import("./DigitalTwinPanel"));
 
 const Dashboard: React.FC = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -50,7 +50,11 @@ const Dashboard: React.FC = () => {
       <header className="glass flex items-center justify-between gap-4 flex-none animate-fade-in header-glow rounded-[28px] px-5 py-4">
         <div className="flex items-center gap-4 min-w-0">
           <div className="w-11 h-11 rounded-[16px] flex items-center justify-center relative group/logo cursor-pointer transition-all duration-300 overflow-hidden bg-white">
-            <img src={capgeminiLogo} alt="Capgemini" className="w-9 h-9 object-contain group-hover/logo:scale-110 transition-transform duration-300" />
+            <img
+              src={capgeminiLogo}
+              alt="Capgemini"
+              className="w-9 h-9 object-contain group-hover/logo:scale-110 transition-transform duration-300"
+            />
             <div
               className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-300 rounded-full border-2 border-[#07192f] shadow-[0_0_10px_rgba(52,211,153,0.8)] animate-pulse-glow"
               style={{ color: "#6ee7b7" }}
@@ -126,7 +130,10 @@ const Dashboard: React.FC = () => {
 
           <div className="hidden xl:block h-6 w-px bg-gradient-to-b from-transparent via-cyan-300/20 to-transparent"></div>
 
-          <button onClick={() => setNotifOpen(true)} className="icon-btn notification-bell w-10 h-10 flex items-center justify-center rounded-full glass text-cyan-100/50 hover:text-white relative transition-all duration-300 hover:shadow-[0_0_24px_rgba(34,211,238,0.15)]">
+          <button
+            onClick={() => setNotifOpen(true)}
+            className="icon-btn notification-bell w-10 h-10 flex items-center justify-center rounded-full glass text-cyan-100/50 hover:text-white relative transition-all duration-300 hover:shadow-[0_0_24px_rgba(34,211,238,0.15)]"
+          >
             <svg
               width="16"
               height="16"
@@ -200,33 +207,30 @@ const Dashboard: React.FC = () => {
 
       {/* Main Grid */}
       <div className="grid grid-cols-12 gap-4 flex-grow min-h-0 overflow-hidden">
-        {/* Left Sidebar */}
-        <div className="col-span-3 flex flex-col gap-4 h-full min-h-0">
-          <ActiveMachinery className="flex-[3] min-h-0" />
-          <CurrentConsumption className="flex-[2] min-h-0" />
-        </div>
-
-        {/* Center Content */}
-        <div className="col-span-6 flex flex-col gap-4 h-full min-h-0">
-          <div className="flex items-end justify-between gap-4 px-1 animate-fade-in delay-1">
-            <div>
-              <div className="text-[11px] font-semibold text-cyan-200/70 uppercase tracking-[0.18em]">
+        {/* Center Content — expanded for larger factory floor */}
+        <div className="col-span-9 flex flex-col gap-4 h-full min-h-0">
+          <div className="relative flex items-end px-1 animate-fade-in delay-1">
+            <div className="w-full text-center">
+              <div className="section-title mx-auto inline-flex items-center gap-2">
+                <span className="ind-live-dot" />
                 Operations Snapshot
               </div>
-              <div className="text-[18px] font-semibold text-cyan-50 mt-1 tracking-tight leading-tight">
+              <div className="text-[18px] font-semibold text-slate-100 mt-2 tracking-tight leading-tight">
                 Monitor alerts, machine health, and plant KPIs in one view.
               </div>
+              <div className="divider-animated mt-3 mx-auto" style={{ maxWidth: 320 }} />
             </div>
-            <div className="flex items-center gap-2 flex-wrap justify-end">
+            <div className="absolute right-1 bottom-0 flex items-center gap-2 flex-wrap justify-end">
               {overviewChips.map((chip) => (
                 <div
                   key={chip.label}
-                  className={`px-3 py-2 rounded-xl backdrop-blur-xl ${chip.tone}`}
+                  className={`px-3 py-2 rounded-md ${chip.tone}`}
+                  style={{ border: "1px solid #2a3444", background: "rgba(20,27,39,0.7)" }}
                 >
-                  <div className="text-[8px] uppercase tracking-[0.15em] font-semibold opacity-70">
+                  <div className="text-[8px] uppercase tracking-[0.18em] font-semibold text-slate-400">
                     {chip.label}
                   </div>
-                  <div className="text-sm font-semibold mt-0.5">
+                  <div className="text-sm font-semibold mt-0.5 ind-data">
                     {chip.value}
                   </div>
                 </div>
@@ -241,9 +245,17 @@ const Dashboard: React.FC = () => {
             onDigitalTwinClick={() => setDigitalTwinOpen(true)}
             predAlertCount={predAlertCount}
           />
-          <div className="flex-grow min-h-0 card relative overflow-hidden group">
+          <div className="flex-grow min-h-0 card data-trace corner-marks relative overflow-hidden group">
             {/* 3D Scene — Factory or PLC Control Room */}
-            {sceneView === "factory" ? <FactoryScene /> : <PLCControlRoom />}
+            <Suspense
+              fallback={
+                <div className="absolute inset-0 flex items-center justify-center text-cyan-200/60 text-[11px]">
+                  Initializing 3D scene…
+                </div>
+              }
+            >
+              {sceneView === "factory" ? <FactoryScene /> : <PLCControlRoom />}
+            </Suspense>
 
             {/* Gradient overlays */}
             <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-[#030b1a]/60 to-transparent pointer-events-none z-10"></div>
@@ -251,7 +263,12 @@ const Dashboard: React.FC = () => {
 
             {/* View switcher tab */}
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex gap-1 p-1 rounded-xl bg-black/40 backdrop-blur-md border border-cyan-300/10">
-              {([["factory", "Factory Floor"], ["plc", "PLC Controls"]] as const).map(([id, label]) => (
+              {(
+                [
+                  ["factory", "Factory Floor"],
+                  ["plc", "PLC Controls"],
+                ] as const
+              ).map(([id, label]) => (
                 <button
                   key={id}
                   onClick={() => setSceneView(id)}
@@ -267,11 +284,15 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* Overlays — only show on factory view */}
-            <div className={`absolute top-14 left-5 z-20 pointer-events-auto ${sceneView !== "factory" ? "hidden" : ""}`}>
+            <div
+              className={`absolute top-14 left-5 z-20 pointer-events-auto ${sceneView !== "factory" ? "hidden" : ""}`}
+            >
               <ZoneTabs />
             </div>
 
-            <div className={`absolute top-[280px] right-5 glass rounded-2xl px-5 py-3 flex items-center gap-4 z-20 hidden`}>
+            <div
+              className={`absolute top-[280px] right-5 glass rounded-2xl px-5 py-3 flex items-center gap-4 z-20 hidden`}
+            >
               <div className="text-right">
                 <div className="text-lg font-semibold gradient-number leading-none">
                   2,498
@@ -313,13 +334,15 @@ const Dashboard: React.FC = () => {
                       }`}
                     >
                       {/* Alert icon */}
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center border flex-shrink-0 ${
-                        alert.severity === "critical"
-                          ? "bg-red-500/[0.10] border-red-500/[0.15] shadow-[0_0_16px_rgba(239,68,68,0.12)]"
-                          : alert.severity === "warning"
-                            ? "bg-amber-500/[0.10] border-amber-500/[0.15] shadow-[0_0_16px_rgba(245,158,11,0.12)]"
-                            : "bg-blue-500/[0.10] border-blue-500/[0.15] shadow-[0_0_16px_rgba(59,130,246,0.12)]"
-                      }`}>
+                      <div
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center border flex-shrink-0 ${
+                          alert.severity === "critical"
+                            ? "bg-red-500/[0.10] border-red-500/[0.15] shadow-[0_0_16px_rgba(239,68,68,0.12)]"
+                            : alert.severity === "warning"
+                              ? "bg-amber-500/[0.10] border-amber-500/[0.15] shadow-[0_0_16px_rgba(245,158,11,0.12)]"
+                              : "bg-blue-500/[0.10] border-blue-500/[0.15] shadow-[0_0_16px_rgba(59,130,246,0.12)]"
+                        }`}
+                      >
                         <img
                           src={alertWarning}
                           alt="Warning"
@@ -327,22 +350,26 @@ const Dashboard: React.FC = () => {
                         />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className={`text-[12px] font-medium transition-colors truncate ${
-                          alert.severity === "critical"
-                            ? "text-red-200/90 group-hover/alert:text-red-100"
-                            : alert.severity === "warning"
-                              ? "text-amber-200/90 group-hover/alert:text-amber-100"
-                              : "text-blue-200/90 group-hover/alert:text-blue-100"
-                        }`}>
+                        <div
+                          className={`text-[12px] font-medium transition-colors truncate ${
+                            alert.severity === "critical"
+                              ? "text-red-200/90 group-hover/alert:text-red-100"
+                              : alert.severity === "warning"
+                                ? "text-amber-200/90 group-hover/alert:text-amber-100"
+                                : "text-blue-200/90 group-hover/alert:text-blue-100"
+                          }`}
+                        >
                           {alert.machineName}
                         </div>
-                        <div className={`text-[10px] mt-0.5 font-medium flex items-center gap-1.5 ${
-                          alert.severity === "critical"
-                            ? "text-red-400/60"
-                            : alert.severity === "warning"
-                              ? "text-amber-400/60"
-                              : "text-blue-400/60"
-                        }`}>
+                        <div
+                          className={`text-[10px] mt-0.5 font-medium flex items-center gap-1.5 ${
+                            alert.severity === "critical"
+                              ? "text-red-400/60"
+                              : alert.severity === "warning"
+                                ? "text-amber-400/60"
+                                : "text-blue-400/60"
+                          }`}
+                        >
                           <span
                             className={`w-1.5 h-1.5 rounded-full animate-pulse-glow ${
                               alert.severity === "critical"
@@ -351,26 +378,37 @@ const Dashboard: React.FC = () => {
                                   ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.7)]"
                                   : "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.7)]"
                             }`}
-                            style={{ color: alert.severity === "critical" ? "#ef4444" : alert.severity === "warning" ? "#f59e0b" : "#3b82f6" }}
+                            style={{
+                              color:
+                                alert.severity === "critical"
+                                  ? "#ef4444"
+                                  : alert.severity === "warning"
+                                    ? "#f59e0b"
+                                    : "#3b82f6",
+                            }}
                           ></span>
                           {alert.issue} • {alert.time}
                         </div>
                       </div>
                       {/* Glow */}
-                      <div className={`absolute -bottom-6 -left-6 w-20 h-20 blur-[25px] rounded-full pointer-events-none transition-all duration-500 ${
-                        alert.severity === "critical"
-                          ? "bg-red-500/[0.06] group-hover/alert:bg-red-500/[0.10]"
-                          : alert.severity === "warning"
-                            ? "bg-amber-500/[0.06] group-hover/alert:bg-amber-500/[0.10]"
-                            : "bg-blue-500/[0.06] group-hover/alert:bg-blue-500/[0.10]"
-                      }`}></div>
-                      <div className={`absolute -top-8 -right-8 w-16 h-16 blur-[20px] rounded-full pointer-events-none ${
-                        alert.severity === "critical"
-                          ? "bg-red-500/[0.03]"
-                          : alert.severity === "warning"
-                            ? "bg-amber-500/[0.03]"
-                            : "bg-blue-500/[0.03]"
-                      }`}></div>
+                      <div
+                        className={`absolute -bottom-6 -left-6 w-20 h-20 blur-[25px] rounded-full pointer-events-none transition-all duration-500 ${
+                          alert.severity === "critical"
+                            ? "bg-red-500/[0.06] group-hover/alert:bg-red-500/[0.10]"
+                            : alert.severity === "warning"
+                              ? "bg-amber-500/[0.06] group-hover/alert:bg-amber-500/[0.10]"
+                              : "bg-blue-500/[0.06] group-hover/alert:bg-blue-500/[0.10]"
+                        }`}
+                      ></div>
+                      <div
+                        className={`absolute -top-8 -right-8 w-16 h-16 blur-[20px] rounded-full pointer-events-none ${
+                          alert.severity === "critical"
+                            ? "bg-red-500/[0.03]"
+                            : alert.severity === "warning"
+                              ? "bg-amber-500/[0.03]"
+                              : "bg-blue-500/[0.03]"
+                        }`}
+                      ></div>
                     </div>
                   ))}
                 </div>
@@ -379,25 +417,53 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Sidebar */}
+        {/* Right Sidebar — PLC + motor/emergency only */}
         <div className="col-span-3 flex flex-col gap-3 h-full min-h-0">
-          <PLCParametersWidget className="flex-[2.2] min-h-0" />
-
+          <PLCParametersWidget className="flex-[3] min-h-0" />
           <div className="flex-[1] min-h-0 flex gap-3">
             <MotorFanWidget className="flex-1 min-h-0" />
             <EmergencyLightWidget className="flex-1 min-h-0" />
           </div>
-
         </div>
       </div>
 
       <AIFloatingButton onClick={() => setAiChatOpen(true)} />
-      <AIAssistantModal open={aiChatOpen} onClose={() => setAiChatOpen(false)} />
-      <NotificationDrawer open={notifOpen} onClose={() => setNotifOpen(false)} alerts={filteredAlerts} />
-      <KPIAnalyticsPanel open={analyticsOpen} onClose={() => setAnalyticsOpen(false)} />
-      <OEEPanel open={oeeOpen} onClose={() => setOeeOpen(false)} />
-      <PredictivePanel open={predictiveOpen} onClose={() => setPredictiveOpen(false)} />
-      <DigitalTwinPanel open={digitalTwinOpen} onClose={() => setDigitalTwinOpen(false)} />
+      <Suspense fallback={null}>
+        {aiChatOpen && (
+          <AIAssistantModal
+            open={aiChatOpen}
+            onClose={() => setAiChatOpen(false)}
+          />
+        )}
+        {notifOpen && (
+          <NotificationDrawer
+            open={notifOpen}
+            onClose={() => setNotifOpen(false)}
+            alerts={filteredAlerts}
+          />
+        )}
+        {analyticsOpen && (
+          <KPIAnalyticsPanel
+            open={analyticsOpen}
+            onClose={() => setAnalyticsOpen(false)}
+          />
+        )}
+        {oeeOpen && (
+          <OEEPanel open={oeeOpen} onClose={() => setOeeOpen(false)} />
+        )}
+        {predictiveOpen && (
+          <PredictivePanel
+            open={predictiveOpen}
+            onClose={() => setPredictiveOpen(false)}
+          />
+        )}
+        {digitalTwinOpen && (
+          <DigitalTwinPanel
+            open={digitalTwinOpen}
+            onClose={() => setDigitalTwinOpen(false)}
+          />
+        )}
+      </Suspense>
     </div>
   );
 };

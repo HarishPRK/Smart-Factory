@@ -4,6 +4,7 @@ import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import * as THREE from "three";
 import type { ManufacturingStage } from "../../types/digitalTwin";
+import { useDigitalTwinStore } from "../../stores/digitalTwinStore";
 
 interface ControlBoard3DProps {
   stage: ManufacturingStage;
@@ -12,11 +13,25 @@ interface ControlBoard3DProps {
 }
 
 const ControlBoard3D: React.FC<ControlBoard3DProps> = ({
-  stage,
+  stage: stageProp,
   position,
   visible = false,
 }) => {
   const screenRef = useRef<THREE.Mesh>(null);
+
+  // Subscribe to the digital-twin tick (500ms) so the board reflects live
+  // sensor values streaming in from the PLC feed. The simulation mutates the
+  // stage object in place, so without a tick-triggered re-render React keeps
+  // showing whatever values were present at initial mount.
+  const tick = useDigitalTwinStore((s) => s.tick);
+  // Always pull the latest mutable stage reference by id, so live PLC values
+  // (e.g. forming_pressure) propagate immediately.
+  const liveStage = useDigitalTwinStore
+    .getState()
+    .stages.find((s) => s.id === stageProp.id);
+  const stage = liveStage ?? stageProp;
+  // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+  tick;
 
   useFrame(({ clock }) => {
     if (!screenRef.current) return;

@@ -1,10 +1,14 @@
 "use no memo";
 import React, { useRef, useMemo, useState, useCallback } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { AdaptiveDpr, OrbitControls } from "@react-three/drei";
+import {
+  AdaptiveDpr,
+  ContactShadows,
+  MeshReflectorMaterial,
+  OrbitControls,
+} from "@react-three/drei";
 import * as THREE from "three";
 import ConveyorBelt from "./ConveyorBelt";
-import MaterialFlow from "./MaterialFlow";
 import ProcessPipeline3D from "./ProcessPipeline3D";
 import SensorHUD from "./SensorHUD";
 import CameraController from "./CameraController";
@@ -20,9 +24,12 @@ import FactoryExtras3D from "./FactoryExtras3D";
 import FactoryPremium3D from "./FactoryPremium3D";
 import FactoryCompound3D from "./FactoryCompound3D";
 import FactoryShowpiece3D from "./FactoryShowpiece3D";
+import PostFxStack from "./PostFxStack";
 import { CONVEYOR_PATH } from "./factoryLayout";
 import { useDigitalTwinStore } from "../../stores/digitalTwinStore";
 import { usePLCStore } from "../../stores/plcStore";
+import { useCaptureMode } from "../../hooks/useCaptureMode";
+import { useSceneSettingsStore } from "../../stores/sceneSettingsStore";
 
 /* ── 🎉 EASTER EGG: Disco Party Mode (Konami Code) ──── */
 
@@ -31,6 +38,16 @@ const MAX_DPR =
   typeof window === "undefined"
     ? 1
     : Math.min(window.devicePixelRatio || 1, 1.25);
+
+function RendererConfig() {
+  const gl = useThree((s) => s.gl);
+  React.useEffect(() => {
+    gl.toneMapping = THREE.ACESFilmicToneMapping;
+    gl.toneMappingExposure = 1.0;
+    gl.outputColorSpace = THREE.SRGBColorSpace;
+  }, [gl]);
+  return null;
+}
 
 function pseudoRandom(seed: number) {
   const x = Math.sin(seed * 12.9898) * 43758.5453123;
@@ -179,6 +196,10 @@ const OpenFloor: React.FC = () => {
   const H = 7; // wall height
   const ROOF_H = 8; // roof height
 
+  const postFxQuality = useSceneSettingsStore((s) => s.postFxQuality);
+  const reflectiveFloor = postFxQuality !== "off";
+  const physicalGlass = postFxQuality === "high" || postFxQuality === "ultra";
+
   return (
     <group>
       {/* ═══ REFLECTIVE EPOXY FLOOR ═══ */}
@@ -192,19 +213,35 @@ const OpenFloor: React.FC = () => {
         <meshStandardMaterial color="#0c1018" metalness={0.2} roughness={0.8} />
       </mesh>
 
-      {/* Main factory floor — high-gloss epoxy */}
+      {/* Main factory floor — high-gloss epoxy (mirror-reflective on MED+) */}
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, 0.0, 0]}
         receiveShadow
       >
         <planeGeometry args={[W, D]} />
-        <meshStandardMaterial
-          color="#151d2b"
-          metalness={0.6}
-          roughness={0.25}
-          envMapIntensity={0.5}
-        />
+        {reflectiveFloor ? (
+          <MeshReflectorMaterial
+            color="#0f1520"
+            metalness={0.4}
+            roughness={0.75}
+            blur={[300, 100]}
+            mixBlur={3}
+            mixStrength={0.35}
+            mirror={0.15}
+            resolution={256}
+            depthScale={1.2}
+            minDepthThreshold={0.8}
+            maxDepthThreshold={1.4}
+          />
+        ) : (
+          <meshStandardMaterial
+            color="#151d2b"
+            metalness={0.6}
+            roughness={0.25}
+            envMapIntensity={0.5}
+          />
+        )}
       </mesh>
 
       {/* Floor grid lines — subtle modern pattern */}
@@ -317,7 +354,7 @@ const OpenFloor: React.FC = () => {
         <meshStandardMaterial
           color="#a8c8e8"
           transparent
-          opacity={0.08}
+          opacity={physicalGlass ? 0.12 : 0.08}
           metalness={0.9}
           roughness={0.05}
           side={THREE.DoubleSide}
@@ -329,7 +366,7 @@ const OpenFloor: React.FC = () => {
         <meshStandardMaterial
           color="#a8c8e8"
           transparent
-          opacity={0.08}
+          opacity={physicalGlass ? 0.12 : 0.08}
           metalness={0.9}
           roughness={0.05}
           side={THREE.DoubleSide}
@@ -341,7 +378,7 @@ const OpenFloor: React.FC = () => {
         <meshStandardMaterial
           color="#a8c8e8"
           transparent
-          opacity={0.08}
+          opacity={physicalGlass ? 0.12 : 0.08}
           metalness={0.9}
           roughness={0.05}
           side={THREE.DoubleSide}
@@ -353,7 +390,7 @@ const OpenFloor: React.FC = () => {
         <meshStandardMaterial
           color="#a8c8e8"
           transparent
-          opacity={0.08}
+          opacity={physicalGlass ? 0.12 : 0.08}
           metalness={0.9}
           roughness={0.05}
           side={THREE.DoubleSide}
@@ -400,32 +437,9 @@ const OpenFloor: React.FC = () => {
 
       {/* Roof removed — open-top factory for clear visibility from above */}
 
-      {/* ═══ LED CEILING LIGHT PANELS ═══ */}
-      {[-9, -3, 3, 9].map((x) =>
-        [-6, 0, 6].map((z) => (
-          <group key={`led-${x}-${z}`} position={[x, ROOF_H - 0.05, z]}>
-            {/* Light housing */}
-            <mesh>
-              <boxGeometry args={[2.5, 0.06, 1.2]} />
-              <meshStandardMaterial
-                color="#e2e8f0"
-                emissive="#e0e8ff"
-                emissiveIntensity={0.8}
-                metalness={0.3}
-                roughness={0.4}
-              />
-            </mesh>
-            {/* Actual light source */}
-            <pointLight
-              position={[0, -0.2, 0]}
-              color="#e8f0ff"
-              intensity={0.8}
-              distance={10}
-              decay={2}
-            />
-          </group>
-        )),
-      )}
+      {/* LED ceiling panels removed — overhead fixtures were visible through
+          the open roof and distracted from the factory floor. Core directional +
+          hemisphere + pointLights from SceneContent already provide lighting. */}
 
       {/* Safety line around production floor perimeter */}
       {[
@@ -453,7 +467,10 @@ const OpenFloor: React.FC = () => {
 
 /* ── Day/Night Lighting Adjuster ─────────────────────── */
 
-const DayNightLighting: React.FC<{ isNight: boolean }> = ({ isNight }) => {
+const DayNightLighting: React.FC<{ isNight: boolean; useIBL: boolean }> = ({
+  isNight,
+  useIBL,
+}) => {
   const { scene } = useThree();
   const ambientRef = useRef<THREE.AmbientLight>(null);
   const dayBackground = useMemo(() => new THREE.Color("#87CEEB"), []);
@@ -465,9 +482,11 @@ const DayNightLighting: React.FC<{ isNight: boolean }> = ({ isNight }) => {
     if (scene.background instanceof THREE.Color) {
       scene.background.lerp(targetBg, 0.02);
     }
-    // Adjust ambient
+    // Ambient — legacy fill uses full intensity; IBL tier uses a tiny top-up
     if (ambientRef.current) {
-      const targetIntensity = isNight ? 0.7 : 1.8;
+      const nightTarget = useIBL ? 0.08 : 0.7;
+      const dayTarget = useIBL ? 0.25 : 1.8;
+      const targetIntensity = isNight ? nightTarget : dayTarget;
       ambientRef.current.intensity +=
         (targetIntensity - ambientRef.current.intensity) * 0.02;
     }
@@ -482,6 +501,43 @@ const DayNightLighting: React.FC<{ isNight: boolean }> = ({ isNight }) => {
   );
 };
 
+/**
+ * Legacy fill rig — hemisphere + 3 overhead HID point lights + a fill
+ * directional. Used on HIGH/MED/LOW tiers where HDRI IBL isn't active.
+ * On ULTRA the HDRI environment replaces all of these.
+ */
+const LegacyFillLights: React.FC = () => (
+  <>
+    <directionalLight
+      position={[-10, 20, -8]}
+      intensity={0.6}
+      color="#dde4f0"
+    />
+    <hemisphereLight args={["#7aa2d4", "#1a2030", 0.8]} />
+    <pointLight
+      position={[-5, 5, 4]}
+      color="#e0e8ff"
+      intensity={1.15}
+      distance={18}
+      decay={2}
+    />
+    <pointLight
+      position={[0, 5, 0]}
+      color="#dde4ff"
+      intensity={1.1}
+      distance={18}
+      decay={2}
+    />
+    <pointLight
+      position={[5, 5, -4]}
+      color="#e0e8ff"
+      intensity={1.05}
+      distance={18}
+      decay={2}
+    />
+  </>
+);
+
 const LiveConveyorSystem: React.FC = React.memo(() => {
   const photoESensorActive = usePLCStore((s) => s.photoESensor);
   const motorFanOn = usePLCStore((s) => s.motorFanOn);
@@ -494,7 +550,6 @@ const LiveConveyorSystem: React.FC = React.memo(() => {
   return (
     <>
       <ConveyorBelt path={CONVEYOR_PATH} running={running} />
-      <MaterialFlow path={CONVEYOR_PATH} active={running} />
     </>
   );
 });
@@ -510,16 +565,24 @@ const SceneContent: React.FC<{
   isNight: boolean;
   discoMode: boolean;
 }> = React.memo(({ isNight, discoMode }) => {
+  const particlesEnabled = useSceneSettingsStore((s) => s.particlesEnabled);
+  const extrasEnabled = useSceneSettingsStore((s) => s.extrasEnabled);
+  const cctvEnabled = useSceneSettingsStore((s) => s.cctvEnabled);
   return (
     <>
-      {/* Dynamic day/night ambient lighting */}
-      <DayNightLighting isNight={isNight} />
+      {/* Legacy fill lighting for all tiers. Post-processing (Phase 2) will
+          differentiate ULTRA visually instead of IBL, which fights this scene's
+          hand-tuned material palette. */}
+      <DayNightLighting isNight={isNight} useIBL={false} />
+      <LegacyFillLights />
       <directionalLight
         position={[15, 30, 12]}
-        intensity={2.0}
+        intensity={1.8}
         castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
+        shadow-mapSize-width={4096}
+        shadow-mapSize-height={4096}
+        shadow-bias={-0.0002}
+        shadow-normalBias={0.04}
         shadow-camera-far={80}
         shadow-camera-left={-22}
         shadow-camera-right={22}
@@ -527,34 +590,14 @@ const SceneContent: React.FC<{
         shadow-camera-bottom={-22}
         color="#f0ecff"
       />
-      <directionalLight
-        position={[-10, 20, -8]}
-        intensity={0.6}
-        color="#dde4f0"
-      />
-      <hemisphereLight args={["#7aa2d4", "#1a2030", 0.8]} />
-
-      {/* Bright overhead area lights per row — like real warehouse HID lamps */}
-      <pointLight
-        position={[-5, 5, 4]}
-        color="#e0e8ff"
-        intensity={1.15}
-        distance={18}
-        decay={2}
-      />
-      <pointLight
-        position={[0, 5, 0]}
-        color="#dde4ff"
-        intensity={1.1}
-        distance={18}
-        decay={2}
-      />
-      <pointLight
-        position={[5, 5, -4]}
-        color="#e0e8ff"
-        intensity={1.05}
-        distance={18}
-        decay={2}
+      <ContactShadows
+        position={[0, 0.01, 0]}
+        opacity={0.55}
+        scale={80}
+        blur={2.4}
+        far={6}
+        resolution={1024}
+        frames={1}
       />
 
       {/* Accent colored uplights under each production row */}
@@ -615,7 +658,7 @@ const SceneContent: React.FC<{
 
       {/* Open floor — no walls or roof */}
       <OpenFloor />
-      <AmbientParticles />
+      {particlesEnabled && <AmbientParticles />}
 
       {/* Zig-zag Conveyor Belt */}
       <LiveConveyorSystem />
@@ -624,7 +667,7 @@ const SceneContent: React.FC<{
       <ProcessPipeline3D />
 
       {/* Animated atmosphere — steam, sparks, glowing effects */}
-      <FactoryAtmosphere3D />
+      {particlesEnabled && <FactoryAtmosphere3D />}
 
       {/* Ground infrastructure — pipe racks, walkways, signage */}
       <FactoryInfrastructure3D />
@@ -645,16 +688,16 @@ const SceneContent: React.FC<{
       <BottleProcessing3D />
 
       {/* Extra details — reservoir, counters, energy meter, shift, QR scanner */}
-      <FactoryExtras3D />
+      {extrasEnabled && <FactoryExtras3D />}
 
       {/* Premium features — CCTV, clock, smoke, LEDs, bins, antenna, waves, turntables */}
-      <FactoryPremium3D />
+      {cctvEnabled && <FactoryPremium3D />}
 
       {/* Factory compound — parking, solar, cooling tower, guard booth, flags */}
-      <FactoryCompound3D />
+      {extrasEnabled && <FactoryCompound3D />}
 
       {/* Showpiece — AI orb, data streams, helicopter, scoreboard, welding, holo table */}
-      <FactoryShowpiece3D />
+      {extrasEnabled && <FactoryShowpiece3D />}
 
       {/* Emergency light */}
       <LiveEmergencyLight />
@@ -673,6 +716,7 @@ const FactoryScene: React.FC = () => {
   const [discoMode, setDiscoMode] = useState(false);
   const konamiProgress = useRef<number>(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const captureMode = useCaptureMode();
 
   const handleDayNight = useCallback((night: boolean) => {
     setIsNight(night);
@@ -750,7 +794,7 @@ const FactoryScene: React.FC = () => {
       }}
     >
       <Canvas
-        shadows={{ type: THREE.BasicShadowMap }}
+        shadows="soft"
         dpr={MAX_DPR}
         performance={{ min: 0.6, debounce: 200 }}
         gl={{
@@ -758,6 +802,7 @@ const FactoryScene: React.FC = () => {
           alpha: false,
           powerPreference: "high-performance",
           stencil: false,
+          depth: true,
         }}
         camera={{ position: [18, 14, 18], fov: 40, near: 0.1, far: 120 }}
         onCreated={({ scene }) => {
@@ -765,8 +810,10 @@ const FactoryScene: React.FC = () => {
         }}
         style={{ position: "absolute", inset: 0 }}
       >
-        <AdaptiveDpr pixelated />
+        <RendererConfig />
+        {!captureMode && <AdaptiveDpr pixelated />}
         <SceneContent isNight={isNight} discoMode={discoMode} />
+        <PostFxStack />
       </Canvas>
       <SensorHUD />
       <FunControls onDayNightToggle={handleDayNight} />

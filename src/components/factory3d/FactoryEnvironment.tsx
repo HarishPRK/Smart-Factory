@@ -399,10 +399,8 @@ const FactoryEnvironment: React.FC = () => (
     <Barrel position={[12, 0, 2]} color="#2563eb" />
     <Barrel position={[12.4, 0, 2.5]} color="#f59e0b" />
 
-    {/* Pallets */}
-    <Pallet position={[-12, 0, 3]} />
-    <Pallet position={[-12, 0.07, 3]} />
-    <Pallet position={[11, 0, 7]} />
+    {/* Pallets removed — stray crates cluttering the floor */}
+
 
     {/* Fire extinguishers on walls */}
     <FireExtinguisher position={[-13.8, 0, -2]} />

@@ -6,6 +6,7 @@ import { consumptionByZone } from "../data/mockData";
 
 interface CurrentConsumptionProps {
   className?: string;
+  variant?: "full" | "compact";
 }
 
 const CircularProgress: React.FC<{
@@ -59,15 +60,17 @@ const CircularProgress: React.FC<{
 
 const CurrentConsumption: React.FC<CurrentConsumptionProps> = ({
   className = "",
+  variant = "full",
 }) => {
   const { state } = useFilters();
   const data = consumptionByZone[state.selectedZone];
   const isEnergyHighlighted = state.selectedKpi === "energy";
   const isWaterHighlighted = state.selectedKpi === "water";
+  const isCompact = variant === "compact";
 
   return (
     <div
-      className={`card p-4 flex flex-col gap-3 animate-fade-in delay-3 ${className}`}
+      className={`card ${isCompact ? "p-3 gap-2" : "p-4 gap-3"} flex flex-col animate-fade-in delay-3 ${className}`}
     >
       <div className="flex items-center justify-between gap-3 flex-none">
         <div className="flex items-center gap-2.5">
@@ -122,6 +125,7 @@ const CurrentConsumption: React.FC<CurrentConsumptionProps> = ({
             <CircularProgress value={data.energy.value} max={data.energy.max} color="#3b82f6" />
           </div>
           {/* Energy illustration */}
+          {!isCompact && (
           <div className="flex-1 flex items-center justify-center z-10 pointer-events-none my-1">
             <svg width="100%" height="100%" viewBox="0 0 120 50" fill="none" className="max-h-[50px] opacity-[0.07] group-hover/energy:opacity-[0.12] transition-opacity duration-700">
               {/* Power meter arc */}
@@ -150,9 +154,10 @@ const CurrentConsumption: React.FC<CurrentConsumptionProps> = ({
               </defs>
             </svg>
           </div>
+          )}
           <div className="z-10">
             <div className="flex items-baseline gap-1">
-              <div className="text-[24px] font-semibold gradient-number leading-none">
+              <div className={`${isCompact ? "text-[18px]" : "text-[24px]"} font-semibold gradient-number leading-none`}>
                 {data.energy.value}
               </div>
               <div className="text-[10px] text-blue-200/75 font-medium">
@@ -200,6 +205,7 @@ const CurrentConsumption: React.FC<CurrentConsumptionProps> = ({
             <CircularProgress value={data.water.value} max={data.water.max} color="#06b6d4" />
           </div>
           {/* Water illustration */}
+          {!isCompact && (
           <div className="flex-1 flex items-center justify-center z-10 pointer-events-none my-1">
             <svg width="100%" height="100%" viewBox="0 0 120 50" fill="none" className="max-h-[50px] opacity-[0.07] group-hover/water:opacity-[0.12] transition-opacity duration-700">
               {/* Water tank */}
@@ -242,9 +248,10 @@ const CurrentConsumption: React.FC<CurrentConsumptionProps> = ({
               </defs>
             </svg>
           </div>
+          )}
           <div className="z-10">
             <div className="flex items-baseline gap-1">
-              <div className="text-[24px] font-semibold gradient-number leading-none">
+              <div className={`${isCompact ? "text-[18px]" : "text-[24px]"} font-semibold gradient-number leading-none`}>
                 {data.water.value}
               </div>
               <div className="text-[10px] text-blue-200/70 font-medium">m³</div>

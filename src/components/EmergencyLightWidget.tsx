@@ -144,7 +144,7 @@ const EmergencyLightWidget: React.FC<EmergencyLightWidgetProps> = ({
   const handleToggle = () => {
     const turningOn = !manualAlert;
     setManualAlert(turningOn);
-    // Publish to plc/control with relay channel 1
+    // Publish to plc/control using the legacy 8ch alarm-relay key (firmware contract).
     const relayState = turningOn ? 1 : 0;
     sendCommand("emergency_light", {
       _topic: "plc/control",

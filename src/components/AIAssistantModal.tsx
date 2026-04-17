@@ -301,70 +301,79 @@ const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Backdrop — graphite scrim, no heavy blur */}
       <div
-        className="fixed inset-0 z-[9990] bg-black/70 backdrop-blur-xl animate-[fadeIn_0.3s_ease]"
+        className="fixed inset-0 z-[9990] animate-[fadeIn_0.25s_ease]"
+        style={{ background: "rgba(6, 10, 16, 0.78)" }}
         onClick={onClose}
       />
 
       {/* ── Modal ── */}
       <div className="fixed inset-0 z-[9991] flex items-center justify-center p-5 pointer-events-none">
         <div
-          className="pointer-events-auto w-full max-w-[1280px] h-[88vh] max-h-[860px] rounded-[28px] overflow-hidden flex relative animate-[modalIn_0.45s_cubic-bezier(0.16,1,0.3,1)]"
+          className="pointer-events-auto w-full max-w-[1280px] h-[88vh] max-h-[860px] rounded-[10px] overflow-hidden flex relative animate-[modalIn_0.35s_cubic-bezier(0.16,1,0.3,1)]"
           style={{
             background:
-              "linear-gradient(165deg, rgba(6,14,36,0.98), rgba(3,8,22,0.99))",
-            border: "1px solid rgba(0,200,255,0.08)",
+              "linear-gradient(180deg, #141b27 0%, #0f1520 100%)",
+            border: "1px solid #2a3444",
             boxShadow:
-              "0 0 120px rgba(0,200,255,0.06), 0 0 300px rgba(120,60,255,0.04), 0 60px 120px rgba(0,0,0,0.8)",
+              "0 1px 0 rgba(255,255,255,0.03) inset, 0 20px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(58,169,192,0.08)",
           }}
         >
-          {/* BG effects */}
+          {/* Industrial precision grid + subtle accent line */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className="absolute -top-60 -right-60 w-[600px] h-[600px] rounded-full bg-cyan-500/[0.025] blur-[150px] animate-[orbFloat_14s_ease-in-out_infinite]" />
-            <div className="absolute -bottom-60 -left-60 w-[550px] h-[550px] rounded-full bg-violet-500/[0.025] blur-[150px] animate-[orbFloat_18s_ease-in-out_infinite_reverse]" />
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full bg-blue-500/[0.015] blur-[120px] animate-[orbPulse_10s_ease-in-out_infinite]" />
-            {/* Grid overlay */}
             <div
-              className="absolute inset-0 opacity-[0.015]"
+              className="absolute inset-0 opacity-40"
               style={{
                 backgroundImage:
-                  "linear-gradient(rgba(0,220,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(0,220,255,1) 1px, transparent 1px)",
-                backgroundSize: "80px 80px",
+                  "linear-gradient(rgba(58,169,192,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(58,169,192,0.025) 1px, transparent 1px)",
+                backgroundSize: "48px 48px",
+              }}
+            />
+            {/* Hairline header accent */}
+            <div
+              className="absolute top-0 left-0 right-0 h-px"
+              style={{
+                background:
+                  "linear-gradient(90deg, transparent, #3aa9c0 50%, transparent)",
+                opacity: 0.5,
               }}
             />
           </div>
 
           {/* ════════ LEFT SIDEBAR ════════ */}
-          <div className="w-[280px] flex-shrink-0 border-r border-white/[0.04] flex flex-col relative">
-            {/* Sidebar gradient accent */}
-            <div className="absolute top-0 right-0 w-px h-full bg-gradient-to-b from-cyan-400/10 via-transparent to-violet-400/10 pointer-events-none" />
-
+          <div
+            className="w-[280px] flex-shrink-0 flex flex-col relative"
+            style={{
+              borderRight: "1px solid #2a3444",
+              background:
+                "linear-gradient(180deg, rgba(20,27,39,0.6) 0%, rgba(15,21,32,0.6) 100%)",
+            }}
+          >
             {/* AI Brand */}
             <div className="px-6 pt-7 pb-5">
               <div className="flex items-center gap-4">
                 <AIAvatar size={48} />
                 <div>
-                  <div className="text-[15px] font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-200 via-blue-100 to-violet-300">
-                    Factory AI
+                  <div className="text-[15px] font-semibold tracking-tight" style={{ color: "#e4ebf3" }}>
+                    Plant Copilot
                   </div>
-                  <div className="text-[9px] text-cyan-300/30 mt-1 flex items-center gap-1.5">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inset-0 rounded-full bg-emerald-400/40" />
-                      <span className="relative rounded-full h-2 w-2 bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
+                  <div className="text-[9px] mt-1 flex items-center gap-1.5" style={{ color: "#8a97a8", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="relative rounded-full h-1.5 w-1.5" style={{ background: "#3fa66a" }} />
                     </span>
-                    Online &middot; Claude AI
+                    Online &middot; Ops Intelligence
                   </div>
                 </div>
               </div>
-              <div className="mt-4 text-[9px] text-blue-300/20 leading-relaxed">
+              <div className="mt-4 text-[10px] leading-relaxed" style={{ color: "#8a97a8" }}>
                 Real-time factory intelligence powered by live PLC sensor data
                 and Claude AI.
               </div>
             </div>
 
             {/* Divider */}
-            <div className="mx-5 h-px bg-gradient-to-r from-transparent via-cyan-400/10 to-transparent" />
+            <div className="mx-5 h-px" style={{ background: "#2a3444" }} />
 
             {/* Health Score */}
             <div className="px-6 py-5">
@@ -439,35 +448,38 @@ const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
               </div>
             </div>
 
-            <div className="mx-5 h-px bg-gradient-to-r from-transparent via-cyan-400/8 to-transparent" />
+            <div className="mx-5 h-px" style={{ background: "#2a3444" }} />
 
             {/* Navigation */}
             <div className="px-4 py-4 space-y-1">
-              <div className="text-[8px] text-blue-300/20 uppercase tracking-[0.18em] font-bold px-2 mb-2">
+              <div className="text-[9px] px-2 mb-2" style={{ color: "#5d6a7c", letterSpacing: "0.18em", textTransform: "uppercase", fontWeight: 700 }}>
                 Navigation
               </div>
               {TABS.map((t) => (
                 <button
                   key={t.id}
                   onClick={() => setTab(t.id)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[11px] font-medium transition-all duration-300 group/t ${
-                    tab === t.id
-                      ? "bg-gradient-to-r from-cyan-500/12 to-violet-500/6 text-cyan-50 border border-cyan-400/10"
-                      : "text-blue-300/30 hover:text-blue-200/50 hover:bg-white/[0.015] border border-transparent"
-                  }`}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded text-[11px] font-medium transition-all duration-150 group/t"
+                  style={{
+                    background: tab === t.id ? "rgba(58,169,192,0.10)" : "transparent",
+                    color: tab === t.id ? "#e4ebf3" : "#8a97a8",
+                    border: tab === t.id ? "1px solid rgba(58,169,192,0.45)" : "1px solid transparent",
+                    borderLeft: tab === t.id ? "2px solid #3aa9c0" : "2px solid transparent",
+                  }}
                 >
                   <span
-                    className={`w-[18px] h-[18px] flex-shrink-0 ${tab === t.id ? "opacity-80" : "opacity-30 group-hover/t:opacity-50"} transition-opacity`}
+                    className={`w-[18px] h-[18px] flex-shrink-0 ${tab === t.id ? "opacity-90" : "opacity-50 group-hover/t:opacity-80"} transition-opacity`}
                     dangerouslySetInnerHTML={{ __html: TAB_ICONS[t.id] }}
                   />
                   {t.label}
                   {t.badge && t.badge > 0 && (
                     <span
-                      className={`ml-auto min-w-[20px] h-[18px] rounded-full text-[8px] font-bold flex items-center justify-center px-1.5 ${
-                        t.id === "insights"
-                          ? "bg-red-500/15 border border-red-400/15 text-red-300/70"
-                          : "bg-white/[0.04] border border-white/[0.06] text-blue-300/30"
-                      }`}
+                      className="ml-auto min-w-[20px] h-[18px] rounded-sm text-[9px] font-bold flex items-center justify-center px-1.5"
+                      style={{
+                        background: t.id === "insights" ? "rgba(192,57,43,0.15)" : "rgba(138,151,168,0.10)",
+                        border: t.id === "insights" ? "1px solid rgba(192,57,43,0.4)" : "1px solid #2a3444",
+                        color: t.id === "insights" ? "#d65544" : "#8a97a8",
+                      }}
                     >
                       {t.badge}
                     </span>
@@ -476,7 +488,7 @@ const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
               ))}
             </div>
 
-            <div className="mx-5 h-px bg-gradient-to-r from-transparent via-cyan-400/8 to-transparent" />
+            <div className="mx-5 h-px" style={{ background: "#2a3444" }} />
 
             {/* Quick Actions */}
             <div className="px-4 py-4 flex-1 overflow-y-auto space-y-0.5">
@@ -953,9 +965,19 @@ const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
                       <div ref={bottomRef} />
                     </div>
 
-                    {/* Input */}
-                    <div className="px-7 py-4 border-t border-white/[0.04] flex-shrink-0">
-                      <div className="flex items-center gap-3 bg-white/[0.02] border border-white/[0.06] rounded-2xl px-5 py-3.5 focus-within:border-cyan-400/15 focus-within:shadow-[0_0_30px_rgba(34,211,238,0.04)] transition-all duration-300">
+                    {/* Input — industrial console entry */}
+                    <div
+                      className="px-7 py-4 flex-shrink-0"
+                      style={{ borderTop: "1px solid #2a3444" }}
+                    >
+                      <div
+                        className="flex items-center gap-3 px-4 py-3 transition-all duration-150 focus-within:border-[#3aa9c0]"
+                        style={{
+                          background: "#1b2330",
+                          border: "1px solid #2a3444",
+                          borderRadius: "6px",
+                        }}
+                      >
                         <input
                           ref={inputRef}
                           type="text"
@@ -963,32 +985,30 @@ const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
                           onChange={(e) => setInput(e.target.value)}
                           onKeyDown={(e) => e.key === "Enter" && sendMessage()}
                           placeholder="Ask anything about your factory..."
-                          className="flex-1 bg-transparent text-[13px] text-cyan-50 placeholder:text-blue-300/18 outline-none"
+                          className="flex-1 bg-transparent text-[13px] outline-none"
+                          style={{ color: "#e4ebf3" }}
                           disabled={loading}
                         />
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => sendMessage()}
-                            disabled={loading || !input.trim()}
-                            className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/15 to-violet-500/10 border border-cyan-400/12 flex items-center justify-center hover:from-cyan-500/25 hover:to-violet-500/20 hover:shadow-[0_0_20px_rgba(34,211,238,0.1)] transition-all duration-300 disabled:opacity-15 disabled:cursor-not-allowed group/s"
-                          >
-                            <svg
-                              width="15"
-                              height="15"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                            >
-                              <path
-                                d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"
-                                stroke="#67e8f9"
-                                strokeWidth="1.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                className="group-hover/s:stroke-cyan-300 transition-colors"
-                              />
-                            </svg>
-                          </button>
-                        </div>
+                        <button
+                          onClick={() => sendMessage()}
+                          disabled={loading || !input.trim()}
+                          className="w-9 h-9 flex items-center justify-center transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#3aa9c015]"
+                          style={{
+                            background: "#141b27",
+                            border: "1px solid #3aa9c0",
+                            borderRadius: "4px",
+                          }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                            <path
+                              d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"
+                              stroke="#3aa9c0"
+                              strokeWidth="1.6"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </button>
                       </div>
                       <div className="flex items-center justify-center gap-3 mt-2.5">
                         <span className="text-[8px] text-blue-300/12">
@@ -1650,46 +1670,56 @@ const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
   );
 };
 
-/* ── AI Avatar ── */
+/* ── AI Avatar — industrial instrument dial ── */
 const AIAvatar: React.FC<{ size?: number }> = ({ size = 40 }) => (
   <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
-    <div className="absolute inset-0 rounded-full border border-cyan-400/12 animate-[spinSlow_8s_linear_infinite]">
-      <div className="absolute -top-[2px] left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.7)]" />
+    {/* Outer graphite ring with accent tick */}
+    <div
+      className="absolute inset-0 rounded-full animate-[spinSlow_12s_linear_infinite]"
+      style={{ border: "1px solid #2a3444" }}
+    >
+      <div
+        className="absolute -top-[2px] left-1/2 -translate-x-1/2 w-1 h-1 rounded-full"
+        style={{ background: "#3aa9c0" }}
+      />
     </div>
-    <div className="absolute inset-[3px] rounded-full border border-violet-400/8 animate-[spinSlow_5s_linear_infinite_reverse]">
-      <div className="absolute -bottom-[1px] left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-violet-400 shadow-[0_0_4px_rgba(167,139,250,0.7)]" />
-    </div>
-    <div className="absolute inset-[6px] rounded-full bg-gradient-to-br from-cyan-500/12 to-violet-500/12 border border-cyan-300/8 flex items-center justify-center animate-[corePulse_4s_ease-in-out_infinite]">
+    {/* Inner dial */}
+    <div
+      className="absolute inset-[3px] rounded-full"
+      style={{ border: "1px solid #3a475c" }}
+    />
+    {/* Core */}
+    <div
+      className="absolute inset-[6px] rounded-full flex items-center justify-center animate-[corePulse_4s_ease-in-out_infinite]"
+      style={{
+        background: "linear-gradient(180deg, #1b2330, #141b27)",
+        border: "1px solid #3a475c",
+      }}
+    >
       <svg
-        width={size * 0.35}
-        height={size * 0.35}
+        width={size * 0.4}
+        height={size * 0.4}
         viewBox="0 0 24 24"
         fill="none"
       >
         <path
           d="M12 2a10 10 0 100 20 10 10 0 000-20z"
-          stroke="url(#av)"
-          strokeWidth="1.5"
+          stroke="#3aa9c0"
+          strokeWidth="1.4"
           fill="none"
         />
         <path
           d="M8 12h8M12 8v8"
-          stroke="#67e8f9"
-          strokeWidth="1.2"
+          stroke="#e4ebf3"
+          strokeWidth="1.3"
           strokeLinecap="round"
         />
-        <defs>
-          <linearGradient id="av" x1="2" y1="2" x2="22" y2="22">
-            <stop stopColor="#67e8f9" />
-            <stop offset="1" stopColor="#a78bfa" />
-          </linearGradient>
-        </defs>
       </svg>
     </div>
   </div>
 );
 
-/* ── Floating Button ── */
+/* ── Floating Button — AI hero pill, instantly recognizable ── */
 export const AIFloatingButton: React.FC<{ onClick: () => void }> = ({
   onClick,
 }) => (
@@ -1697,72 +1727,130 @@ export const AIFloatingButton: React.FC<{ onClick: () => void }> = ({
     onClick={onClick}
     className="fixed bottom-7 right-7 z-[9980] group/fab"
     aria-label="Open AI Assistant"
+    style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
   >
-    <div className="absolute inset-0 rounded-full bg-cyan-400/10 animate-[fabPing_3s_ease-out_infinite]" />
-    <div
-      className="absolute inset-0 rounded-full bg-violet-400/8 animate-[fabPing_3s_ease-out_infinite]"
-      style={{ animationDelay: "1s" }}
+    {/* Outer pulse ring — signals "live" */}
+    <span
+      className="absolute inset-0 rounded-full animate-[fabPing_2.6s_ease-out_infinite]"
+      style={{
+        border: "1px solid rgba(92, 192, 212, 0.5)",
+        pointerEvents: "none",
+      }}
     />
+    <span
+      className="absolute inset-0 rounded-full animate-[fabPing_2.6s_ease-out_infinite]"
+      style={{
+        border: "1px solid rgba(92, 192, 212, 0.3)",
+        pointerEvents: "none",
+        animationDelay: "1.2s",
+      }}
+    />
+
+    {/* Main pill — icon + label + sparkle */}
     <div
-      className="relative w-[58px] h-[58px] rounded-full flex items-center justify-center transition-all duration-500 group-hover/fab:scale-110"
+      className="relative flex items-center gap-2.5 pl-2 pr-4 h-[52px] rounded-full transition-all duration-200 group-hover/fab:scale-[1.03]"
       style={{
         background:
-          "linear-gradient(135deg, rgba(8,18,45,0.96), rgba(15,25,60,0.96))",
-        border: "1px solid rgba(0,200,255,0.18)",
+          "linear-gradient(135deg, #0f2a33 0%, #173e4a 45%, #0f2a33 100%)",
+        border: "1px solid rgba(92, 192, 212, 0.55)",
         boxShadow:
-          "0 0 28px rgba(34,211,238,0.12), 0 0 60px rgba(167,139,250,0.06), 0 8px 32px rgba(0,0,0,0.5)",
+          "inset 0 1px 0 rgba(255,255,255,0.08)," +
+          "inset 0 0 0 1px rgba(58,169,192,0.15)," +
+          "0 8px 24px rgba(0,0,0,0.55)," +
+          "0 0 32px rgba(58,169,192,0.22)",
       }}
     >
-      <div
-        className="absolute inset-[-2px] rounded-full animate-[spinSlow_5s_linear_infinite]"
+      {/* Icon puck */}
+      <span
+        className="relative w-9 h-9 flex items-center justify-center rounded-full flex-shrink-0"
         style={{
           background:
-            "conic-gradient(from 0deg, transparent, rgba(34,211,238,0.35), transparent, rgba(167,139,250,0.25), transparent)",
-          mask: "radial-gradient(farthest-side, transparent calc(100% - 2px), black calc(100% - 2px))",
-          WebkitMask:
-            "radial-gradient(farthest-side, transparent calc(100% - 2px), black calc(100% - 2px))",
+            "radial-gradient(circle at 30% 30%, #5cc0d4 0%, #3aa9c0 55%, #1e6a7b 100%)",
+          boxShadow:
+            "inset 0 1px 0 rgba(255,255,255,0.25), 0 0 14px rgba(92,192,212,0.55)",
         }}
-      />
-      <svg
-        width="24"
-        height="24"
-        viewBox="0 0 24 24"
-        fill="none"
-        className="relative z-10"
       >
-        <path
-          d="M12 2a10 10 0 100 20 10 10 0 000-20z"
-          stroke="url(#fg)"
-          strokeWidth="1.3"
-          fill="none"
+        {/* Neural / spark glyph */}
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <defs>
+            <linearGradient id="ai-spark" x1="0" y1="0" x2="24" y2="24">
+              <stop stopColor="#ffffff" />
+              <stop offset="1" stopColor="#e4ebf3" />
+            </linearGradient>
+          </defs>
+          {/* 4-point sparkle (big) */}
+          <path
+            d="M12 2.5 L13.6 10.4 L21.5 12 L13.6 13.6 L12 21.5 L10.4 13.6 L2.5 12 L10.4 10.4 Z"
+            fill="url(#ai-spark)"
+          />
+          {/* small sparkle */}
+          <path
+            d="M18.5 4.2 L19.1 6.3 L21.2 6.9 L19.1 7.5 L18.5 9.6 L17.9 7.5 L15.8 6.9 L17.9 6.3 Z"
+            fill="#ffffff"
+            opacity="0.85"
+          />
+        </svg>
+        {/* Online status dot */}
+        <span
+          className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2"
+          style={{
+            background: "#3fa66a",
+            borderColor: "#0f2a33",
+            boxShadow: "0 0 8px rgba(63,166,106,0.9)",
+          }}
         />
-        <path
-          d="M8.5 12h7M12 8.5v7"
-          stroke="#67e8f9"
-          strokeWidth="1.3"
-          strokeLinecap="round"
-        />
-        <circle
-          cx="12"
-          cy="12"
-          r="2.5"
-          stroke="#a78bfa"
-          strokeWidth="0.8"
-          fill="none"
-          className="animate-[corePulse_2.5s_ease-in-out_infinite]"
-        />
-        <defs>
-          <linearGradient id="fg" x1="2" y1="2" x2="22" y2="22">
-            <stop stopColor="#67e8f9" />
-            <stop offset="1" stopColor="#a78bfa" />
-          </linearGradient>
-        </defs>
-      </svg>
+      </span>
+
+      {/* Text label — always visible, instantly identifies the button */}
+      <span className="flex flex-col items-start leading-none">
+        <span
+          style={{
+            fontSize: "13px",
+            fontWeight: 700,
+            letterSpacing: "0.02em",
+            background: "linear-gradient(180deg, #ffffff 0%, #cfe4ec 100%)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+          }}
+        >
+          Plant Copilot
+        </span>
+        <span
+          className="mt-1 flex items-center gap-1"
+          style={{
+            fontSize: "8px",
+            fontWeight: 700,
+            letterSpacing: "0.22em",
+            color: "#5cc0d4",
+            textTransform: "uppercase",
+          }}
+        >
+          <span
+            className="inline-block w-1 h-1 rounded-full"
+            style={{ background: "#3fa66a", boxShadow: "0 0 6px #3fa66a" }}
+          />
+          Ops Intelligence
+        </span>
+      </span>
     </div>
-    <div className="absolute right-full mr-4 top-1/2 -translate-y-1/2 px-4 py-2 rounded-xl bg-[#0a1d38]/95 border border-cyan-400/12 text-[10.5px] text-cyan-200/70 font-medium whitespace-nowrap opacity-0 -translate-x-2 group-hover/fab:opacity-100 group-hover/fab:translate-x-0 transition-all duration-300 pointer-events-none shadow-[0_4px_24px_rgba(0,0,0,0.5)]">
-      AI Assistant
-      <div className="absolute top-1/2 -translate-y-1/2 -right-1 w-2 h-2 rotate-45 bg-[#0a1d38]/95 border-r border-t border-cyan-400/12" />
-    </div>
+
+    {/* Keyboard hint — appears on hover */}
+    <span
+      className="absolute right-full mr-3 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-sm whitespace-nowrap opacity-0 -translate-x-1 group-hover/fab:opacity-100 group-hover/fab:translate-x-0 transition-all duration-200 pointer-events-none"
+      style={{
+        background: "#141b27",
+        border: "1px solid #2a3444",
+        color: "#8a97a8",
+        fontSize: "9px",
+        fontWeight: 600,
+        letterSpacing: "0.14em",
+        textTransform: "uppercase",
+        boxShadow: "0 4px 14px rgba(0,0,0,0.5)",
+      }}
+    >
+      Open Assistant
+    </span>
   </button>
 );
 

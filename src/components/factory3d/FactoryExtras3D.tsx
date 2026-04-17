@@ -439,6 +439,36 @@ const FactoryExtras3D: React.FC = () => {
       </group>
 
       {/* ══════ 4. SHIFT INDICATOR ══════ */}
+      {/* Mounting post — runs from the floor up to the sign so the readout
+          doesn't look suspended in mid-air. */}
+      <group position={[8, 0, 6]}>
+        {/* Concrete base */}
+        <mesh position={[0, 0.04, 0]} castShadow receiveShadow>
+          <boxGeometry args={[0.28, 0.08, 0.28]} />
+          <meshStandardMaterial color="#334155" metalness={0.4} roughness={0.7} />
+        </mesh>
+        {/* Vertical pole */}
+        <mesh position={[0, 1.75, 0]} castShadow>
+          <cylinderGeometry args={[0.04, 0.05, 3.5, 10]} />
+          <meshStandardMaterial color="#6b7280" metalness={0.85} roughness={0.2} />
+        </mesh>
+        {/* Sign backplate so the HTML readout appears mounted */}
+        <mesh position={[0, 3.5, 0]} castShadow>
+          <boxGeometry args={[0.9, 0.45, 0.06]} />
+          <meshStandardMaterial color="#0f172a" metalness={0.5} roughness={0.5} />
+        </mesh>
+        {/* Backplate rim */}
+        <mesh position={[0, 3.5, 0.035]}>
+          <boxGeometry args={[0.92, 0.47, 0.01]} />
+          <meshStandardMaterial
+            color="#1e293b"
+            emissive="#334155"
+            emissiveIntensity={0.3}
+            metalness={0.6}
+            roughness={0.4}
+          />
+        </mesh>
+      </group>
       <Html
         position={[8, 3.5, 6]}
         center

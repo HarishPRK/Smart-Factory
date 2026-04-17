@@ -26,7 +26,7 @@ const FilterBar: React.FC = () => {
     state.machineType !== "all";
 
   return (
-    <div className="flex items-center gap-3 animate-fade-in delay-2">
+    <div className="flex items-center justify-center gap-3 animate-fade-in delay-2">
       {/* Time Range */}
       <div className="flex glass rounded-full p-0.5 shadow-[0_2px_12px_rgba(0,10,40,0.2)]">
         {timeRanges.map((t) => (

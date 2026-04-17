@@ -1,7 +1,6 @@
 "use no memo";
 import React, { useState, useRef, useCallback, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Html } from "@react-three/drei";
 import * as THREE from "three";
 import ManufacturingStage3D from "./ManufacturingStage3D";
 import ProductFlow3D from "./ProductFlow3D";
@@ -131,7 +130,7 @@ const ProcessPipeline3D: React.FC = () => {
             key={`board-${stage.id}`}
             stage={stage}
             position={[pos[0] - 2.5, pos[1] - 0.5, pos[2]]}
-            visible={selectedStage?.id === stage.id}
+            visible
           />
         );
       })}

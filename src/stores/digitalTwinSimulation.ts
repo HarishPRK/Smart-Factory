@@ -82,27 +82,32 @@ function digitalTwinDebug(message: string, details?: unknown) {
 
 const CORE_PLC_IDS = new Set(["voltage", "current", "relay", "ph", "photoE", "metal"]);
 
+// Each key is a stage sensorId; the array lists paramIds (in order of
+// preference) that can feed it from the live MQTT payload. This lets multiple
+// stages re-use a single board-A sensor — e.g. the one pressure transducer
+// feeds BOTH forming_pressure and pkg_pressure, one ORP probe feeds mixing
+// ORP + anything downstream that wants it, etc.
 const SENSOR_FALLBACKS: Record<string, string[]> = {
-  intake_gps: ["intake_gps"],
-  intake_fingerprint: ["intake_fingerprint"],
-  intake_lidar: ["intake_lidar"],
-  mixing_ph: ["mixing_ph", "ph"],
-  mixing_orp: ["mixing_orp"],
-  mixing_turbidity: ["mixing_turbidity"],
-  mixing_mq: ["mixing_mq"],
-  forming_pressure: ["forming_pressure"],
-  forming_light: ["forming_light"],
-  curing_o2: ["curing_o2"],
-  curing_mq: ["curing_mq"],
-  curing_motion: ["curing_motion"],
-  quality_lidar: ["quality_lidar"],
-  quality_light: ["quality_light"],
-  quality_turbidity: ["quality_turbidity"],
-  pkg_motion: ["pkg_motion"],
-  pkg_pressure: ["pkg_pressure"],
-  pkg_water: ["pkg_water"],
-  dispatch_gps: ["dispatch_gps", "intake_gps"],
-  dispatch_fingerprint: ["dispatch_fingerprint", "intake_fingerprint"],
+  intake_gps:          ["intake_gps"],
+  intake_fingerprint:  ["intake_fingerprint"],
+  intake_lidar:        ["intake_lidar"],
+  mixing_ph:           ["mixing_ph", "ph"],
+  mixing_orp:          ["mixing_orp"],
+  mixing_turbidity:    ["mixing_turbidity"],
+  mixing_mq:           ["mixing_mq"],
+  forming_pressure:    ["forming_pressure"],
+  forming_light:       ["forming_light"],
+  curing_o2:           ["curing_o2"],
+  curing_mq:           ["curing_mq", "mixing_mq"],          // shared metaloxide sensor
+  curing_motion:       ["curing_motion"],
+  quality_lidar:       ["quality_lidar"],
+  quality_light:       ["quality_light", "forming_light"],  // shared light sensor
+  quality_turbidity:   ["quality_turbidity", "mixing_turbidity"], // shared turbidity sensor
+  pkg_motion:          ["pkg_motion", "curing_motion"],     // shared microwave motion sensor
+  pkg_pressure:        ["pkg_pressure", "forming_pressure"], // shared pressure transducer
+  pkg_water:           ["pkg_water"],
+  dispatch_gps:        ["dispatch_gps", "intake_gps"],      // shared aux voltage pot
+  dispatch_fingerprint:["dispatch_fingerprint", "intake_fingerprint"],
 };
 
 function getPLCOverride(sensorId: string): number | undefined {
@@ -115,6 +120,20 @@ function getPLCOverride(sensorId: string): number | undefined {
   return undefined;
 }
 
+/**
+ * Public helper — lets UI components (e.g. SensorHUD) show a LIVE vs SIM
+ * badge per sensor row based on whether the current payload actually supplies
+ * a value for that sensor.
+ */
+export function isSensorLive(sensorId: string): boolean {
+  if (!plcFeed.active) return false;
+  const keys = SENSOR_FALLBACKS[sensorId] ?? [sensorId];
+  for (const key of keys) {
+    if (plcFeed.paramValues[key] !== undefined) return true;
+  }
+  return false;
+}
+
 function defaultMotorRpm(stageId: StageId, deviceId: string): number {
   return (
     STAGE_CONFIGS.find((stage) => stage.id === stageId)
@@ -123,23 +142,76 @@ function defaultMotorRpm(stageId: StageId, deviceId: string): number {
   );
 }
 
+/** Thresholds applied to analog board-A readings. Tuned to the live payload
+ *  ranges so routine fluctuations don't trip them. */
+const OP_LIMITS = {
+  voltageLow:     3.5,  // V  — under-voltage trip
+  voltageHigh:   11.0,  // V  — over-voltage trip
+  currentHigh:    9.0,  // A  — over-current trip
+  tempWarn:      60.0,  // °C — thermal warning
+  tempCrit:      85.0,  // °C — thermal emergency stop
+} as const;
+
 function applyPLCOperationalOverrides(stages: ManufacturingStage[], thresholdSpeed: number): number {
   if (!plcFeed.active || !plcFeed.outputs) return thresholdSpeed;
 
   const outputs = plcFeed.outputs;
+  const vals = plcFeed.paramValues;
+
+  // ── Per-machine PLC condition flags (scoped, not line-wide) ──
+  // Each analog reading is owned by one stage; faulting one no longer cascades
+  // to the whole line. Only the operator E-stop (red/buzzer/alarm relays) and
+  // the RFID gate are truly line-wide.
+  const voltage     = vals.voltage    ?? 0;
+  const current     = vals.current    ?? 0;
+  const temperature = vals.temperature ?? 0;
+
+  // Forming (blow-mold press) — owns voltage + current readings.
+  const formingFault =
+    (voltage > 0 && voltage < OP_LIMITS.voltageLow) ||
+    voltage > OP_LIMITS.voltageHigh ||
+    current > OP_LIMITS.currentHigh;
+
+  // Curing (oven) — owns the temperature probe.
+  const curingFault = temperature > OP_LIMITS.tempCrit;
+  const curingWarn  = temperature > OP_LIMITS.tempWarn && !curingFault;
+
+  // Operator E-stop — red light, buzzer, or alarm relay all halt the line.
+  const operatorEstop =
+    outputs.alerts[0] === true ||           // red
+    outputs.alerts[2] === true ||           // buzzer
+    outputs.alerts[3] === true;             // alarm relay
+
+  // Line speed gates: only RFID badge + operator E-stop freeze the conveyor.
+  // Stage-level faults (pressure, voltage, temp, etc.) stop their own motor
+  // but the belt itself keeps moving so upstream production isn't blocked.
+  let effectiveSpeed = thresholdSpeed;
+  if (!outputs.rfidAuthorized || operatorEstop) {
+    effectiveSpeed = 0;
+  }
 
   const operationSnapshot = JSON.stringify({
     photoESensor: outputs.photoESensor,
     metalSensor: outputs.metalSensor,
+    rfidAuthorized: outputs.rfidAuthorized,
+    motorRelay: outputs.motorFanOn,
+    cobotButton: outputs.pushButton, // for traceability only — wired elsewhere
+    voltage, current, temperature,
+    formingFault, curingFault, curingWarn, operatorEstop,
     thresholdSpeed,
+    effectiveSpeed,
   });
 
   if (operationSnapshot !== lastPLCOperationSnapshot) {
     lastPLCOperationSnapshot = operationSnapshot;
     digitalTwinDebug("Factory operation override updated", {
-      photoESensor: outputs.photoESensor,
-      metalSensor: outputs.metalSensor,
+      rfidAuthorized: outputs.rfidAuthorized,
+      motorRelay: outputs.motorFanOn,
+      cobotButton: outputs.pushButton,
+      voltage, current, temperature,
+      formingFault, curingFault, curingWarn, operatorEstop,
       thresholdSpeed,
+      effectiveSpeed,
     });
   }
 
@@ -149,11 +221,39 @@ function applyPLCOperationalOverrides(stages: ManufacturingStage[], thresholdSpe
     // Only "idle" and "faulted" are non-running states.
     let stageRunning = stage.status === "running" || stage.status === "warning";
 
-    // Map specific PLC sensors to specific stages.
-    // NOTE: photoESensor is a MOMENTARY product-detection pulse, not a continuous
-    // "conveyor running" signal. Do NOT use it to control the intake running state —
-    // doing so causes intake to flicker idle whenever no product is passing the beam.
-    // The intake stage stays running as long as the system is connected.
+    // ── True line-wide gates ──
+    // Operator E-stop (red light, buzzer, or alarm relay) faults every stage.
+    if (operatorEstop) {
+      stageFaulted = true;
+      stageRunning = false;
+    }
+    // RFID badge — line is idle (not faulted) when no authorized operator
+    // is present. Each machine drops to idle, motors stop.
+    if (!outputs.rfidAuthorized && !stageFaulted) {
+      stageRunning = false;
+    }
+
+    // ── Per-machine PLC gates — only the owning stage is affected ──
+    if (stage.id === "forming") {
+      // Voltage / current excursion → fault the blow-mold press only.
+      if (formingFault) {
+        stageFaulted = true;
+        stageRunning = false;
+      }
+    }
+    if (stage.id === "curing") {
+      // Temperature critical → fault the curing oven only.
+      if (curingFault) {
+        stageFaulted = true;
+        stageRunning = false;
+      } else if (curingWarn && !stageFaulted && stage.status === "running") {
+        // Soft thermal warning: keep running but flag warning.
+        stage.status = "warning";
+      }
+    }
+    if (stage.id === "intake" && !outputs.photoESensor && stageRunning) {
+      // photoE === 0 is the resting state (no product under beam) — normal.
+    }
     if (stage.id === "quality") {
       if (outputs.metalSensor) {
         stageFaulted = true;
@@ -193,7 +293,7 @@ function applyPLCOperationalOverrides(stages: ManufacturingStage[], thresholdSpe
     }
   }
 
-  return thresholdSpeed;
+  return effectiveSpeed;
 }
 
 /* ── Initialize stages from config ────────────────────── */
@@ -299,11 +399,12 @@ function evaluateThresholds(stages: ManufacturingStage[]): number {
 
       if (!isEffectTriggered(sensor.value, sc.nominal, effect)) continue;
 
-      // When live PLC feed is active, downgrade hard-stop effects (emergency_stop / stop)
-      // to quality_degrade so that sensors still being calibrated/developed don't halt
-      // production. Hard stops remain fully active in simulation-scenario mode only.
+      // When live PLC feed is active we still honour `stop` effects (operator-set
+      // safety thresholds such as forming_pressure below 50 bar must halt the
+      // machine on the factory floor). Only `emergency_stop` is downgraded to a
+      // quality warning so an uncalibrated sensor can't shut down the whole line.
       const effectiveEffect =
-        plcFeed.active && (effect.effect === "emergency_stop" || effect.effect === "stop")
+        plcFeed.active && effect.effect === "emergency_stop"
           ? "quality_degrade"
           : effect.effect;
 
@@ -316,9 +417,12 @@ function evaluateThresholds(stages: ManufacturingStage[]): number {
           }
           break;
         case "stop":
-          if (stageStatus !== "faulted") stageStatus = "faulted";
+          stageStatus = "faulted";
           for (const d of stage.outputDevices) {
-            if (d.type === "motor" && d.deviceId === effect.targetDeviceId) {
+            // Fire the emergency light for visibility on the factory floor
+            if (d.type === "emergency_light") d.active = true;
+            // Halt the specific motor named by the effect; if none named, halt all motors on this stage
+            if (d.type === "motor" && (!effect.targetDeviceId || d.deviceId === effect.targetDeviceId)) {
               d.active = false; d.rpm = 0; d.direction = "stopped";
             }
           }

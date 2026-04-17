@@ -1,6 +1,7 @@
 "use no memo";
 import React, { useState, useMemo, useCallback } from "react";
 import { useDigitalTwinStore } from "../../stores/digitalTwinStore";
+import { isSensorLive } from "../../stores/digitalTwinSimulation";
 import { STAGE_POSITIONS } from "./digitalTwinLayout";
 import { setCameraTarget, resetCameraView } from "./CameraController";
 import type { StageId } from "../../types/digitalTwin";
@@ -112,6 +113,7 @@ const SensorHUD: React.FC = () => {
         status: sensor?.status ?? "normal",
         history: history,
         stageStatus: stage?.status ?? "idle",
+        live: isSensorLive(ps.sensorId),
       };
     });
   }, [tick]);
@@ -266,8 +268,39 @@ const SensorHUD: React.FC = () => {
                   <div style={{ color: "#94a3b8", fontSize: "8px", lineHeight: 1.2 }}>
                     {s.stageLabel}
                   </div>
-                  <div style={{ color: "#e2e8f0", fontSize: "10px", fontWeight: 600, lineHeight: 1.2 }}>
+                  <div
+                    style={{
+                      color: "#e2e8f0",
+                      fontSize: "10px",
+                      fontWeight: 600,
+                      lineHeight: 1.2,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px",
+                    }}
+                  >
                     {s.label}
+                    {/* LIVE vs SIM chip — tells the operator whether this row
+                        is fed by the real MQTT payload or simulated drift. */}
+                    <span
+                      title={
+                        s.live
+                          ? "Live — driven by the PLC MQTT payload"
+                          : "Simulated — no matching payload key"
+                      }
+                      style={{
+                        fontSize: "7px",
+                        fontWeight: 800,
+                        letterSpacing: "0.1em",
+                        padding: "1px 4px",
+                        borderRadius: "2px",
+                        border: `1px solid ${s.live ? "rgba(63,166,106,0.5)" : "rgba(138,151,168,0.35)"}`,
+                        color: s.live ? "#3fa66a" : "#8a97a8",
+                        background: s.live ? "rgba(63,166,106,0.10)" : "transparent",
+                      }}
+                    >
+                      {s.live ? "LIVE" : "SIM"}
+                    </span>
                   </div>
                 </div>
 

@@ -1005,9 +1005,7 @@ const MotorFanLabel: React.FC<{
       // Also send MQTT command
       sendCommand("motor_fan", {
         _topic: "plc/control",
-        _rawPayload: {
-          boardA_8ch_relay_motor: turnOn ? 1 : 0,
-        },
+        _rawPayload: { boardA_8ch_relay_motor: turnOn ? 1 : 0 },
       }).catch(() => {});
     },
     [sendCommand],
@@ -1183,9 +1181,7 @@ const EmergencyLabel: React.FC<{
       usePLCStore.setState({ emergencyLightOn: turnOn });
       sendCommand("emergency_light", {
         _topic: "plc/control",
-        _rawPayload: {
-          boardA_8ch_relay_alarm: turnOn ? 1 : 0,
-        },
+        _rawPayload: { boardA_8ch_relay_alarm: turnOn ? 1 : 0 },
       }).catch(() => {});
     },
     [sendCommand],
@@ -1606,9 +1602,7 @@ const Scene: React.FC<SceneProps> = ({
   const toggleMotor = useCallback(() => {
     sendCommand("motor_fan", {
       _topic: "plc/control",
-      _rawPayload: {
-        boardA_8ch_relay_motor: motorFanOn ? 0 : 1,
-      },
+      _rawPayload: { boardA_8ch_relay_motor: motorFanOn ? 0 : 1 },
     }).catch(() => {});
   }, [motorFanOn, sendCommand]);
 
