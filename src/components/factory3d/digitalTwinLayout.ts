@@ -169,9 +169,10 @@ const MIXING_EFFECTS: ThresholdEffect[] = [
 ];
 
 const FORMING_EFFECTS: ThresholdEffect[] = [
-  // Pressure: normal range is 60–80 bar. Only low pressure triggers inspection — never a stop.
-  { sensorId: "forming_pressure", condition: "below_warning",  effect: "quality_degrade", description: "Pressure below 50 bar — inspection required",      qualityPenalty: 15 },
-  { sensorId: "forming_pressure", condition: "below_critical", effect: "quality_degrade", description: "Pressure critically low — escalated inspection",    qualityPenalty: 25 },
+  // Pressure: normal range is 60–80 bar. Below 50 bar halts the press immediately;
+  // below 30 bar escalates to an emergency stop with alarm light.
+  { sensorId: "forming_pressure", condition: "below_warning",  effect: "stop",            targetDeviceId: "forming_motor", description: "Pressure below 50 bar — press halted",         qualityPenalty: 15 },
+  { sensorId: "forming_pressure", condition: "below_critical", effect: "emergency_stop",                                    description: "Pressure critically low — emergency stop",     qualityPenalty: 25 },
   { sensorId: "forming_light",    condition: "below_warning",  effect: "quality_degrade", description: "Low light — inspection failure",                    qualityPenalty: 15 },
 ];
 
@@ -189,10 +190,11 @@ const QUALITY_EFFECTS: ThresholdEffect[] = [
 ];
 
 const PACKAGING_EFFECTS: ThresholdEffect[] = [
-  { sensorId: "pkg_water",    condition: "above_critical", effect: "stop",            description: "Moisture detected — stop packaging",               qualityPenalty: 20 },
-  // Pressure: normal range is 60–80 bar. Only low pressure triggers inspection — never a stop.
-  { sensorId: "pkg_pressure", condition: "below_warning",  effect: "quality_degrade", description: "Pressure below 50 bar — inspection required",      qualityPenalty: 15 },
-  { sensorId: "pkg_pressure", condition: "below_critical", effect: "quality_degrade", description: "Pressure critically low — escalated inspection",    qualityPenalty: 25 },
+  { sensorId: "pkg_water",    condition: "above_critical", effect: "stop",             targetDeviceId: "pkg_motor",        description: "Moisture detected — stop packaging",            qualityPenalty: 20 },
+  // Pressure: normal range is 60–80 bar. Below 50 bar halts packaging immediately;
+  // below 30 bar escalates to an emergency stop.
+  { sensorId: "pkg_pressure", condition: "below_warning",  effect: "stop",             targetDeviceId: "pkg_motor",        description: "Pressure below 50 bar — packaging halted",      qualityPenalty: 15 },
+  { sensorId: "pkg_pressure", condition: "below_critical", effect: "emergency_stop",                                        description: "Pressure critically low — emergency stop",      qualityPenalty: 25 },
 ];
 
 // ── Full Stage Configurations ──────────────────────────────

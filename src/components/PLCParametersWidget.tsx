@@ -282,14 +282,37 @@ const PLCParametersWidget: React.FC<{ className?: string }> = ({
   className = "",
 }) => {
   const params = usePLCStore((s) => s.params);
+  const liveRfid = usePLCStore((s) => s.rfidAuthorized);
+  const rfidOverride = usePLCStore((s) => s.rfidOverride);
+  const setRfidOverride = usePLCStore((s) => s.setRfidOverride);
+  // What the simulation actually uses — override wins when set.
+  const rfidAuthorized = rfidOverride === null ? liveRfid : rfidOverride;
+  const isOverridden = rfidOverride !== null;
   const { isConnected, sendCommand } = usePLCContext(false);
-  const displayParams = React.useMemo(
-    () =>
-      params.filter((p) =>
-        ["voltage", "current", "relay", "ph", "photoE", "metal"].includes(p.id),
-      ),
-    [params],
+  // Surface the full board-A sensor set from the latest payload so operators
+  // can see every live value, not just the core six.
+  const DISPLAY_ORDER = React.useMemo(
+    () => [
+      "voltage",           // boardA_voltage_pot_1
+      "current",           // boardA_current_pot
+      "relay",             // aggregate alert-relay state
+      "ph",                // boardA_ph_sensor
+      "forming_pressure",  // boardA_pressure_sensor
+      "curing_mq",         // boardA_metaloxide_sensor (also mixing_mq)
+      "mixing_turbidity",  // boardA_turbidity_sensor
+      "forming_light",     // boardA_light_sensor
+      "mixing_orp",        // boardA_orp_sensor
+      "photoE",            // boardA_photoelectric_sensor
+      "metal",             // boardA_metal_sensor
+    ],
+    [],
   );
+  const displayParams = React.useMemo(() => {
+    const byId = new Map(params.map((p) => [p.id, p]));
+    return DISPLAY_ORDER.map((id) => byId.get(id)).filter(
+      (p): p is NonNullable<typeof p> => !!p,
+    );
+  }, [params, DISPLAY_ORDER]);
 
   return (
     <div
@@ -385,17 +408,139 @@ const PLCParametersWidget: React.FC<{ className?: string }> = ({
             PLC Parameters
           </h3>
         </div>
-        <span className="text-[11px] text-blue-100/80 font-medium flex items-center gap-1.5 bg-blue-500/[0.04] px-2 py-0.5 rounded-md border border-blue-400/[0.06]">
+        <div className="flex items-center gap-2">
+          {/* RFID operator-badge indicator — gates the intake stage */}
           <span
-            className="w-1.5 h-1.5 rounded-full bg-blue-400/60 animate-pulse-glow"
-            style={{ color: "#60a5fa" }}
-          />
-          Live
-        </span>
+            className={`text-[10px] font-semibold flex items-center gap-1.5 px-2 py-0.5 rounded-md border ${
+              rfidAuthorized
+                ? "bg-emerald-500/[0.08] border-emerald-500/30 text-emerald-300"
+                : "bg-amber-500/[0.08] border-amber-500/30 text-amber-300"
+            }`}
+            title={
+              rfidAuthorized
+                ? "Authorized operator badge present — intake unlocked"
+                : "No authorized badge — intake stage is locked"
+            }
+          >
+            <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
+              <rect
+                x="2"
+                y="3"
+                width="12"
+                height="10"
+                rx="1.5"
+                stroke="currentColor"
+                strokeWidth="1.3"
+              />
+              <path
+                d="M5 8a3 3 0 0 1 3 0M5.5 9.5a4 4 0 0 1 5 0M6 11a2 2 0 0 1 4 0"
+                stroke="currentColor"
+                strokeWidth="1.1"
+                strokeLinecap="round"
+                fill="none"
+              />
+            </svg>
+            RFID {rfidAuthorized ? "Auth" : "Locked"}
+          </span>
+          <span className="text-[11px] text-blue-100/80 font-medium flex items-center gap-1.5 bg-blue-500/[0.04] px-2 py-0.5 rounded-md border border-blue-400/[0.06]">
+            <span
+              className="w-1.5 h-1.5 rounded-full bg-blue-400/60 animate-pulse-glow"
+              style={{ color: "#60a5fa" }}
+            />
+            Live
+          </span>
+        </div>
       </div>
 
-      {/* 2×3 grid */}
-      <div className="grid grid-cols-2 gap-2 flex-grow overflow-hidden">
+      {/* RFID operator-gate strip — prominent status row */}
+      <div
+        className={`flex items-center justify-between px-3 py-2 rounded-md border transition-colors ${
+          rfidAuthorized
+            ? "bg-emerald-500/[0.06] border-emerald-500/25"
+            : "bg-amber-500/[0.10] border-amber-500/35"
+        }`}
+      >
+        <div className="flex items-center gap-2.5">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+            className={rfidAuthorized ? "text-emerald-300" : "text-amber-300"}
+          >
+            <rect
+              x="1.5"
+              y="3"
+              width="13"
+              height="10"
+              rx="1.8"
+              stroke="currentColor"
+              strokeWidth="1.3"
+            />
+            <path
+              d="M4.5 8a3.5 3.5 0 0 1 3.5 0M5 9.5a4.5 4.5 0 0 1 5 0M5.5 11a2.5 2.5 0 0 1 4 0"
+              stroke="currentColor"
+              strokeWidth="1.1"
+              strokeLinecap="round"
+              fill="none"
+            />
+          </svg>
+          <div className="flex flex-col leading-tight">
+            <span className="text-[10px] uppercase tracking-[0.16em] font-semibold text-slate-400">
+              RFID Operator Gate
+            </span>
+            <span
+              className={`text-[12px] font-semibold ${
+                rfidAuthorized ? "text-emerald-300" : "text-amber-300"
+              }`}
+            >
+              {rfidAuthorized
+                ? "Authorized · Line Active"
+                : "Locked · Awaiting Badge"}
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {/* Test / reset control — cycles: LIVE → TEST ON → TEST OFF → LIVE */}
+          <button
+            onClick={() => {
+              // null (LIVE) → true (force ON) → false (force OFF) → null
+              if (rfidOverride === null) setRfidOverride(true);
+              else if (rfidOverride === true) setRfidOverride(false);
+              else setRfidOverride(null);
+            }}
+            title={
+              isOverridden
+                ? "Click to cycle test state (next: OFF or LIVE)"
+                : "Override the RFID state for testing"
+            }
+            className={`text-[9px] font-bold px-2 py-0.5 rounded border uppercase tracking-[0.1em] transition-colors ${
+              isOverridden
+                ? "bg-sky-500/[0.14] border-sky-500/50 text-sky-200 hover:bg-sky-500/[0.24]"
+                : "bg-slate-500/[0.08] border-slate-500/40 text-slate-300 hover:bg-slate-500/[0.18]"
+            }`}
+          >
+            {isOverridden ? `Test: ${rfidOverride ? "On" : "Off"}` : "Reset"}
+          </button>
+          <span
+            className={`text-[10px] font-bold px-2 py-0.5 rounded border flex items-center gap-1 ${
+              rfidAuthorized
+                ? "bg-emerald-500/[0.10] border-emerald-500/40 text-emerald-300"
+                : "bg-amber-500/[0.10] border-amber-500/40 text-amber-300"
+            }`}
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                rfidAuthorized ? "bg-emerald-400" : "bg-amber-400 animate-pulse"
+              }`}
+            />
+            {rfidAuthorized ? "ON" : "OFF"}
+          </span>
+        </div>
+      </div>
+
+      {/* Sensor grid — 3 cols now that we surface the full board-A set */}
+      <div className="grid grid-cols-3 gap-2 flex-grow overflow-y-auto pr-1">
         {displayParams.map((p) =>
           p.kind === "analog" ? (
             <AnalogCard key={p.id} param={p} />

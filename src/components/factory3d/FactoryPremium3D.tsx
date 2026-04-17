@@ -181,9 +181,29 @@ const FactoryPremium3D: React.FC = () => {
       {/* ══════ 1. CCTV CAMERAS ══════ */}
       {cctvPositions.map((cctv, i) => (
         <group key={`cctv-${i}`} position={cctv.pos}>
-          {/* Pole */}
-          <mesh position={[0, -1.5, 0]}>
-            <cylinderGeometry args={[0.03, 0.035, 3.0, 6]} />
+          {/* Floor base plate — so the pole looks planted, not floating */}
+          <mesh position={[0, -cctv.pos[1] + 0.04, 0]} castShadow receiveShadow>
+            <cylinderGeometry args={[0.14, 0.16, 0.08, 12]} />
+            <meshStandardMaterial color="#374151" metalness={0.7} roughness={0.4} />
+          </mesh>
+          {/* Anchor bolts on the base */}
+          {[0, 1, 2, 3].map((b) => {
+            const a = (b / 4) * Math.PI * 2;
+            return (
+              <mesh key={b} position={[Math.cos(a) * 0.1, -cctv.pos[1] + 0.09, Math.sin(a) * 0.1]}>
+                <cylinderGeometry args={[0.012, 0.012, 0.03, 6]} />
+                <meshStandardMaterial color="#0f172a" metalness={0.9} roughness={0.2} />
+              </mesh>
+            );
+          })}
+          {/* Pole — full length from floor up to camera */}
+          <mesh position={[0, -cctv.pos[1] / 2 + 0.04, 0]} castShadow>
+            <cylinderGeometry args={[0.03, 0.04, cctv.pos[1] - 0.08, 8]} />
+            <meshStandardMaterial color="#6b7280" metalness={0.8} roughness={0.2} />
+          </mesh>
+          {/* Horizontal arm reaching out to the camera head */}
+          <mesh position={[0, -0.02, 0.08]}>
+            <boxGeometry args={[0.04, 0.04, 0.2]} />
             <meshStandardMaterial color="#6b7280" metalness={0.8} roughness={0.2} />
           </mesh>
           {/* Camera housing (panning) */}

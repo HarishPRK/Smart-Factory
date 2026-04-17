@@ -5,6 +5,7 @@ import React, {
   useMemo,
   useEffect,
   useLayoutEffect,
+  useRef,
 } from "react";
 import { createPLCService } from "../services/plcService";
 import { usePLCLive } from "../hooks/usePLCLive";
@@ -42,6 +43,8 @@ const selectPhotoESensor = (s: ReturnType<typeof usePLCStore.getState>) =>
   s.photoESensor;
 const selectMetalSensor = (s: ReturnType<typeof usePLCStore.getState>) =>
   s.metalSensor;
+const selectRfidAuthorized = (s: ReturnType<typeof usePLCStore.getState>) =>
+  s.rfidAuthorized;
 const selectPushButton = (s: ReturnType<typeof usePLCStore.getState>) =>
   s.pushButton;
 const selectRelays = (s: ReturnType<typeof usePLCStore.getState>) => s.relays;
@@ -65,19 +68,34 @@ export const PLCProvider: React.FC<{ children: React.ReactNode }> = ({
     [live.isConnected, live.error, live.sendCommand],
   );
 
-  // Sync PLC data into Zustand right before paint instead of during render.
-  // Writing to the store in render was forcing avoidable extra work through the
-  // tree and made the UI feel jittery under frequent PLC updates.
+  // Sync PLC data into Zustand right before paint, but coalesce bursts of MQTT
+  // messages into a single store write per animation frame. This prevents
+  // rapid MQTT traffic from triggering a cascade of React re-renders on every
+  // message and is the main lever for holding 120fps under live load.
+  const pendingRef = useRef<{
+    params: typeof live.params;
+    outputs: typeof live.outputs;
+  } | null>(null);
+  const rafRef = useRef<number | null>(null);
   useLayoutEffect(() => {
-    usePLCStore.setState({
-      params: live.params,
-      motorFanOn: live.outputs.motorFanOn,
-      emergencyLightOn: live.outputs.emergencyLightOn,
-      photoESensor: live.outputs.photoESensor,
-      metalSensor: live.outputs.metalSensor,
-      pushButton: live.outputs.pushButton,
-      relays: live.outputs.relay ?? [],
-      alerts: live.outputs.alerts ?? [],
+    pendingRef.current = { params: live.params, outputs: live.outputs };
+    if (rafRef.current != null) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      const latest = pendingRef.current;
+      if (!latest) return;
+      pendingRef.current = null;
+      usePLCStore.setState({
+        params: latest.params,
+        motorFanOn: latest.outputs.motorFanOn,
+        emergencyLightOn: latest.outputs.emergencyLightOn,
+        photoESensor: latest.outputs.photoESensor,
+        metalSensor: latest.outputs.metalSensor,
+        rfidAuthorized: latest.outputs.rfidAuthorized,
+        pushButton: latest.outputs.pushButton,
+        relays: latest.outputs.relay ?? [],
+        alerts: latest.outputs.alerts ?? [],
+      });
     });
   }, [
     live.params,
@@ -88,11 +106,26 @@ export const PLCProvider: React.FC<{ children: React.ReactNode }> = ({
     live.outputs.pushButton,
     live.outputs.relay,
     live.outputs.alerts,
+    live.outputs,
   ]);
+  useEffect(
+    () => () => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    },
+    [],
+  );
 
+  // Apply the UI's RFID override (if any) to the outputs before handing them
+  // to the digital twin. Subscribing to the override value here makes the
+  // effect re-fire whenever the test button flips it.
+  const rfidOverride = usePLCStore((s) => s.rfidOverride);
   useEffect(() => {
-    setDigitalTwinPLCFeed(live.params, live.outputs);
-  }, [live.params, live.outputs]);
+    const effectiveOutputs =
+      rfidOverride === null
+        ? live.outputs
+        : { ...live.outputs, rfidAuthorized: rfidOverride };
+    setDigitalTwinPLCFeed(live.params, effectiveOutputs);
+  }, [live.params, live.outputs, rfidOverride]);
 
   // Run prediction engine continuously
   usePredictions();
@@ -132,6 +165,7 @@ export function usePLCContext(active = true): UsePLCLiveResult {
   );
   const photoESensor = usePLCStore(active ? selectPhotoESensor : selectFalse);
   const metalSensor = usePLCStore(active ? selectMetalSensor : selectFalse);
+  const rfidAuthorized = usePLCStore(active ? selectRfidAuthorized : selectFalse);
   const pushButton = usePLCStore(active ? selectPushButton : selectFalse);
   const relay = usePLCStore(active ? selectRelays : selectEmptyRelays);
   const alerts = usePLCStore(active ? selectAlerts : selectEmptyAlerts);
@@ -142,6 +176,7 @@ export function usePLCContext(active = true): UsePLCLiveResult {
       emergencyLightOn,
       photoESensor,
       metalSensor,
+      rfidAuthorized,
       relay,
       pushButton,
       alerts,
@@ -151,6 +186,7 @@ export function usePLCContext(active = true): UsePLCLiveResult {
       emergencyLightOn,
       photoESensor,
       metalSensor,
+      rfidAuthorized,
       relay,
       pushButton,
       alerts,

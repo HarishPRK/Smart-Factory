@@ -4,17 +4,20 @@ import { useFilters } from "../context/FilterContext";
 
 interface ActiveMachineryProps {
   className?: string;
+  variant?: "full" | "compact";
 }
 
 const ActiveMachinery: React.FC<ActiveMachineryProps> = ({
   className = "",
+  variant = "full",
 }) => {
   const { filteredMachines, state } = useFilters();
   const hasKpiSelected = state.selectedKpi !== null;
+  const isCompact = variant === "compact";
 
   return (
     <div
-      className={`card p-4 flex flex-col gap-3 animate-fade-in delay-1 ${className}`}
+      className={`card ${isCompact ? "p-3 gap-2" : "p-4 gap-3"} flex flex-col animate-fade-in delay-1 ${className}`}
     >
       <div className="flex justify-between items-center flex-none">
         <div className="flex items-center gap-2.5">
@@ -46,7 +49,7 @@ const ActiveMachinery: React.FC<ActiveMachineryProps> = ({
           filteredMachines.map((machine, index) => (
             <div
               key={machine.id}
-              className={`flex flex-col gap-2 group cursor-pointer p-2.5 rounded-xl hover:bg-cyan-400/[0.05] transition-all duration-200 animate-fade-in delay-${index + 1} ${
+              className={`flex flex-col ${isCompact ? "gap-1 p-1.5" : "gap-2 p-2.5"} group cursor-pointer rounded-xl hover:bg-cyan-400/[0.05] transition-all duration-200 animate-fade-in delay-${index + 1} ${
                 hasKpiSelected ? "opacity-60 hover:opacity-100" : ""
               }`}
             >
@@ -88,6 +91,7 @@ const ActiveMachinery: React.FC<ActiveMachineryProps> = ({
                 </div>
               </div>
               {/* Progress bar */}
+              {!isCompact && (
               <div
                 className="flex items-center gap-2 ml-9"
                 style={{ width: "calc(100% - 36px)" }}
@@ -102,6 +106,7 @@ const ActiveMachinery: React.FC<ActiveMachineryProps> = ({
                   />
                 </div>
               </div>
+              )}
             </div>
           ))
         )}

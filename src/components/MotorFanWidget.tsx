@@ -120,7 +120,7 @@ const MotorFanWidget: React.FC<MotorFanWidgetProps> = ({ className = "" }) => {
   const handleToggle = () => {
     const turningOn = !manualOn;
     setManualOn(turningOn);
-    // Publish to plc/control with relay payload
+    // Publish to plc/control using the legacy 8ch relay key (firmware contract).
     const relayState = turningOn ? 1 : 0;
     sendCommand("motor_fan", {
       _topic: "plc/control",

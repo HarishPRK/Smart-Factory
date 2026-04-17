@@ -17,6 +17,21 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('three') || id.includes('@react-three'))   return 'vendor-three';
+            if (id.includes('@anthropic-ai'))                           return 'vendor-anthropic';
+            if (id.includes('mqtt'))                                    return 'vendor-mqtt';
+            if (id.includes('@aws-sdk') || id.includes('@smithy'))      return 'vendor-aws';
+            if (id.includes('react'))                                   return 'vendor-react';
+          }
+        },
+      },
+    },
+  },
   test: {
     environment: 'jsdom',
     globals: false,

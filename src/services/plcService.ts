@@ -71,6 +71,9 @@ export interface PLCOutputs {
   emergencyLightOn: boolean;
   photoESensor: boolean;
   metalSensor: boolean;
+  /** True when an authorized operator badge is currently presented to the
+   *  Board A RFID reader (boardA_rfid_authorized_user). Gates the intake stage. */
+  rfidAuthorized: boolean;
   relay: boolean[];
   pushButton: boolean;
   alerts: boolean[];
@@ -86,6 +89,7 @@ export const DEFAULT_OUTPUTS: PLCOutputs = {
   emergencyLightOn: false,
   photoESensor: false,
   metalSensor: false,
+  rfidAuthorized: false,
   relay: [false, false, false, false, false, false, false, false],
   pushButton: false,
   alerts: [false, false, false, false],
@@ -213,26 +217,6 @@ function readBitSignal(
   return { value: resolved.value >= 0.5, hasReal: resolved.hasReal };
 }
 
-function readArrayBitSignal(
-  raw: RawPLCPayload,
-  arrayKey: string,
-  index: number,
-  prevValue: boolean,
-  prevHasReal = false,
-): { value: boolean; hasReal: boolean } {
-  const arr = raw[arrayKey];
-  if (
-    Array.isArray(arr) &&
-    arr.length > index &&
-    typeof arr[index] === "number" &&
-    Number.isFinite(arr[index]) &&
-    arr[index] !== -1
-  ) {
-    return { value: arr[index] >= 0.5, hasReal: true };
-  }
-  return { value: prevHasReal ? prevValue : false, hasReal: prevHasReal };
-}
-
 function collectFallbackDebug(
   raw: RawPLCPayload,
   label: string,
@@ -302,10 +286,16 @@ export function isRawPLCPayload(data: unknown): data is RawPLCPayload {
   if (!data || typeof data !== "object") return false;
   const raw = data as Record<string, unknown>;
   return [
+    // New flat payload (2026-04)
     "boardA_voltage_pot_1",
     "boardA_current_pot",
     "boardA_photoelectric_sensor",
+    "boardA_ph_sensor",
+    "boardA_pressure_sensor",
+    "boardB_io_green_button",
+    // Legacy keys (pre-2026-04)
     "boardA_8ch_analog_1_ph_sensor",
+    "boardA_8ch_analog_1_pressure_sensor",
     "voltage_pot",
     "current_pot",
     "photoE_sensor",
@@ -338,7 +328,7 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
   );
   const ph = readSignal(
     raw,
-    ["boardA_8ch_analog_1_ph_sensor", "pH"],
+    ["boardA_ph_sensor", "boardA_8ch_analog_1_ph_sensor", "pH"],
     prevNum(prevState, "ph", 7),
     prevKnown(prevState, "ph"),
   );
@@ -350,134 +340,100 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
   );
   const metal = readBitSignal(
     raw,
-    ["boardA_metal_sensor", "boardB_8ch_io_metal_sensor", "metal_sensor"],
+    // plc/data uses the flat `boardA_metal_sensor` / `boardB_io_metal_sensor`
+    // keys. The legacy `boardB_8ch_io_metal_sensor` key was dropped from the
+    // payload; we stop reading it here (it's still sent on plc/control for
+    // firmware compatibility).
+    ["boardA_metal_sensor", "boardB_io_metal_sensor", "metal_sensor"],
     prevBit(prevState, "metal", false),
     prevKnown(prevState, "metal"),
+  );
+  // RFID — authorizes operator badge at the intake gate. When this reads 0 the
+  // digital twin forces the intake stage into "idle" (line cannot start).
+  const rfidAuthorized = readBitSignal(
+    raw,
+    ["boardA_rfid_authorized_user"],
+    prevState?.outputs.rfidAuthorized ?? false,
+    prevState?.outputs.rfidAuthorized !== undefined,
   );
   const pushButton = readBitSignal(
     raw,
     [
       "boardA_green_push_button",
-      "boardB_8ch_io_green_button",
-      "boardB_8ch_io_push_lock_button",
+      "boardB_io_green_button",
+      "boardB_io_push_lock_button",
       "push_button",
     ],
     prevState?.outputs.pushButton ?? false,
     prevState?.outputs.pushButton !== undefined,
   );
-  const motorRelay = (() => {
-    const direct = readBitSignal(
-      raw,
-      ["boardA_8ch_relay_motor"],
-      prevState?.outputs.motorFanOn ?? false,
-      prevState != null,
-    );
-    return direct.hasReal
-      ? direct
-      : readArrayBitSignal(
-          raw,
-          "8ch_relay_1",
-          0,
-          prevState?.outputs.motorFanOn ?? false,
-          prevState != null,
-        );
-  })();
-  const alarmRelay = (() => {
-    const direct = readBitSignal(
-      raw,
-      ["boardA_8ch_relay_alarm"],
-      prevState?.outputs.relay?.[1] ?? false,
-      prevState != null,
-    );
-    if (direct.hasReal) return direct;
-    const legacyRelay = readArrayBitSignal(
-      raw,
-      "8ch_relay_1",
-      1,
-      prevState?.outputs.relay?.[1] ?? false,
-      prevState != null,
-    );
-    return legacyRelay.hasReal
-      ? legacyRelay
-      : readArrayBitSignal(
-          raw,
-          "alerts",
-          3,
-          prevState?.outputs.alerts?.[3] ?? false,
-          prevState != null,
-        );
-  })();
-  const alertRed = (() => {
-    const direct = readBitSignal(
-      raw,
-      ["boardA_alert_relays_red", "boardB_8ch_io_output_red"],
-      prevState?.outputs.alerts?.[0] ?? false,
-      prevState != null,
-    );
-    return direct.hasReal
-      ? direct
-      : readArrayBitSignal(
-          raw,
-          "alerts",
-          0,
-          prevState?.outputs.alerts?.[0] ?? false,
-          prevState != null,
-        );
-  })();
-  const alertYellow = (() => {
-    const direct = readBitSignal(
-      raw,
-      ["boardA_alert_relays_yellow", "boardB_8ch_io_output_yellow"],
-      prevState?.outputs.alerts?.[1] ?? false,
-      prevState != null,
-    );
-    return direct.hasReal
-      ? direct
-      : readArrayBitSignal(
-          raw,
-          "alerts",
-          1,
-          prevState?.outputs.alerts?.[1] ?? false,
-          prevState != null,
-        );
-  })();
+  // ── Relay / alert reads from plc/data ──
+  // plc/data publishes the new flat keys only (boardA_relay_motor,
+  // boardA_relay_alarm, boardA_alert_relays_*, boardB_io_output_*). The
+  // `boardA_8ch_relay_*` and `boardB_8ch_io_*` names are no longer in the
+  // inbound payload — they're retained only on plc/control publishes for
+  // firmware-side backwards compatibility.
+  const motorRelay = readBitSignal(
+    raw,
+    ["boardA_relay_motor"],
+    prevState?.outputs.motorFanOn ?? false,
+    prevState != null,
+  );
+  const alarmRelay = readBitSignal(
+    raw,
+    ["boardA_relay_alarm"],
+    prevState?.outputs.relay?.[1] ?? false,
+    prevState != null,
+  );
+  const alertRed = readBitSignal(
+    raw,
+    ["boardA_alert_relays_red", "boardB_io_output_red"],
+    prevState?.outputs.alerts?.[0] ?? false,
+    prevState != null,
+  );
+  const alertYellow = readBitSignal(
+    raw,
+    ["boardA_alert_relays_yellow", "boardB_io_output_yellow"],
+    prevState?.outputs.alerts?.[1] ?? false,
+    prevState != null,
+  );
   const alertGreen = readBitSignal(
     raw,
-    ["boardA_alert_relays_green", "boardB_8ch_io_output_green"],
+    ["boardA_alert_relays_green", "boardB_io_output_green"],
     prevState?.outputs.relay?.[4] ?? false,
     prevState != null,
   );
-  const alertBuzzer = (() => {
-    const direct = readBitSignal(
-      raw,
-      ["boardA_alert_relays_buzzer", "boardB_8ch_io_output_buzzer"],
-      prevState?.outputs.alerts?.[2] ?? false,
-      prevState != null,
-    );
-    return direct.hasReal
-      ? direct
-      : readArrayBitSignal(
-          raw,
-          "alerts",
-          2,
-          prevState?.outputs.alerts?.[2] ?? false,
-          prevState != null,
-        );
-  })();
+  const alertBuzzer = readBitSignal(
+    raw,
+    ["boardA_alert_relays_buzzer", "boardB_io_output_buzzer"],
+    prevState?.outputs.alerts?.[2] ?? false,
+    prevState != null,
+  );
 
+  // Pressure: new payload uses `boardA_pressure_sensor` (raw 12-bit ADC,
+  // ~0–4095 → scaled to 0–200 bar). Keep the legacy key + boardB ESP32 key
+  // as fallbacks for older deployments.
   const formingPressure = readScaledSignal(
     raw,
-    ["boardA_8ch_analog_1_pressure_sensor", "boardB_esp32_pressure"],
+    [
+      "boardA_pressure_sensor",
+      "boardA_8ch_analog_1_pressure_sensor",
+      "boardB_esp32_pressure",
+    ],
     prevNum(prevState, "forming_pressure", 0),
     prevKnown(prevState, "forming_pressure"),
     (value, key) =>
       key === "boardB_esp32_pressure" && value <= 200
         ? value
-        : scaleLinear(value, 0, 3200, 0, 200),
+        : scaleLinear(value, 0, 4095, 0, 200),
   );
   const microwaveMotion = readScaledSignal(
     raw,
-    ["boardA_8ch_analog_1_microwave_motion_sensor", "boardB_esp32_touch_event"],
+    [
+      "boardA_microwave_motion_sensor",
+      "boardA_8ch_analog_1_microwave_motion_sensor",
+      "boardB_esp32_touch_event",
+    ],
     prevNum(prevState, "curing_motion", 0),
     prevKnown(prevState, "curing_motion"),
     (value) => (value <= 1 ? value : scaleLinear(value, 0, 4095, 0, 1)),
@@ -485,6 +441,7 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
   const mqGas = readScaledSignal(
     raw,
     [
+      "boardA_metaloxide_sensor",
       "boardA_8ch_analog_1_metaloxide_sensor",
       "boardB_esp32_bme_gas",
       "boardB_esp32_voc",
@@ -502,21 +459,21 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
   );
   const turbidity = readScaledSignal(
     raw,
-    ["boardA_8ch_analog_1_turbidity_sensor"],
+    ["boardA_turbidity_sensor", "boardA_8ch_analog_1_turbidity_sensor"],
     prevNum(prevState, "mixing_turbidity", 0),
     prevKnown(prevState, "mixing_turbidity"),
     (value) => (value <= 100 ? value : scaleLinear(value, 0, 5000, 0, 50)),
   );
   const light = readScaledSignal(
     raw,
-    ["boardA_8ch_analog_1_light_sensor"],
+    ["boardA_light_sensor", "boardA_8ch_analog_1_light_sensor"],
     prevNum(prevState, "forming_light", 0),
     prevKnown(prevState, "forming_light"),
     (value) => (value <= 1000 ? value : scaleLinear(value, 0, 5000, 0, 1000)),
   );
   const orp = readScaledSignal(
     raw,
-    ["boardA_8ch_analog_1_orp_sensor"],
+    ["boardA_orp_sensor", "boardA_8ch_analog_1_orp_sensor"],
     prevNum(prevState, "mixing_orp", 0),
     prevKnown(prevState, "mixing_orp"),
     (value) =>
@@ -545,10 +502,30 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
   );
   const water = readScaledSignal(
     raw,
-    ["boardB_esp32_water"],
+    [
+      // New flat payload — Board B's 8-channel analog water-leakage probe.
+      "boardB_analog_8ch_b_water_leakage_sensor",
+      "boardB_esp32_water",
+    ],
     prevNum(prevState, "pkg_water", 0),
     prevKnown(prevState, "pkg_water"),
     (value) => (value <= 1 ? value : scaleLinear(value, 0, 5000, 0, 1)),
+  );
+  // Fire / smoke detector (boardB_analog_8ch_b_fire_sensor). Raw ADC on a
+  // 12-bit channel — values ≥ ~3000 indicate smoke / flame.
+  const fire = readScaledSignal(
+    raw,
+    ["boardB_analog_8ch_b_fire_sensor"],
+    prevNum(prevState, "fire", 0),
+    prevKnown(prevState, "fire"),
+    (value) => (value <= 100 ? value : scaleLinear(value, 0, 4095, 0, 100)),
+  );
+  // System-wide emergency-stop latch from the PLC firmware.
+  const systemEmergencyStop = readBitSignal(
+    raw,
+    ["system_was_in_emergency_stop_state"],
+    false,
+    false,
   );
   const auxGps = readScaledSignal(
     raw,
@@ -593,7 +570,7 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
   collectFallbackDebug(
     raw,
     "metal",
-    ["boardA_metal_sensor", "boardB_8ch_io_metal_sensor", "metal_sensor"],
+    ["boardA_metal_sensor", "boardB_io_metal_sensor", "boardB_8ch_io_metal_sensor", "metal_sensor"],
     metal.hasReal,
     metal.value,
     debugEvents,
@@ -603,6 +580,8 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
     "push_button",
     [
       "boardA_green_push_button",
+      "boardB_io_green_button",
+      "boardB_io_push_lock_button",
       "boardB_8ch_io_green_button",
       "boardB_8ch_io_push_lock_button",
       "push_button",
@@ -614,7 +593,7 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
   collectFallbackDebug(
     raw,
     "forming_pressure",
-    ["boardA_8ch_analog_1_pressure_sensor", "boardB_esp32_pressure"],
+    ["boardA_pressure_sensor", "boardA_8ch_analog_1_pressure_sensor", "boardB_esp32_pressure"],
     formingPressure.hasReal,
     formingPressure.value,
     debugEvents,
@@ -622,7 +601,7 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
   collectFallbackDebug(
     raw,
     "mixing_ph",
-    ["boardA_8ch_analog_1_ph_sensor", "pH"],
+    ["boardA_ph_sensor", "boardA_8ch_analog_1_ph_sensor", "pH"],
     ph.hasReal,
     ph.value,
     debugEvents,
@@ -631,6 +610,7 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
     raw,
     "mixing_mq",
     [
+      "boardA_metaloxide_sensor",
       "boardA_8ch_analog_1_metaloxide_sensor",
       "boardB_esp32_bme_gas",
       "boardB_esp32_voc",
@@ -917,6 +897,18 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
       accentHex: "#0ea5e9",
     }),
     analogParam({
+      id: "fire",
+      label: "Fire / Smoke",
+      value: fire.value,
+      hasReal: fire.hasReal,
+      unit: "",
+      min: 0,
+      max: 100,
+      nominal: 0,
+      decimals: 0,
+      accentHex: "#ef4444",
+    }),
+    analogParam({
       id: "intake_gps",
       label: "Intake GPS",
       value: auxGps.value,
@@ -1008,9 +1000,14 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
       },
       outputs: {
         motorFanOn: motorRelay.value,
-        emergencyLightOn: alarmRelay.value || alertRed.value || alertBuzzer.value,
+        emergencyLightOn:
+          alarmRelay.value ||
+          alertRed.value ||
+          alertBuzzer.value ||
+          systemEmergencyStop.value,
         photoESensor: photoE.value,
         metalSensor: metal.value,
+        rfidAuthorized: rfidAuthorized.value,
         pushButton: pushButton.value,
         alerts: [alertRed.value, alertYellow.value, alertBuzzer.value, alarmRelay.value],
       },
@@ -1021,9 +1018,14 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
     params,
     outputs: {
       motorFanOn: motorRelay.value,
-      emergencyLightOn: alarmRelay.value || alertRed.value || alertBuzzer.value,
+      emergencyLightOn:
+        alarmRelay.value ||
+        alertRed.value ||
+        alertBuzzer.value ||
+        systemEmergencyStop.value,
       photoESensor: photoE.value,
       metalSensor: metal.value,
+      rfidAuthorized: rfidAuthorized.value,
       relay,
       pushButton: pushButton.value,
       alerts: [alertRed.value, alertYellow.value, alertBuzzer.value, alarmRelay.value],

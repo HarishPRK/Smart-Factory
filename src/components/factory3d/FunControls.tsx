@@ -14,6 +14,7 @@ import {
   getAutoTourLabel,
 } from "./CameraController";
 import { STAGE_POSITIONS } from "./digitalTwinLayout";
+import { useSceneSettingsStore } from "../../stores/sceneSettingsStore";
 
 /**
  * FunControls — Interactive control panel for playing with the factory
@@ -109,6 +110,17 @@ const FunControls: React.FC<{
   const [isNight, setIsNight] = useState(true);
   const [activeScenario, setActiveScenario] = useState<string | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
+
+  const particlesEnabled = useSceneSettingsStore((s) => s.particlesEnabled);
+  const extrasEnabled    = useSceneSettingsStore((s) => s.extrasEnabled);
+  const cctvEnabled      = useSceneSettingsStore((s) => s.cctvEnabled);
+  const labelsVisible    = useSceneSettingsStore((s) => s.labelsVisible);
+  const quality          = useSceneSettingsStore((s) => s.quality);
+  const setParticles     = useSceneSettingsStore((s) => s.setParticles);
+  const setExtras        = useSceneSettingsStore((s) => s.setExtras);
+  const setCCTV          = useSceneSettingsStore((s) => s.setCCTV);
+  const setLabels        = useSceneSettingsStore((s) => s.setLabels);
+  const setQuality       = useSceneSettingsStore((s) => s.setQuality);
 
   const handleSpeedChange = useCallback((newSpeed: number) => {
     setSpeed(newSpeed);
@@ -511,6 +523,121 @@ const FunControls: React.FC<{
                   >
                     <span style={{ fontSize: "11px" }}>{preset.icon}</span>
                     <span>{preset.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Display Toggles ── */}
+            <div style={{ marginBottom: "10px" }}>
+              <span
+                style={{
+                  color: "#94a3b8",
+                  fontSize: "9px",
+                  fontWeight: 600,
+                  letterSpacing: "0.08em",
+                }}
+              >
+                DISPLAY
+              </span>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "4px",
+                  marginTop: "6px",
+                }}
+              >
+                {([
+                  ["Particles", particlesEnabled, setParticles, "#22d3ee"],
+                  ["Extras",    extrasEnabled,    setExtras,    "#a78bfa"],
+                  ["CCTV",      cctvEnabled,      setCCTV,      "#f472b6"],
+                  ["Labels",    labelsVisible,    setLabels,    "#34d399"],
+                ] as const).map(([label, on, setter, color]) => (
+                  <button
+                    key={label}
+                    onClick={() => setter(!on)}
+                    style={{
+                      background: on
+                        ? `${color}18`
+                        : "rgba(100,116,139,0.08)",
+                      border: on
+                        ? `1px solid ${color}`
+                        : "1px solid rgba(100,116,139,0.15)",
+                      borderRadius: "6px",
+                      color: on ? color : "#94a3b8",
+                      fontSize: "9px",
+                      fontWeight: 600,
+                      padding: "6px 8px",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    <span>{label}</span>
+                    <span
+                      style={{
+                        width: "18px",
+                        height: "10px",
+                        borderRadius: "999px",
+                        background: on ? color : "rgba(100,116,139,0.3)",
+                        position: "relative",
+                        flexShrink: 0,
+                        boxShadow: on ? `0 0 6px ${color}` : "none",
+                        transition: "background 0.2s",
+                      }}
+                    >
+                      <span
+                        style={{
+                          position: "absolute",
+                          top: "1px",
+                          left: on ? "9px" : "1px",
+                          width: "8px",
+                          height: "8px",
+                          borderRadius: "50%",
+                          background: "#0f172a",
+                          transition: "left 0.2s",
+                        }}
+                      />
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  gap: "4px",
+                  marginTop: "6px",
+                }}
+              >
+                {(["low", "medium", "high", "ultra"] as const).map((q) => (
+                  <button
+                    key={q}
+                    onClick={() => setQuality(q)}
+                    style={{
+                      flex: 1,
+                      background:
+                        quality === q
+                          ? "rgba(59,130,246,0.18)"
+                          : "rgba(100,116,139,0.08)",
+                      border:
+                        quality === q
+                          ? "1px solid #3b82f6"
+                          : "1px solid rgba(100,116,139,0.15)",
+                      borderRadius: "5px",
+                      color: quality === q ? "#60a5fa" : "#94a3b8",
+                      fontSize: "9px",
+                      fontWeight: 700,
+                      padding: "4px 0",
+                      cursor: "pointer",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                    }}
+                  >
+                    {q}
                   </button>
                 ))}
               </div>
