@@ -108,6 +108,25 @@ const SENSOR_FALLBACKS: Record<string, string[]> = {
   pkg_water:           ["pkg_water"],
   dispatch_gps:        ["dispatch_gps", "intake_gps"],      // shared aux voltage pot
   dispatch_fingerprint:["dispatch_fingerprint", "intake_fingerprint"],
+  // V2 sensor fallbacks — route to existing PLC param IDs where the hardware
+  // signal already exists. Sensors without a listed fallback remain purely
+  // simulated until a PLC payload key is added.
+  // The user's physical board has one photoelectric beam-break sensor wired as
+  // the proximity input, so all proximity + optical stage sensors track it.
+  intake_optical:      ["photoelectric"],
+  quality_optical:     ["photoelectric"],
+  forming_proximity:   ["photoelectric"],
+  pkg_proximity:       ["photoelectric"],
+  curing_fire:         ["fire"],
+  pkg_fire:            ["fire"],
+  // All three stage-level E-stop sensors are driven by the single PLC-level
+  // `system_emergency_stop` bit (latched `system_was_in_emergency_stop_state`
+  // in the payload). When it goes high, every stage's emergency_stop sensor
+  // crosses its critical threshold, and evaluateThresholds' sensorEstopActive
+  // guard freezes the whole line + clears RFID client-side.
+  forming_estop:       ["system_emergency_stop"],
+  mixing_estop:        ["system_emergency_stop"],
+  pkg_estop:           ["system_emergency_stop"],
 };
 
 function getPLCOverride(sensorId: string): number | undefined {
@@ -134,12 +153,43 @@ export function isSensorLive(sensorId: string): boolean {
   return false;
 }
 
+/* ── Fast lookup maps (built once at module load) ────────
+ *
+ * The simulation tick runs ~30 Hz and inside each tick we used to do hundreds
+ * of `Array.find(...)` calls walking STAGE_CONFIGS, sensorConfigs, and
+ * outputDeviceConfigs. Each `find` is O(n) and allocates a closure for its
+ * predicate. At ~500+ finds per tick × 30 Hz, this is the kind of GC/CPU
+ * pressure that stalls the main thread; when a tick exceeds 33 ms the
+ * setInterval callbacks queue and every new MQTT message waits behind them,
+ * matching the 3–4 s observed latency.
+ *
+ * These maps replace every hot-path find with O(1) lookups. They are built
+ * once from the static STAGE_CONFIGS layout and never mutated.
+ */
+const STAGE_CONFIG_BY_ID: Record<string, typeof STAGE_CONFIGS[number]> = {};
+const SENSOR_CONFIG_BY_KEY: Record<
+  string,
+  typeof STAGE_CONFIGS[number]["sensorConfigs"][number]
+> = {};
+const DEVICE_CONFIG_BY_KEY: Record<
+  string,
+  typeof STAGE_CONFIGS[number]["outputDeviceConfigs"][number]
+> = {};
+
+for (const cfg of STAGE_CONFIGS) {
+  STAGE_CONFIG_BY_ID[cfg.id] = cfg;
+  for (const sc of cfg.sensorConfigs) {
+    // Global-unique sensorId keys (e.g. "forming_pressure") — every sensor in
+    // layout is uniquely named so we don't need to namespace by stage here.
+    SENSOR_CONFIG_BY_KEY[sc.sensorId] = sc;
+  }
+  for (const dc of cfg.outputDeviceConfigs) {
+    DEVICE_CONFIG_BY_KEY[`${cfg.id}::${dc.deviceId}`] = dc;
+  }
+}
+
 function defaultMotorRpm(stageId: StageId, deviceId: string): number {
-  return (
-    STAGE_CONFIGS.find((stage) => stage.id === stageId)
-      ?.outputDeviceConfigs.find((device) => device.deviceId === deviceId)?.defaultRpm ??
-    60
-  );
+  return DEVICE_CONFIG_BY_KEY[`${stageId}::${deviceId}`]?.defaultRpm ?? 60;
 }
 
 /** Thresholds applied to analog board-A readings. Tuned to the live payload
@@ -176,43 +226,53 @@ function applyPLCOperationalOverrides(stages: ManufacturingStage[], thresholdSpe
   const curingFault = temperature > OP_LIMITS.tempCrit;
   const curingWarn  = temperature > OP_LIMITS.tempWarn && !curingFault;
 
-  // Operator E-stop — red light, buzzer, or alarm relay all halt the line.
-  const operatorEstop =
-    outputs.alerts[0] === true ||           // red
-    outputs.alerts[2] === true ||           // buzzer
-    outputs.alerts[3] === true;             // alarm relay
+  // Operator E-stop was previously derived from the red / buzzer / alarm
+  // annunciator outputs — but those lamps are often on during normal state
+  // indication in real firmware (e.g. amber "awaiting", red "RFID locked"
+  // indicators), which made them unreliable as an E-stop signal. The real
+  // operator E-stop path now flows through dedicated `emergency_stop` sensor
+  // inputs handled by `evaluateThresholds` → `sensorEstopActive`, which
+  // explicitly freezes every stage + the conveyor when any E-stop button is
+  // pressed. We keep `operatorEstop = false` here so the annunciator lamps
+  // can't stop the line on their own.
+  const operatorEstop = false;
 
-  // Line speed gates: only RFID badge + operator E-stop freeze the conveyor.
+  // Line speed gate: RFID badge alone decides whether the conveyor moves.
   // Stage-level faults (pressure, voltage, temp, etc.) stop their own motor
   // but the belt itself keeps moving so upstream production isn't blocked.
   let effectiveSpeed = thresholdSpeed;
-  if (!outputs.rfidAuthorized || operatorEstop) {
+  if (!outputs.rfidAuthorized) {
     effectiveSpeed = 0;
   }
 
-  const operationSnapshot = JSON.stringify({
-    photoESensor: outputs.photoESensor,
-    metalSensor: outputs.metalSensor,
-    rfidAuthorized: outputs.rfidAuthorized,
-    motorRelay: outputs.motorFanOn,
-    cobotButton: outputs.pushButton, // for traceability only — wired elsewhere
-    voltage, current, temperature,
-    formingFault, curingFault, curingWarn, operatorEstop,
-    thresholdSpeed,
-    effectiveSpeed,
-  });
-
-  if (operationSnapshot !== lastPLCOperationSnapshot) {
-    lastPLCOperationSnapshot = operationSnapshot;
-    digitalTwinDebug("Factory operation override updated", {
+  // Snapshot/diff-log for operator visibility — only built when debug logging
+  // is enabled. Running JSON.stringify every 33 ms was pure overhead in prod
+  // since the output is only ever consumed by digitalTwinDebug().
+  if (DT_PLC_DEBUG) {
+    const operationSnapshot = JSON.stringify({
+      photoESensor: outputs.photoESensor,
+      metalSensor: outputs.metalSensor,
       rfidAuthorized: outputs.rfidAuthorized,
       motorRelay: outputs.motorFanOn,
-      cobotButton: outputs.pushButton,
+      cobotButton: outputs.pushButton, // for traceability only — wired elsewhere
       voltage, current, temperature,
       formingFault, curingFault, curingWarn, operatorEstop,
       thresholdSpeed,
       effectiveSpeed,
     });
+
+    if (operationSnapshot !== lastPLCOperationSnapshot) {
+      lastPLCOperationSnapshot = operationSnapshot;
+      digitalTwinDebug("Factory operation override updated", {
+        rfidAuthorized: outputs.rfidAuthorized,
+        motorRelay: outputs.motorFanOn,
+        cobotButton: outputs.pushButton,
+        voltage, current, temperature,
+        formingFault, curingFault, curingWarn, operatorEstop,
+        thresholdSpeed,
+        effectiveSpeed,
+      });
+    }
   }
 
   for (const stage of stages) {
@@ -383,6 +443,30 @@ function tickSensors(stages: ManufacturingStage[], dt: number) {
 /* ── Threshold evaluation — mutates stages in place ───── */
 
 function evaluateThresholds(stages: ManufacturingStage[]): number {
+  // ── Line-wide sensor-driven E-Stop gate ──
+  // Any operator-panel emergency-stop input reading above its critical threshold
+  // freezes every stage and drops conveyor speed to zero — mirrors the behaviour
+  // of the PLC alarm-relay E-stop but sourced from the sim/hardware sensor.
+  const sensorEstopActive = stages.some((stage) =>
+    stage.sensors.some(
+      (s) => s.type === "emergency_stop" && s.status === "critical",
+    ),
+  );
+  if (sensorEstopActive) {
+    for (const stage of stages) {
+      stage.status = "faulted";
+      for (const d of stage.outputDevices) {
+        if (d.type === "emergency_light") d.active = true;
+        if (d.type === "motor") {
+          d.active = false;
+          d.rpm = 0;
+          d.direction = "stopped";
+        }
+      }
+    }
+    return 0;
+  }
+
   let minSpeed = 1.0;
 
   for (let si = 0; si < stages.length; si++) {
@@ -394,10 +478,10 @@ function evaluateThresholds(stages: ManufacturingStage[]): number {
       const sensor = stage.sensors.find((s) => s.sensorId === effect.sensorId);
       if (!sensor) continue;
 
-      const sc = STAGE_CONFIGS[si].sensorConfigs.find((c) => c.sensorId === effect.sensorId);
+      const sc = SENSOR_CONFIG_BY_KEY[effect.sensorId];
       if (!sc) continue;
 
-      if (!isEffectTriggered(sensor.value, sc.nominal, effect)) continue;
+      if (!isEffectTriggered(sensor.value, sc, effect)) continue;
 
       // When live PLC feed is active we still honour `stop` effects (operator-set
       // safety thresholds such as forming_pressure below 50 bar must halt the
@@ -441,12 +525,28 @@ function evaluateThresholds(stages: ManufacturingStage[]): number {
     stage.status = stageStatus;
     stage.qualityScore = Math.max(0, stageQuality);
 
-    if (stageStatus === "running") {
+    // Restore healthy state whenever the stage is not faulted.
+    //
+    // Previously we only restored motors + emergency_lights when the final
+    // status was "running" — a stage that ticked over to "warning" (via a
+    // slowdown/quality_degrade) kept whatever emergency_light state a prior
+    // "stop" effect had left behind. That's why the lights appeared to stay
+    // ON during normal operation even after the triggering sensor recovered:
+    // ambient warning-level fluctuations (e.g. proximity beam-break) held the
+    // stage in "warning" and the previous tick's light state stuck around.
+    //
+    // A warning-level stage is still producing — motors run, emergency lights
+    // are off — it's just degraded quality / throughput.
+    if (stageStatus === "running" || stageStatus === "warning") {
+      const stageCfg = STAGE_CONFIG_BY_ID[stage.id];
       for (const d of stage.outputDevices) {
         if (d.type === "emergency_light") d.active = false;
         if (d.type === "motor") {
           d.active = true;
-          const dc = STAGE_CONFIGS[si].outputDeviceConfigs.find((c) => c.deviceId === d.deviceId);
+          // Map lookup keyed by stageId+deviceId (built once at module load).
+          const dc =
+            DEVICE_CONFIG_BY_KEY[`${stage.id}::${d.deviceId}`] ??
+            stageCfg?.outputDeviceConfigs[0];
           d.rpm = dc?.defaultRpm ?? 60;
           d.direction = "forward";
         }
@@ -457,18 +557,22 @@ function evaluateThresholds(stages: ManufacturingStage[]): number {
   return minSpeed;
 }
 
-function isEffectTriggered(value: number, nominal: number, effect: ThresholdEffect): boolean {
-  for (const stageConfig of STAGE_CONFIGS) {
-    const sc = stageConfig.sensorConfigs.find((s) => s.sensorId === effect.sensorId);
-    if (!sc) continue;
-    switch (effect.condition) {
-      case "above_critical": return value >= sc.criticalThreshold && sc.criticalThreshold > nominal;
-      case "above_warning":  return value >= sc.warningThreshold && value < sc.criticalThreshold && sc.warningThreshold > nominal;
-      case "below_critical": return value <= sc.criticalThreshold && sc.criticalThreshold < nominal;
-      case "below_warning":  return value <= sc.warningThreshold && value > sc.criticalThreshold && sc.warningThreshold < nominal;
-    }
+function isEffectTriggered(
+  value: number,
+  sc: typeof STAGE_CONFIGS[number]["sensorConfigs"][number],
+  effect: ThresholdEffect,
+): boolean {
+  // Single-config evaluation — caller passes the already-looked-up sensor
+  // config. Previously walked all of STAGE_CONFIGS per call which was
+  // ~64 redundant iterations per tick on the hot path.
+  const nominal = sc.nominal;
+  switch (effect.condition) {
+    case "above_critical": return value >= sc.criticalThreshold && sc.criticalThreshold > nominal;
+    case "above_warning":  return value >= sc.warningThreshold && value < sc.criticalThreshold && sc.warningThreshold > nominal;
+    case "below_critical": return value <= sc.criticalThreshold && sc.criticalThreshold < nominal;
+    case "below_warning":  return value <= sc.warningThreshold && value > sc.criticalThreshold && sc.warningThreshold < nominal;
+    default:               return false;
   }
-  return false;
 }
 
 /* ── Product flow — mutates product array in place ────── */
@@ -504,10 +608,12 @@ function tickProducts(stages: ManufacturingStage[], products: ProductOnBelt[], d
     const product = products[i];
     product.progress += speed;
 
-    // Determine current stage
+    // Determine current stage — map lookup per stage (O(1)) instead of the
+    // previous O(n) Array.find walk that ran per product per stage per tick.
     let currentStage: StageId | null = null;
     for (const stage of stages) {
-      const config = STAGE_CONFIGS.find((c) => c.id === stage.id)!;
+      const config = STAGE_CONFIG_BY_ID[stage.id];
+      if (!config) continue;
       if (Math.abs(product.progress - config.conveyorT) < 0.08) {
         currentStage = stage.id;
         if (product.currentStageId !== stage.id) {
@@ -589,8 +695,7 @@ const scenarioFns: Record<string, ScenarioFn> = {
         for (const d of stage.outputDevices) {
           if (d.type === "motor" && !d.active) {
             d.active = true;
-            const cfg = STAGE_CONFIGS.find(c => c.id === stage.id)
-              ?.outputDeviceConfigs.find(c => c.deviceId === d.deviceId);
+            const cfg = DEVICE_CONFIG_BY_KEY[`${stage.id}::${d.deviceId}`];
             d.rpm = cfg?.defaultRpm ?? 60;
             d.direction = "forward";
           }
@@ -670,11 +775,37 @@ const scenarioFns: Record<string, ScenarioFn> = {
 
 /* ── Main simulation loop ─────────────────────────────── */
 
-let intervalId: ReturnType<typeof setInterval> | null = null;
+// Self-scheduling tick — we use setTimeout recursion rather than setInterval.
+// setInterval queues callbacks when a tick takes longer than the interval;
+// under load that queue never drains, so every fresh MQTT message ends up
+// waiting behind a growing backlog of stale ticks (the "3–4 s" latency the
+// user was observing). setTimeout schedules the NEXT tick only after the
+// current one finishes, so worst case we just tick slower under load
+// instead of compounding lag indefinitely.
+const TICK_INTERVAL_MS = 33; // ~30 Hz when the main thread is idle
+// Holds either a setTimeout handle or a requestIdleCallback id, depending on
+// which scheduler the current environment uses. Only checked for null-ness
+// and passed to the matching cancel function, so the union is fine.
+let tickTimerId: ReturnType<typeof setTimeout> | number | null = null;
+// Track which scheduler was used so we call the matching cancel on stop.
+let tickUsedIdle = false;
 let lastTime = Date.now();
 
 function tick() {
   const now = Date.now();
+
+  // Pause the sim entirely while the tab is hidden. setInterval is throttled
+  // to ~1 Hz by the browser in background tabs, but the wall-clock-based
+  // spawn check keeps firing — that combination used to clump a long
+  // backlog of near-identical products at intake. Skipping the whole tick
+  // keeps the belt state frozen until the user returns, and the next
+  // visible tick resumes cleanly.
+  if (typeof document !== "undefined" && document.hidden) {
+    lastTime = now;
+    lastSpawnTime = now;
+    return;
+  }
+
   let dt = (now - lastTime) / 1000;
   if (dt > 0.1) dt = 0.1; // clamp dt to prevent massive jumps when tab is inactive
   lastTime = now;
@@ -699,7 +830,7 @@ function tick() {
       for (const sensor of stage.sensors) {
         if (sensorValues[sensor.sensorId] !== undefined) {
           sensor.value = sensorValues[sensor.sensorId];
-          const sc = STAGE_CONFIGS.find(c => c.id === stage.id)?.sensorConfigs.find(c => c.sensorId === sensor.sensorId);
+          const sc = SENSOR_CONFIG_BY_KEY[sensor.sensorId];
           if (sc) sensor.status = sensorStatus(sensor.value, sc);
         }
       }
@@ -720,8 +851,66 @@ function tick() {
 
 /* ── Public API ───────────────────────────────────────── */
 
+/**
+ * Self-scheduling loop: run a tick, then request the next one.
+ *
+ * Uses `requestIdleCallback` when available so the tick only runs in the
+ * gaps between paint frames — this is the difference between "frame missed
+ * because the sim was mid-run" stutter and butter-smooth animation. A
+ * timeout ceiling (2× the nominal interval) guarantees the tick still
+ * progresses even if the browser is perpetually busy. Falls back to
+ * setTimeout for environments without rIC (Safari).
+ */
+let nextTickDelay = TICK_INTERVAL_MS;
+
+type IdleId = number;
+
+interface IdleDeadline {
+  didTimeout: boolean;
+  timeRemaining: () => number;
+}
+type RIC = (
+  cb: (deadline: IdleDeadline) => void,
+  opts?: { timeout: number },
+) => IdleId;
+type CIC = (id: IdleId) => void;
+
+const ric: RIC | null =
+  typeof window !== "undefined" && "requestIdleCallback" in window
+    ? (window as unknown as { requestIdleCallback: RIC }).requestIdleCallback
+    : null;
+const cic: CIC | null =
+  typeof window !== "undefined" && "cancelIdleCallback" in window
+    ? (window as unknown as { cancelIdleCallback: CIC }).cancelIdleCallback
+    : null;
+
+function runTickAndReschedule() {
+  const started = performance.now();
+  try {
+    tick();
+  } finally {
+    const elapsed = performance.now() - started;
+    nextTickDelay = Math.max(0, TICK_INTERVAL_MS - elapsed);
+    if (tickTimerId !== null) scheduleTick();
+  }
+}
+
+function scheduleTick() {
+  if (ric) {
+    // Idle-scheduled: runs between frames, never interrupting paint. The
+    // timeout ceiling ensures we never starve the sim indefinitely.
+    tickUsedIdle = true;
+    tickTimerId = ric(() => runTickAndReschedule(), {
+      timeout: TICK_INTERVAL_MS * 2,
+    });
+  } else {
+    tickUsedIdle = false;
+    tickTimerId = setTimeout(runTickAndReschedule, nextTickDelay);
+  }
+}
+
 export function startDigitalTwinSim() {
-  if (intervalId) return;
+  if (tickTimerId) return;
 
   sensorValues = {};
   productIdCounter = 0;
@@ -744,13 +933,20 @@ export function startDigitalTwinSim() {
   });
 
   lastTime = Date.now();
-  intervalId = setInterval(tick, 33); // ~30 Hz — smooth sensor drift & product movement
+  nextTickDelay = TICK_INTERVAL_MS;
+  scheduleTick();
 }
 
 export function stopDigitalTwinSim() {
-  if (intervalId) {
-    clearInterval(intervalId);
-    intervalId = null;
+  if (tickTimerId !== null) {
+    // Dispatch the correct cancel based on which scheduler queued the
+    // current pending tick.
+    if (tickUsedIdle && cic) {
+      cic(tickTimerId as number);
+    } else {
+      clearTimeout(tickTimerId as ReturnType<typeof setTimeout>);
+    }
+    tickTimerId = null;
   }
   useDigitalTwinStore.setState({ simulationActive: false });
 }
@@ -811,7 +1007,7 @@ export function setDigitalTwinPLCFeed(
 }
 
 export function isDigitalTwinRunning() {
-  return intervalId !== null;
+  return tickTimerId !== null;
 }
 
 export const DT_SCENARIOS = [

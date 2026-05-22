@@ -5,7 +5,7 @@
  * for the digital twin manufacturing pipeline.
  */
 
-// ── 12 Input Sensor Types ──────────────────────────────────
+// ── 22 Input Sensor Types ──────────────────────────────────
 export type SensorType =
   | "ph"
   | "microwave_motion"
@@ -18,15 +18,33 @@ export type SensorType =
   | "water"
   | "mq_gas"
   | "pressure"
-  | "fingerprint";
+  | "fingerprint"
+  // V2: ten additional input sensors sourced from the PLC payload /
+  // mock simulation. Used to drive stage status and line gates.
+  | "proximity"
+  | "optical"
+  | "emergency_stop"
+  | "capacitive_touch"
+  | "water_level"
+  | "rfid"
+  | "fire"
+  | "flow_liquid"
+  | "valve_signal"
+  | "flow_air";
 
-// ── 6 Output Device Types ──────────────────────────────────
+// ── Output Device Types ──────────────────────────────────
+// `three_phase_motor` represents a heavy 3-phase load (blow-molder press,
+// rotary filler drive) metered by the Shelly proEM 3-phase energy meter.
+// The dashboard's ThreePhaseMotorWidget subscribes to the raw PLC payload
+// for live per-phase voltage/current/power/PF readings; the 3D variant
+// renders a chunkier motor with three coloured phase indicators.
 export type OutputDeviceType =
   | "switch_4ep"
   | "shelly"
   | "single_phase"
   | "power_meter"
   | "motor"
+  | "three_phase_motor"
   | "emergency_light";
 
 // ── Manufacturing Stage IDs ────────────────────────────────

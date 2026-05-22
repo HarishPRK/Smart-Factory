@@ -164,6 +164,75 @@ const MotorDevice: React.FC<{ device: OutputDeviceState }> = ({ device }) => {
   );
 };
 
+/* ── 3-Phase Motor ────────────────────────────────────── */
+// Heavy 3-phase drive (blow-molder press / rotary filler) metered by
+// Shelly proEM. The shaft spins faster as device.rpm rises; three coloured
+// "RYB" lights on top indicate the three phase legs are energised.
+
+const ThreePhaseMotorDevice: React.FC<{ device: OutputDeviceState }> = ({ device }) => {
+  const shaftRef = useRef<THREE.Mesh>(null);
+  const phaseRefs = [useRef<THREE.Mesh>(null), useRef<THREE.Mesh>(null), useRef<THREE.Mesh>(null)];
+
+  useFrame(({ clock }, delta) => {
+    if (shaftRef.current && device.active && device.rpm) {
+      shaftRef.current.rotation.x += delta * (device.rpm / 60) * Math.PI * 2;
+    }
+    // Phase indicators pulse out of phase to suggest 3-phase AC
+    phaseRefs.forEach((ref, i) => {
+      if (!ref.current) return;
+      const mat = ref.current.material as THREE.MeshStandardMaterial;
+      const offset = (i * 2 * Math.PI) / 3;
+      mat.emissiveIntensity = device.active
+        ? 0.5 + Math.max(0, Math.sin(clock.elapsedTime * 6 + offset)) * 0.8
+        : 0.05;
+    });
+  });
+
+  // Phase colours — Red / Yellow / Blue (industrial 3-phase convention)
+  const phaseColors = ["#ef4444", "#eab308", "#3b82f6"];
+
+  return (
+    <group>
+      {/* Larger motor body — visually heavier than the single-phase motor */}
+      <mesh position={[0, 0.08, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.06, 0.06, 0.16, 14]} />
+        <meshStandardMaterial color="#1f2937" metalness={0.75} roughness={0.3} />
+      </mesh>
+      {/* Cooling fins — 4 ridges around the body */}
+      {[0, 1, 2, 3].map((i) => (
+        <mesh
+          key={i}
+          position={[-0.06 + i * 0.04, 0.08, 0]}
+          rotation={[0, 0, Math.PI / 2]}
+        >
+          <cylinderGeometry args={[0.062, 0.062, 0.005, 14]} />
+          <meshStandardMaterial color="#374151" metalness={0.6} roughness={0.4} />
+        </mesh>
+      ))}
+      {/* Output shaft */}
+      <mesh ref={shaftRef} position={[0.13, 0.08, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.012, 0.012, 0.08, 8]} />
+        <meshStandardMaterial color="#d4d4d8" metalness={0.9} roughness={0.1} />
+      </mesh>
+      {/* Terminal box on top with 3 phase indicators */}
+      <mesh position={[0, 0.16, 0]}>
+        <boxGeometry args={[0.08, 0.025, 0.05]} />
+        <meshStandardMaterial color="#475569" metalness={0.5} roughness={0.5} />
+      </mesh>
+      {phaseRefs.map((ref, i) => (
+        <mesh key={i} ref={ref} position={[-0.025 + i * 0.025, 0.18, 0]}>
+          <sphereGeometry args={[0.008, 8, 8]} />
+          <meshStandardMaterial
+            color={device.active ? phaseColors[i] : "#374151"}
+            emissive={device.active ? phaseColors[i] : "#000"}
+            emissiveIntensity={0.05}
+          />
+        </mesh>
+      ))}
+    </group>
+  );
+};
+
 /* ── Emergency Light ──────────────────────────────────── */
 
 const EmergencyLightDevice: React.FC<{ device: OutputDeviceState }> = ({ device }) => {
@@ -207,8 +276,9 @@ const DeviceGeometry: React.FC<{ type: OutputDeviceType; device: OutputDeviceSta
     case "shelly":          return <ShellyDevice device={device} />;
     case "single_phase":    return <SinglePhaseDevice device={device} />;
     case "power_meter":     return <PowerMeterDevice device={device} />;
-    case "motor":           return <MotorDevice device={device} />;
-    case "emergency_light": return <EmergencyLightDevice device={device} />;
+    case "motor":             return <MotorDevice device={device} />;
+    case "three_phase_motor": return <ThreePhaseMotorDevice device={device} />;
+    case "emergency_light":   return <EmergencyLightDevice device={device} />;
     default:
       return (
         <mesh position={[0, 0.05, 0]}>

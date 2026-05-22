@@ -105,7 +105,11 @@ const CAMERA_PRESETS: {
 const FunControls: React.FC<{
   onDayNightToggle?: (isNight: boolean) => void;
 }> = ({ onDayNightToggle }) => {
-  const [expanded, setExpanded] = useState(true);
+  // Default collapsed. On laptop-sized viewports the fully-expanded panel is
+  // taller than the 3D scene container and pushes the CONTROLS toggle off-screen
+  // (the user couldn't close it). Starting collapsed keeps the trigger visible
+  // and lets the user choose to expand.
+  const [expanded, setExpanded] = useState(false);
   const [speed, setSpeed] = useState(1.0);
   const [isNight, setIsNight] = useState(true);
   const [activeScenario, setActiveScenario] = useState<string | null>(null);
@@ -302,35 +306,6 @@ const FunControls: React.FC<{
       )}
 
       <div style={panelStyle}>
-        {/* Toggle button */}
-        <button
-          onClick={() => setExpanded((e) => !e)}
-          style={{
-            background: "rgba(10, 22, 40, 0.9)",
-            border: "1px solid rgba(59,130,246,0.3)",
-            borderRadius: "8px",
-            color: "#e2e8f0",
-            padding: "6px 12px",
-            cursor: "pointer",
-            fontSize: "12px",
-            fontWeight: 600,
-            marginBottom: "8px",
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
-          }}
-        >
-          <span style={{ fontSize: "14px" }}>
-            {expanded ? "\u25BC" : "\u25B2"}
-          </span>
-          CONTROLS
-          <span
-            style={{ fontSize: "9px", color: "#64748b", marginLeft: "4px" }}
-          >
-            Press ? for shortcuts
-          </span>
-        </button>
-
         {expanded && (
           <div
             style={{
@@ -339,6 +314,12 @@ const FunControls: React.FC<{
               borderRadius: "10px",
               padding: "12px",
               width: "260px",
+              // Cap height so the panel + bottom CLOSE button stay inside the
+              // 3D-scene container (which has overflow:hidden). Anything
+              // beyond this height scrolls internally.
+              maxHeight: "calc(100vh - 380px)",
+              overflowY: "auto",
+              marginBottom: "8px",
             }}
           >
             {/* ── Speed Control ── */}
@@ -724,6 +705,43 @@ const FunControls: React.FC<{
             </div>
           </div>
         )}
+
+        {/* Bottom-anchored toggle. Renders AFTER the expanded panel in DOM
+            order, so the panel anchors this button to its bottom (12px from
+            the 3D-scene container's bottom). The expanded content can grow
+            upward and even get clipped at the top by the scene's overflow:
+            hidden — this trigger remains visible and clickable, so the user
+            can always close the panel. */}
+        <button
+          onClick={() => setExpanded((e) => !e)}
+          title={expanded ? "Close controls" : "Open controls"}
+          style={{
+            background: expanded
+              ? "rgba(220, 38, 38, 0.85)"
+              : "rgba(10, 22, 40, 0.9)",
+            border: expanded
+              ? "1px solid rgba(248, 113, 113, 0.6)"
+              : "1px solid rgba(59,130,246,0.3)",
+            borderRadius: "8px",
+            color: expanded ? "#fff5f5" : "#e2e8f0",
+            padding: "8px 14px",
+            cursor: "pointer",
+            fontSize: "12px",
+            fontWeight: 700,
+            letterSpacing: "0.06em",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            boxShadow: expanded
+              ? "0 6px 18px rgba(220, 38, 38, 0.35)"
+              : "0 4px 12px rgba(0,0,0,0.45)",
+          }}
+        >
+          <span style={{ fontSize: "14px", lineHeight: 1 }}>
+            {expanded ? "✕" : "▲"}
+          </span>
+          {expanded ? "CLOSE CONTROLS" : "CONTROLS"}
+        </button>
       </div>
     </>
   );

@@ -761,6 +761,153 @@ input:focus-visible,
   background: linear-gradient(180deg, #5cc0d4, #3aa9c0);
 }
 
+/* ─────────────────────────────────────────────────────────
+ * Status-driven anomaly glow
+ * Pulsing border-glow used on PLC cards to draw the operator's
+ * eye to anything in WARNING or CRITICAL state. Subtle in
+ * amplitude — meant to register peripherally without becoming
+ * a flashing distraction.
+ * ────────────────────────────────────────────────────────── */
+@keyframes pulse-warn-border {
+  0%, 100% {
+    box-shadow:
+      inset 0 0 0 1px rgba(208, 138, 30, 0.30),
+      0 0 0 1px rgba(208, 138, 30, 0.18),
+      0 0 14px rgba(208, 138, 30, 0.10);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 1px rgba(208, 138, 30, 0.60),
+      0 0 0 1px rgba(208, 138, 30, 0.45),
+      0 0 22px rgba(208, 138, 30, 0.28);
+  }
+}
+@keyframes pulse-alarm-border {
+  0%, 100% {
+    box-shadow:
+      inset 0 0 0 1px rgba(192, 57, 43, 0.35),
+      0 0 0 1px rgba(192, 57, 43, 0.22),
+      0 0 16px rgba(192, 57, 43, 0.12);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 1px rgba(192, 57, 43, 0.70),
+      0 0 0 1px rgba(192, 57, 43, 0.55),
+      0 0 26px rgba(192, 57, 43, 0.36);
+  }
+}
+.status-warn-glow {
+  border-color: rgba(208, 138, 30, 0.45) !important;
+  animation: pulse-warn-border 2s ease-in-out infinite;
+}
+.status-alarm-glow {
+  border-color: rgba(192, 57, 43, 0.55) !important;
+  animation: pulse-alarm-border 1.6s ease-in-out infinite;
+}
+
+/* ─────────────────────────────────────────────────────────
+ * Modern command-strip chip
+ * Used for the Critical / Warnings / Online status row above
+ * the KPI bar. Styled like a Bloomberg-terminal cell — small
+ * caps label, accent bar on the left, value in industrial
+ * mono with a colored signal dot.
+ * ────────────────────────────────────────────────────────── */
+.cmd-chip {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 7px 14px 7px 14px;
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 60%),
+    linear-gradient(180deg, #141b27 0%, #0e141d 100%);
+  border: 1px solid var(--ind-edge);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 4px 10px rgba(0, 0, 0, 0.35);
+  transition: border-color 0.18s ease, transform 0.18s ease,
+    box-shadow 0.18s ease;
+  min-width: 86px;
+}
+.cmd-chip:hover {
+  transform: translateY(-1px);
+  border-color: var(--ind-edge-strong);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 6px 14px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(58, 169, 192, 0.10);
+}
+.cmd-chip::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 18%;
+  bottom: 18%;
+  width: 2px;
+  border-radius: 0 2px 2px 0;
+  background: var(--accent, var(--ind-accent));
+  box-shadow: 0 0 8px var(--accent, var(--ind-accent));
+}
+.cmd-chip-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #6c7a8c;
+  line-height: 1;
+  white-space: nowrap;
+}
+.cmd-chip-value {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  color: #e4ebf3;
+}
+.cmd-chip-value .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--accent, var(--ind-accent));
+  box-shadow: 0 0 8px var(--accent, var(--ind-accent));
+}
+.cmd-chip.tone-alarm { --accent: #ef4444; }
+.cmd-chip.tone-warn  { --accent: #f59e0b; }
+.cmd-chip.tone-ok    { --accent: #10b981; }
+.cmd-chip.tone-alarm .dot { animation: ind-breathe 2.4s ease-out infinite; }
+.cmd-chip.tone-warn  .dot { animation: ind-breathe 2.8s ease-out infinite; }
+
+/* Hero accent bar — taller, more prominent build of .hero-accent for the
+ * Operations Snapshot row. Animated subtle glow so the dashboard reads
+ * "live" not "static graphic". */
+.hero-accent {
+  width: 3px;
+  height: 42px;
+  border-radius: 2px;
+  background: linear-gradient(
+    180deg,
+    var(--ind-accent) 0%,
+    rgba(58, 169, 192, 0.15) 100%
+  );
+  box-shadow: 0 0 14px rgba(58, 169, 192, 0.45);
+  animation: hero-accent-breathe 3.2s ease-in-out infinite;
+}
+@keyframes hero-accent-breathe {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(58, 169, 192, 0.35);
+    opacity: 0.85;
+  }
+  50% {
+    box-shadow: 0 0 18px rgba(58, 169, 192, 0.65);
+    opacity: 1;
+  }
+}
+
 /* Reusable gradient chip label — pairs with .signal-pill */
 .signal-pill.live {
   color: var(--ind-ok);
@@ -1068,3 +1215,39 @@ input:focus-visible,
   color: #e4ebf3;
   line-height: 1;
 }
+
+/* ─────────────────────────────────────────────────────────
+ * Universal font-size bump — improves readability on large
+ * factory-floor displays at 100% zoom. Bumps the small
+ * arbitrary tailwind sizes that are sprinkled across the app
+ * (text-[10px], text-[11px], …) by ~1–2px, plus tightens the
+ * built-in xs/sm helpers and the named industrial labels.
+ * Designed to be non-breaking — fixed-height cards still fit.
+ * ────────────────────────────────────────────────────────── */
+[class*="text-[8px]"]  { font-size: 10px !important; }
+[class*="text-[9px]"]  { font-size: 11px !important; }
+[class*="text-[10px]"] { font-size: 12px !important; }
+[class*="text-[11px]"] { font-size: 13px !important; }
+[class*="text-[12px]"] { font-size: 14px !important; }
+[class*="text-[13px]"] { font-size: 14px !important; }
+[class*="text-[14px]"] { font-size: 15px !important; }
+[class*="text-[15px]"] { font-size: 16px !important; }
+[class*="text-[16px]"] { font-size: 17px !important; }
+[class*="text-[17px]"] { font-size: 18px !important; }
+[class*="text-[18px]"] { font-size: 19px !important; }
+[class*="text-[20px]"] { font-size: 21px !important; }
+[class*="text-[22px]"] { font-size: 23px !important; }
+[class*="text-[24px]"] { font-size: 25px !important; }
+
+/* Built-in tailwind helpers */
+.text-xs  { font-size: 13px !important; line-height: 1.35 !important; }
+.text-sm  { font-size: 15px !important; line-height: 1.45 !important; }
+
+/* Named industrial helpers */
+.ind-label    { font-size: 11px; }
+.section-title { font-size: 11px; }
+.signal-pill   { font-size: 11px; }
+.cs-label      { font-size: 9px; }
+.cs-value      { font-size: 13px; }
+.chip-label    { font-size: 9px; }
+.chip-value    { font-size: 14px; }

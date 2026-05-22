@@ -3,12 +3,16 @@ import React, { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useDigitalTwinStore } from "../../stores/digitalTwinStore";
+import { isBlowMolderEngaged } from "./InlineMachine3D";
 
 interface ProductFlow3DProps {
   path: [number, number, number][];
 }
 
-const MAX_PRODUCTS = 160;
+// Halved from 160 → 80: 80 slots still fills the full zig-zag belt densely
+// enough to look continuous (one bottle every ~25 cm of belt), and halves
+// the per-frame matrix/color update cost across 6 InstancedMesh buffers.
+const MAX_PRODUCTS = 80;
 
 /**
  * ISBM Manufacturing Stages (Injection Stretch Blow Molding):
@@ -162,6 +166,7 @@ const ProductFlow3D: React.FC<ProductFlow3DProps> = ({ path }) => {
     const products = useDigitalTwinStore.getState().products;
     const visibleCount = Math.min(products.length, MAX_PRODUCTS);
     const t = clock.elapsedTime;
+    const moldEngaged = isBlowMolderEngaged(t);
 
     const counts = [0, 0, 0, 0];
 
@@ -169,8 +174,18 @@ const ProductFlow3D: React.FC<ProductFlow3DProps> = ({ path }) => {
       const product = products[i];
       const stage = classifyStage(product.progress);
 
-      // NO LONGER HIDING in blow molder - preforms/bottles stay visible!
-      // Transformation from preform to bottle happens gradually inside machine
+      // Blow-molder — hide products that land inside the forming zone while
+      // the press cycle has the die closed. Without this, bottles visibly
+      // slide *through* the solid mold halves. Only the window [0.16, 0.20]
+      // is affected, so products arriving before the mold or leaving after
+      // remain visible.
+      if (
+        moldEngaged &&
+        product.progress >= FORMING_ZONE_START &&
+        product.progress < FORMING_ZONE_END
+      ) {
+        continue;
+      }
 
       // Bottles are now visible through the glass filling station enclosure!
       // The color transition from empty (light blue) to filled (dark brown)
@@ -321,7 +336,9 @@ const ProductFlow3D: React.FC<ProductFlow3DProps> = ({ path }) => {
       <instancedMesh
         ref={pelletRef}
         args={[undefined, undefined, MAX_PRODUCTS]}
-        castShadow
+        /* castShadow intentionally disabled — 80 moving bottles each writing
+           to the shadow depth pass added ~1.5 ms/frame for very little
+           visual gain (the belt already gets ContactShadows underneath). */
         frustumCulled={false}
       >
         <dodecahedronGeometry args={[0.05, 0]} />
@@ -338,7 +355,9 @@ const ProductFlow3D: React.FC<ProductFlow3DProps> = ({ path }) => {
       <instancedMesh
         ref={preformRef}
         args={[preformGeo, undefined, MAX_PRODUCTS]}
-        castShadow
+        /* castShadow intentionally disabled — 80 moving bottles each writing
+           to the shadow depth pass added ~1.5 ms/frame for very little
+           visual gain (the belt already gets ContactShadows underneath). */
         frustumCulled={false}
       >
         <meshStandardMaterial
@@ -357,7 +376,9 @@ const ProductFlow3D: React.FC<ProductFlow3DProps> = ({ path }) => {
       <instancedMesh
         ref={bottleRef}
         args={[bottleGeo, undefined, MAX_PRODUCTS]}
-        castShadow
+        /* castShadow intentionally disabled — 80 moving bottles each writing
+           to the shadow depth pass added ~1.5 ms/frame for very little
+           visual gain (the belt already gets ContactShadows underneath). */
         frustumCulled={false}
       >
         <meshStandardMaterial
@@ -408,7 +429,9 @@ const ProductFlow3D: React.FC<ProductFlow3DProps> = ({ path }) => {
       <instancedMesh
         ref={packageRef}
         args={[undefined, undefined, MAX_PRODUCTS]}
-        castShadow
+        /* castShadow intentionally disabled — 80 moving bottles each writing
+           to the shadow depth pass added ~1.5 ms/frame for very little
+           visual gain (the belt already gets ContactShadows underneath). */
         frustumCulled={false}
       >
         <boxGeometry args={[0.12, 0.15, 0.1]} />

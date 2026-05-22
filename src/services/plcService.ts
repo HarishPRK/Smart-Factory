@@ -16,9 +16,21 @@ export interface RawPLCPayload {
   boardA_alert_relays_yellow?: number;
   boardA_alert_relays_green?: number;
   boardA_alert_relays_buzzer?: number;
+  // Current flat payload keys (board A relays + analog channels)
+  boardA_rfid_authorized_user?: number;
+  boardA_relay_motor?: number;
+  boardA_relay_alarm?: number;
+  boardA_voltage_pot_2?: number;
+  boardA_pressure_sensor?: number;
+  boardA_microwave_motion_sensor?: number;
+  boardA_ph_sensor?: number;
+  boardA_metaloxide_sensor?: number;
+  boardA_turbidity_sensor?: number;
+  boardA_light_sensor?: number;
+  boardA_orp_sensor?: number;
+  // Legacy "8ch_analog_1"-prefixed names kept as aliases for older firmware.
   boardA_8ch_relay_motor?: number;
   boardA_8ch_relay_alarm?: number;
-  boardA_voltage_pot_2?: number;
   boardA_8ch_analog_1_pressure_sensor?: number;
   boardA_8ch_analog_1_microwave_motion_sensor?: number;
   boardA_8ch_analog_1_ph_sensor?: number;
@@ -26,6 +38,15 @@ export interface RawPLCPayload {
   boardA_8ch_analog_1_turbidity_sensor?: number;
   boardA_8ch_analog_1_light_sensor?: number;
   boardA_8ch_analog_1_orp_sensor?: number;
+  // Board B IO (new flat names)
+  boardB_io_metal_sensor?: number;
+  boardB_io_green_button?: number;
+  boardB_io_push_lock_button?: number;
+  boardB_io_output_red?: number;
+  boardB_io_output_yellow?: number;
+  boardB_io_output_green?: number;
+  boardB_io_output_buzzer?: number;
+  // Board B legacy "8ch_io"-prefixed aliases
   boardB_8ch_io_metal_sensor?: number;
   boardB_8ch_io_green_button?: number;
   boardB_8ch_io_push_lock_button?: number;
@@ -33,6 +54,65 @@ export interface RawPLCPayload {
   boardB_8ch_io_output_yellow?: number;
   boardB_8ch_io_output_green?: number;
   boardB_8ch_io_output_buzzer?: number;
+  // Board B analog extras
+  boardB_analog_8ch_b_fire_sensor?: number;
+  boardB_analog_8ch_b_water_leakage_sensor?: number;
+  // Shelly proEM 3-phase power meter — current payload publishes per-phase
+  // (a/b/c) channels, a neutral current, and pre-summed totals. The relay
+  // state remains a single bit. The older single-channel keys (temperature,
+  // freq, plain _act_power/_current/_voltage/_pf) are kept below as legacy
+  // fallbacks for older firmware that still ships the aggregated shape.
+  boardB_shelly_proEM_data_a_act_power?: number;
+  boardB_shelly_proEM_data_a_aprt_power?: number;
+  boardB_shelly_proEM_data_a_current?: number;
+  boardB_shelly_proEM_data_a_pf?: number;
+  boardB_shelly_proEM_data_a_voltage?: number;
+  boardB_shelly_proEM_data_b_act_power?: number;
+  boardB_shelly_proEM_data_b_aprt_power?: number;
+  boardB_shelly_proEM_data_b_current?: number;
+  boardB_shelly_proEM_data_b_pf?: number;
+  boardB_shelly_proEM_data_b_voltage?: number;
+  boardB_shelly_proEM_data_c_act_power?: number;
+  boardB_shelly_proEM_data_c_aprt_power?: number;
+  boardB_shelly_proEM_data_c_current?: number;
+  boardB_shelly_proEM_data_c_pf?: number;
+  boardB_shelly_proEM_data_c_voltage?: number;
+  boardB_shelly_proEM_data_n_current?: number;
+  boardB_shelly_proEM_data_total_act_power?: number;
+  boardB_shelly_proEM_data_total_aprt_power?: number;
+  boardB_shelly_proEM_data_total_current?: number;
+  boardB_shelly_proEM_relay_1_state?: number;
+  // Legacy single-channel proEM keys (pre-2026-04 firmware)
+  boardB_shelly_proEM_data_temperature?: number;
+  boardB_shelly_proEM_data_act_power?: number;
+  boardB_shelly_proEM_data_aprt_power?: number;
+  boardB_shelly_proEM_data_current?: number;
+  boardB_shelly_proEM_data_voltage?: number;
+  boardB_shelly_proEM_data_freq?: number;
+  boardB_shelly_proEM_data_pf?: number;
+  // Shelly Pro3 — 3-channel relay device with built-in metering
+  boardB_shelly_pro3_data_temperature?: number;
+  boardB_shelly_pro3_data_act_power?: number;
+  boardB_shelly_pro3_data_aprt_power?: number;
+  boardB_shelly_pro3_data_current?: number;
+  boardB_shelly_pro3_data_voltage?: number;
+  boardB_shelly_pro3_data_freq?: number;
+  boardB_shelly_pro3_data_pf?: number;
+  boardB_shelly_pro3_relay_1_state?: number;
+  boardB_shelly_pro3_relay_2_state?: number;
+  boardB_shelly_pro3_relay_3_state?: number;
+  // Shelly Pro2PM — 2-channel metering relay
+  boardB_shelly_pro2pm_data_temperature?: number;
+  boardB_shelly_pro2pm_data_act_power?: number;
+  boardB_shelly_pro2pm_data_aprt_power?: number;
+  boardB_shelly_pro2pm_data_current?: number;
+  boardB_shelly_pro2pm_data_voltage?: number;
+  boardB_shelly_pro2pm_data_freq?: number;
+  boardB_shelly_pro2pm_data_pf?: number;
+  boardB_shelly_pro2pm_relay_1_state?: number;
+  boardB_shelly_pro2pm_relay_2_state?: number;
+  // Latched system-level E-stop state (clears RFID authorization client-side)
+  system_was_in_emergency_stop_state?: number;
   boardB_esp32_temperature?: number;
   boardB_esp32_humidity?: number;
   boardB_esp32_pressure?: number;
@@ -62,7 +142,63 @@ export interface RawPLCPayload {
   push_button?: [number];
   temperature?: [number];
   pH?: [number];
+  // Aggregate OEE metrics — published on `plc/data` as shift-rollup values
+  // alongside (or instead of) raw sensor channels. Consumed by the OEE
+  // dashboard via subscribeRawPLCPayload.
+  OEE?: number;
+  availability?: number;
+  performance?: number;
+  quality?: number;
+  total_units_produced?: number;
+  uptime_in_minutes?: number;
+  downtime_in_minutes?: number;
 }
+
+/* ── Raw payload broadcaster ──────────────────────────────
+ * Not every `plc/data` publish is sensor-shaped. Aggregate metrics (OEE,
+ * availability, uptime) ride the same topic under different keys, so we
+ * broadcast the raw object to any interested subscriber before the sensor
+ * parser reduces it to typed PLCParameter rows. Used by the OEE dashboard.
+ */
+type RawPLCPayloadListener = (payload: RawPLCPayload) => void;
+const rawPLCPayloadListeners = new Set<RawPLCPayloadListener>();
+
+export function subscribeRawPLCPayload(cb: RawPLCPayloadListener): () => void {
+  rawPLCPayloadListeners.add(cb);
+  return () => {
+    rawPLCPayloadListeners.delete(cb);
+  };
+}
+
+function emitRawPLCPayload(payload: RawPLCPayload) {
+  for (const cb of rawPLCPayloadListeners) cb(payload);
+}
+
+/* ── KOS topic broadcaster ───────────────────────────────
+ * AWS IoT publishes dispenser/vending events on `KOS/*` topics on the same
+ * broker the bridge already subscribes to. The MosquittoPLCService.onmessage
+ * handler routes any topic starting with "kos" (case-insensitive) here, so
+ * widgets like KOSDispenseWidget can subscribe without parsing PLC frames.
+ */
+export type KOSMessageListener = (topic: string, payload: unknown) => void;
+const kosMessageListeners = new Set<KOSMessageListener>();
+
+export function subscribeKOSMessage(cb: KOSMessageListener): () => void {
+  kosMessageListeners.add(cb);
+  return () => {
+    kosMessageListeners.delete(cb);
+  };
+}
+
+function emitKOSMessage(topic: string, payload: unknown) {
+  for (const cb of kosMessageListeners) cb(topic, payload);
+}
+
+// Module-level memory of the previous E-stop signal state. Used to detect
+// the rising edge (inactive → active) for the RFID latch clear path, so a
+// firmware-side latched "was in emergency" bit doesn't keep re-clearing the
+// authorized state on every subsequent tick.
+let lastEstopSignal = false;
 
 /* ── Shared types ──────────────────────────────────────── */
 
@@ -148,8 +284,29 @@ function scaleLinear(
   return outMin + clamp(normalized, 0, 1) * (outMax - outMin);
 }
 
+/**
+ * Normalise any MQTT-friendly scalar-ish value into a number. Supports:
+ *   - number          → returned as-is
+ *   - [number, ...]   → first element (legacy array payload format)
+ *   - boolean         → 1 / 0          (firmware sometimes publishes bits as bool)
+ *   - "1" / "0"       → 1 / 0          (JSON-as-string edge cases)
+ *   - "true" / "false" → 1 / 0         (same, different encoding)
+ *   - "authorized" / "unauthorized" → 1 / 0   (semantic RFID states)
+ *   - "on" / "off"    → 1 / 0          (relay convention)
+ *
+ * Everything else returns null, which tells the reader "no real data here,
+ * keep the previous value".
+ */
 function scalar(rawValue: unknown): number | null {
   if (typeof rawValue === "number" && Number.isFinite(rawValue)) return rawValue;
+  if (typeof rawValue === "boolean") return rawValue ? 1 : 0;
+  if (typeof rawValue === "string") {
+    const trimmed = rawValue.trim().toLowerCase();
+    if (trimmed === "true" || trimmed === "on" || trimmed === "authorized" || trimmed === "yes") return 1;
+    if (trimmed === "false" || trimmed === "off" || trimmed === "unauthorized" || trimmed === "no") return 0;
+    const n = Number(trimmed);
+    if (Number.isFinite(n)) return n;
+  }
   if (
     Array.isArray(rawValue) &&
     rawValue.length > 0 &&
@@ -350,22 +507,57 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
   );
   // RFID — authorizes operator badge at the intake gate. When this reads 0 the
   // digital twin forces the intake stage into "idle" (line cannot start).
+  //
+  // The key list covers the firmware variations we've seen in the wild:
+  // the canonical `boardA_rfid_authorized_user` plus common alternates that
+  // some PLC builds publish (`rfid`, `rfid_authorized`, `rfid_authorised`,
+  // `authorized`, `badge`). Values may arrive as number/bool/string — the
+  // scalar() helper normalises all of them.
   const rfidAuthorized = readBitSignal(
     raw,
-    ["boardA_rfid_authorized_user"],
+    [
+      "boardA_rfid_authorized_user",
+      "rfid_authorized_user",
+      "rfid_authorized",
+      "rfid_authorised",
+      "rfidAuthorized",
+      "rfid",
+      "authorized",
+      "badge",
+    ],
     prevState?.outputs.rfidAuthorized ?? false,
     prevState?.outputs.rfidAuthorized !== undefined,
   );
+  // Latch logic is applied below (after alert/buzzer reads) so an explicit
+  // operator E-stop can still clear authorization. The firmware transiently
+  // republishes rfid_authorized=0 when the physical green start button is
+  // pressed, which would otherwise drop the line back to idle every time the
+  // operator starts production; the latch keeps the badge state sticky.
   const pushButton = readBitSignal(
     raw,
     [
       "boardA_green_push_button",
       "boardB_io_green_button",
-      "boardB_io_push_lock_button",
       "push_button",
     ],
     prevState?.outputs.pushButton ?? false,
     prevState?.outputs.pushButton !== undefined,
+  );
+
+  // Physical E-stop (push-lock) button — a dedicated digital input, distinct
+  // from the green start button. Reads from every push-lock variant the PLC
+  // firmware may publish. Used below to clear the RFID latch so the line
+  // returns to "awaiting badge" as soon as the operator hits E-stop.
+  const estopButton = readBitSignal(
+    raw,
+    [
+      "boardB_io_push_lock_button",
+      "boardB_8ch_io_push_lock_button",
+      "boardA_push_lock_button",
+      "push_lock_button",
+    ],
+    false,
+    false,
   );
   // ── Relay / alert reads from plc/data ──
   // plc/data publishes the new flat keys only (boardA_relay_motor,
@@ -409,6 +601,59 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
     prevState?.outputs.alerts?.[2] ?? false,
     prevState != null,
   );
+
+  // RFID latch — once authorized, hold true until a real E-stop event.
+  //
+  // The raw payload transiently drops rfid_authorized_user to 0 when the
+  // operator presses the physical green start button; without this latch
+  // the line would fall back to idle on every start press.
+  //
+  // System-level E-stop state from the PLC itself. This is the latched
+  // "emergency stop active" bit the controller maintains after an operator
+  // pushes the physical lock button. It stays true until the operator resets
+  // the lock, which is exactly the behaviour we want for clearing the RFID
+  // authorization client-side.
+  const systemEstop = readBitSignal(
+    raw,
+    [
+      "system_was_in_emergency_stop_state",
+      "system_in_emergency_stop_state",
+      "system_emergency_stop",
+    ],
+    false,
+    false,
+  );
+
+  // RFID authorization latch — rising-edge detection on E-stop signals.
+  //
+  // Why rising-edge instead of "currently active"?
+  // `system_was_in_emergency_stop_state` is a **latched** firmware bit: it
+  // sticks at 1 after an emergency occurs and stays there until the PLC
+  // program explicitly resets it, which can be long after the operator has
+  // physically reset the push-lock button. If we cleared RFID on every tick
+  // where that bit is high, the operator could never re-authorize — because
+  // scanning the badge would set rfidAuthorized to true for one tick, and
+  // the very next tick would clear it again.
+  //
+  // By detecting the rising edge (previously false, now true) we fire the
+  // clear exactly ONCE when the E-stop actually triggers. Subsequent ticks
+  // with the bit still latched are no-ops, and the latch re-holds the
+  // authorized state the moment the operator scans a new badge.
+  //
+  // We also suppress the clear while the green start button is pressed —
+  // some firmware pulses the E-stop bits as an "arming" artifact during
+  // green press, which would otherwise drop the line back to idle.
+  const greenPressed = pushButton.value === true;
+  const estopSignalNow = systemEstop.value === true || estopButton.value === true;
+  const estopSignalPrev = lastEstopSignal;
+  lastEstopSignal = estopSignalNow;
+  const estopRisingEdge = estopSignalNow && !estopSignalPrev;
+  if (estopRisingEdge && !greenPressed) {
+    rfidAuthorized.value = false;
+  } else {
+    rfidAuthorized.value =
+      rfidAuthorized.value || (prevState?.outputs.rfidAuthorized ?? false);
+  }
 
   // Pressure: new payload uses `boardA_pressure_sensor` (raw 12-bit ADC,
   // ~0–4095 → scaled to 0–200 bar). Keep the legacy key + boardB ESP32 key
@@ -703,6 +948,19 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
       active: metal.value,
       hasReal: metal.hasReal,
       accentHex: "#f97316",
+    }),
+    // `system_emergency_stop` — surfaces the latched PLC-level E-stop state
+    // as a PLCParameter so SENSOR_FALLBACKS can route the three stage-level
+    // E-stop sensors (forming_estop / mixing_estop / pkg_estop) to it. When
+    // the operator hits the physical push-lock, this bit goes high, each
+    // stage's emergency_stop sensor picks it up as a "critical" reading,
+    // and evaluateThresholds' sensorEstopActive guard freezes the whole line.
+    digitalParam({
+      id: "system_emergency_stop",
+      label: "System E-Stop",
+      active: systemEmergencyStop.value,
+      hasReal: systemEmergencyStop.hasReal,
+      accentHex: "#ef4444",
     }),
     analogParam({
       id: "temperature",
@@ -1531,12 +1789,31 @@ export class MosquittoPLCService implements PLCService {
     this.ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data as string) as { topic: string; payload: unknown };
+
+        // KOS topics (forwarded from AWS IoT by the bridge) take a separate
+        // route — they're consumed by the dispenser widget, not the PLC
+        // sensor parser. Match `kos/...` and `KOS/...` (case-insensitive,
+        // also tolerant of dot-separated topic styles).
+        if (msg.topic && /^kos[\/.]/i.test(msg.topic)) {
+          emitKOSMessage(msg.topic, msg.payload);
+          return;
+        }
+
         if (msg.topic !== "plc/data") return;
 
         // Always keep the latest raw payload — never drop a message
         this.pendingRaw = msg.payload as RawPLCPayload;
 
-        // Flush on a 50ms timer so we batch rapid bursts but never lose state
+        // Broadcast the raw payload to non-sensor subscribers (OEE dashboard,
+        // KPI tiles) before the sensor parser reduces it.
+        emitRawPLCPayload(this.pendingRaw);
+
+        // Flush within ~20 ms. Intentionally aggressive — PLCContext has its
+        // own rAF coalesce layer above this that bundles rapid successive
+        // updates into a single React commit, so we don't need to batch
+        // heavily here. Keeping this window short means the instant an
+        // operator turns a pot, the voltage/current widgets on the PLC
+        // Parameters panel update in < 40 ms end-to-end.
         if (!this.flushTimer) {
           this.flushTimer = setTimeout(() => {
             this.flushTimer = null;
@@ -1545,7 +1822,7 @@ export class MosquittoPLCService implements PLCService {
             this.pendingRaw = null;
             this.lastState = state;
             this.listeners.forEach((cb) => cb(state));
-          }, 50);
+          }, 20);
         }
       } catch (err) {
         console.error("[Mosquitto] Parse error:", err);

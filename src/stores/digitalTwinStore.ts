@@ -71,8 +71,13 @@ export function pushSensorHistory(sensorId: string, value: number) {
  * Called every sim tick (~33ms). Updates scalar values that 3D reads
  * via getState(). Only bumps `tick` (which triggers React UI re-render)
  * every UI_THROTTLE_MS to keep the 2D panel at a sane refresh rate.
+ *
+ * Lowered from 500 ms → 120 ms so the SensorHUD, ControlBoard3D banners,
+ * and PLC widgets feel like they're tracking live MQTT data rather than
+ * updating twice a second. 120 ms gives ~8 Hz React refresh, well below
+ * the 30 Hz sim tick and cheap for the subscriber set we have today.
  */
-const UI_THROTTLE_MS = 500;
+const UI_THROTTLE_MS = 120;
 let lastUiTick = 0;
 
 export function commitTick(

@@ -1,4 +1,5 @@
 import React from "react";
+import { useTweenedNumber } from "../hooks/useTweenedNumber";
 
 interface OEEGaugeProps {
   value: number; // 0–1
@@ -7,94 +8,104 @@ interface OEEGaugeProps {
   showPercentage?: boolean;
 }
 
+/* ── Semicircle gauge ─────────────────────────────────────
+ * Renders a 180° arc that fills clockwise from the left tip to the right tip.
+ * The fill is a single stroked path with stroke-dasharray sized to the
+ * desired fraction — this avoids re-emitting the `d` attribute on every
+ * value change (which CSS can't animate) and keeps the curve mathematically
+ * exact at any value, including very small ones (no chunky round-cap blob
+ * for 0.4%, no half-clipped path for 95%).
+ */
 const OEEGauge: React.FC<OEEGaugeProps> = ({
   value,
   size = 120,
   label,
   showPercentage = true,
 }) => {
-  const pct = Math.min(Math.max(value, 0), 1) * 100;
-  const radius = (size - 16) / 2;
+  // Tween the incoming 0–1 value — the percentage text, arc fill (via
+  // stroke-dashoffset), and colour band threshold (red/amber/green) all
+  // derive from this so they stay perfectly locked while animating.
+  const tweened = useTweenedNumber(value, 450);
+  const clamped = Math.min(Math.max(tweened, 0), 1);
+  const pct = clamped * 100;
+
+  const strokeWidth = Math.max(6, Math.round(size * 0.07));
+  // Reserve half the stroke width on every edge so the round caps don't get
+  // clipped by the viewBox. This was the source of the "badly shaped" look
+  // at low values — a 4-px round cap on an 8-px stroke landed half outside
+  // the original tight viewBox.
+  const pad = strokeWidth / 2 + 2;
   const cx = size / 2;
-  const cy = size / 2;
+  const radius = cx - pad;
+  const cy = pad + radius; // baseline of the semicircle
 
-  // Semi-circle arc (180 degrees, from left to right)
-  const startAngle = Math.PI;
-  const endAngle = 0;
-  const totalArc = Math.PI;
-  const filledArc = totalArc * Math.min(value, 1);
+  const viewW = size;
+  const viewH = cy + pad;
 
-  const arcX1 = cx + radius * Math.cos(startAngle);
-  const arcY1 = cy - radius * Math.sin(startAngle);
-  const arcX2 = cx + radius * Math.cos(startAngle - filledArc);
-  const arcY2 = cy - radius * Math.sin(startAngle - filledArc);
+  // Full semicircle path: left tip → over the top → right tip.
+  // sweep=0 in SVG goes counter-clockwise visually (Y axis is flipped),
+  // which routes the arc over the top.
+  const arcPath =
+    `M ${cx - radius} ${cy} ` +
+    `A ${radius} ${radius} 0 0 1 ${cx + radius} ${cy}`;
 
-  const bgArcX2 = cx + radius * Math.cos(endAngle);
-  const bgArcY2 = cy - radius * Math.sin(endAngle);
+  // Total length of the half-circle perimeter
+  const arcLength = Math.PI * radius;
+  const filledLength = arcLength * clamped;
 
-  // Color based on OEE value
-  let color = "#ef4444"; // Red < 65%
-  let glowColor = "rgba(239,68,68,0.3)";
+  // Colour bands matching the rest of the dashboard
+  let color = "#ef4444";
+  let glow = "rgba(239,68,68,0.35)";
   if (pct >= 85) {
-    color = "#10b981"; // Green >= 85%
-    glowColor = "rgba(16,185,129,0.3)";
+    color = "#10b981";
+    glow = "rgba(16,185,129,0.35)";
   } else if (pct >= 65) {
-    color = "#f59e0b"; // Yellow 65-84%
-    glowColor = "rgba(245,158,11,0.3)";
+    color = "#f59e0b";
+    glow = "rgba(245,158,11,0.35)";
   }
 
-  const bgPath = `M ${arcX1} ${arcY1} A ${radius} ${radius} 0 ${1} 0 ${bgArcX2} ${bgArcY2}`;
-  const largeArc = filledArc > Math.PI / 2 ? 1 : 0;
-  const fillPath = filledArc > 0.001
-    ? `M ${arcX1} ${arcY1} A ${radius} ${radius} 0 ${largeArc} 0 ${arcX2} ${arcY2}`
-    : "";
-
-  const fontSize = size >= 100 ? 28 : size >= 60 ? 16 : 12;
+  const fontSize = size >= 100 ? Math.round(size * 0.2) : size >= 60 ? 16 : 12;
   const labelSize = size >= 100 ? 10 : 8;
 
   return (
     <div className="flex flex-col items-center">
-      <svg width={size} height={size * 0.62} viewBox={`0 0 ${size} ${size * 0.62}`}>
-        <defs>
-          <filter id={`oee-glow-${size}`}>
-            <feGaussianBlur stdDeviation="3" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
-
-        {/* Background arc */}
+      <svg width={size} height={viewH} viewBox={`0 0 ${viewW} ${viewH}`}>
+        {/* Background track */}
         <path
-          d={bgPath}
+          d={arcPath}
           fill="none"
-          stroke="rgba(100,160,220,0.1)"
-          strokeWidth="8"
+          stroke="rgba(100,160,220,0.12)"
+          strokeWidth={strokeWidth}
           strokeLinecap="round"
         />
 
-        {/* Filled arc */}
-        {fillPath && (
+        {/* Foreground fill — same path, dasharray-clipped to `filledLength`.
+            transitioning stroke-dashoffset is GPU-friendly and animates
+            smoothly even at small fractions. */}
+        {filledLength > 0 && (
           <path
-            d={fillPath}
+            d={arcPath}
             fill="none"
             stroke={color}
-            strokeWidth="8"
+            strokeWidth={strokeWidth}
             strokeLinecap="round"
-            filter={`url(#oee-glow-${size})`}
+            strokeDasharray={`${arcLength} ${arcLength}`}
+            strokeDashoffset={arcLength - filledLength}
             style={{
-              filter: `drop-shadow(0 0 6px ${glowColor})`,
-              transition: "d 0.8s ease-out",
+              filter: `drop-shadow(0 0 5px ${glow})`,
+              // dashoffset is now driven by the tweened value, so no CSS
+              // transition is needed (or wanted — would compound the easing).
+              transition: "stroke 0.4s ease-out",
             }}
           />
         )}
 
-        {/* Value text */}
+        {/* Value text — sits inside the semicircle, vertically centered on
+            the baseline so the number reads cleanly under the arc. */}
         {showPercentage && (
           <text
             x={cx}
-            y={cy - 2}
+            y={cy - 4}
             textAnchor="middle"
             dominantBaseline="alphabetic"
             fill="white"

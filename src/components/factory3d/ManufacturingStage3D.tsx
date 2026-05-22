@@ -307,6 +307,111 @@ const ManufacturingStage3D: React.FC<ManufacturingStage3DProps> = ({
           mat.emissiveIntensity =
             sensor.value > 0.3 ? 0.5 + Math.sin(t * 4) * 0.4 : 0.05;
           break;
+        // ── V2 sensor animations ─────────────────────────
+        case "proximity": {
+          const detected = sensor.value > 0.5;
+          mat.color.set(detected ? "#22c55e" : "#ef4444");
+          mat.emissive.set(detected ? "#22c55e" : "#ef4444");
+          mat.emissiveIntensity =
+            sensor.status !== "normal"
+              ? 0.4 + Math.sin(t * 5) * 0.5
+              : detected ? 0.8 : 0.2;
+          break;
+        }
+        case "optical": {
+          const blocked = sensor.value < 0.5;
+          mat.opacity = blocked ? 0.1 : 0.6 + Math.sin(t * 10) * 0.2;
+          mat.emissiveIntensity = blocked ? 0.1 : 0.9;
+          break;
+        }
+        case "emergency_stop": {
+          const pressed = sensor.value > 0.5;
+          mesh.position.y = pressed ? 0.05 : 0.07;
+          mat.emissiveIntensity = pressed ? 0.6 + Math.sin(t * 6) * 0.4 : 0.3;
+          break;
+        }
+        case "capacitive_touch":
+          mat.emissiveIntensity = sensor.value > 0.5 ? 0.7 : 0.15;
+          break;
+        case "water_level": {
+          const lvlNorm = Math.min(
+            1,
+            Math.max(0, (sensor.value - sensor.min) / (sensor.max - sensor.min)),
+          );
+          mesh.scale.y = 0.01 + lvlNorm * 0.99;
+          mat.color.set(
+            sensor.status === "critical"
+              ? "#ef4444"
+              : sensor.status === "warning"
+              ? "#f59e0b"
+              : "#3b82f6",
+          );
+          mat.emissive.set(
+            sensor.status === "critical"
+              ? "#ef4444"
+              : sensor.status === "warning"
+              ? "#f59e0b"
+              : "#1d4ed8",
+          );
+          break;
+        }
+        case "rfid": {
+          const authorized = sensor.value > 0.5;
+          const wave = ((t * 2) % 1.5) / 1.5;
+          const scale = 0.5 + wave * 1.2;
+          mesh.scale.set(scale, 1, scale);
+          mat.opacity = authorized ? (1 - wave) * 0.6 : 0.1;
+          mat.color.set(authorized ? "#22c55e" : "#ef4444");
+          mat.emissive.set(authorized ? "#22c55e" : "#ef4444");
+          break;
+        }
+        case "fire": {
+          // Inverted: high value = safe; low value = fire. Flame intensity
+          // grows as the reading drops toward zero.
+          const dangerLevel = 1 - Math.min(1, sensor.value / sensor.max);
+          const flicker =
+            1 + Math.sin(t * 9) * 0.15 + Math.sin(t * 17) * 0.08;
+          mesh.scale.set(flicker, flicker, flicker);
+          mat.emissiveIntensity =
+            0.2 + dangerLevel * 1.2 + (sensor.status === "critical" ? 0.5 : 0);
+          break;
+        }
+        case "flow_liquid": {
+          const flowNorm = Math.min(1, sensor.value / sensor.max);
+          const phase = (t * (0.3 + flowNorm * 1.5)) % 1;
+          mesh.position.x = -0.07 + phase * 0.14;
+          mat.opacity = flowNorm > 0.05 ? 0.85 : 0.1;
+          break;
+        }
+        case "valve_signal": {
+          const vNorm = Math.min(
+            1,
+            Math.max(0, (sensor.value - sensor.min) / (sensor.max - sensor.min)),
+          );
+          mesh.rotation.y = vNorm * (Math.PI / 2);
+          mat.color.set(
+            sensor.status === "critical"
+              ? "#ef4444"
+              : sensor.status === "warning"
+              ? "#f59e0b"
+              : "#10b981",
+          );
+          mat.emissive.set(
+            sensor.status === "critical"
+              ? "#ef4444"
+              : sensor.status === "warning"
+              ? "#f59e0b"
+              : "#10b981",
+          );
+          break;
+        }
+        case "flow_air": {
+          const airNorm = Math.min(1, sensor.value / sensor.max);
+          const phase = (t * (0.4 + airNorm * 2.0)) % 1;
+          mesh.position.x = -0.07 + phase * 0.14;
+          mat.opacity = airNorm > 0.05 ? 0.75 : 0.1;
+          break;
+        }
         default:
           break;
       }
@@ -759,6 +864,215 @@ const ManufacturingStage3D: React.FC<ManufacturingStage3DProps> = ({
                     emissive="#22c55e"
                     emissiveIntensity={0.6}
                   />
+                </mesh>
+              </>
+            )}
+            {/* ── V2 sensor types ─────────────────────────── */}
+            {sensorType === "proximity" && (
+              <>
+                <mesh position={[0, 0.08, 0]}>
+                  <cylinderGeometry args={[0.025, 0.025, 0.12, 10]} />
+                  <meshStandardMaterial color="#9ca3af" metalness={0.85} roughness={0.2} />
+                </mesh>
+                <mesh position={[0, 0.14, 0]}>
+                  <cylinderGeometry args={[0.025, 0.025, 0.01, 10]} />
+                  <meshStandardMaterial color="#1f2937" metalness={0.4} roughness={0.6} />
+                </mesh>
+                <mesh
+                  ref={(el) => {
+                    sensorRefs.current[i] = el;
+                  }}
+                  position={[0, 0.03, 0.025]}
+                >
+                  <sphereGeometry args={[0.008, 6, 6]} />
+                  <meshStandardMaterial color="#22c55e" emissive="#22c55e" emissiveIntensity={0.2} />
+                </mesh>
+              </>
+            )}
+            {sensorType === "optical" && (
+              <>
+                <mesh position={[-0.06, 0.06, 0]}>
+                  <boxGeometry args={[0.03, 0.04, 0.03]} />
+                  <meshStandardMaterial color="#1e293b" metalness={0.5} roughness={0.5} />
+                </mesh>
+                <mesh position={[0.06, 0.06, 0]}>
+                  <boxGeometry args={[0.03, 0.04, 0.03]} />
+                  <meshStandardMaterial color="#1e293b" metalness={0.5} roughness={0.5} />
+                </mesh>
+                <mesh
+                  ref={(el) => {
+                    sensorRefs.current[i] = el;
+                  }}
+                  position={[0, 0.06, 0]}
+                  rotation={[0, 0, Math.PI / 2]}
+                >
+                  <cylinderGeometry args={[0.003, 0.003, 0.12, 4]} />
+                  <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={0.8} transparent opacity={0.6} />
+                </mesh>
+              </>
+            )}
+            {sensorType === "emergency_stop" && (
+              <>
+                <mesh position={[0, 0.02, 0]}>
+                  <cylinderGeometry args={[0.05, 0.055, 0.04, 16]} />
+                  <meshStandardMaterial color="#facc15" metalness={0.3} roughness={0.6} />
+                </mesh>
+                <mesh position={[0, 0.085, 0]}>
+                  <sphereGeometry args={[0.04, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
+                  <meshStandardMaterial color="#dc2626" metalness={0.2} roughness={0.4} />
+                </mesh>
+                <mesh
+                  ref={(el) => {
+                    sensorRefs.current[i] = el;
+                  }}
+                  position={[0, 0.07, 0]}
+                >
+                  <cylinderGeometry args={[0.04, 0.04, 0.02, 16]} />
+                  <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={0.3} metalness={0.2} roughness={0.4} />
+                </mesh>
+              </>
+            )}
+            {sensorType === "capacitive_touch" && (
+              <>
+                <mesh position={[0, 0.015, 0]}>
+                  <boxGeometry args={[0.09, 0.01, 0.09]} />
+                  <meshStandardMaterial color="#374151" metalness={0.5} roughness={0.5} />
+                </mesh>
+                <mesh
+                  ref={(el) => {
+                    sensorRefs.current[i] = el;
+                  }}
+                  position={[0, 0.025, 0]}
+                >
+                  <boxGeometry args={[0.07, 0.005, 0.07]} />
+                  <meshStandardMaterial color="#06b6d4" emissive="#06b6d4" emissiveIntensity={0.15} metalness={0.6} roughness={0.3} />
+                </mesh>
+              </>
+            )}
+            {sensorType === "water_level" && (
+              <>
+                <mesh position={[0, 0.1, 0]}>
+                  <cylinderGeometry args={[0.035, 0.035, 0.18, 12, 1, true]} />
+                  <meshStandardMaterial color="#e5e7eb" transparent opacity={0.25} side={2} />
+                </mesh>
+                <mesh position={[0, 0.195, 0]}>
+                  <cylinderGeometry args={[0.04, 0.04, 0.01, 12]} />
+                  <meshStandardMaterial color="#4b5563" metalness={0.6} roughness={0.4} />
+                </mesh>
+                <mesh
+                  ref={(el) => {
+                    sensorRefs.current[i] = el;
+                  }}
+                  position={[0, 0.1, 0]}
+                >
+                  <cylinderGeometry args={[0.03, 0.03, 0.16, 12]} />
+                  <meshStandardMaterial color="#3b82f6" emissive="#1d4ed8" emissiveIntensity={0.4} transparent opacity={0.8} />
+                </mesh>
+              </>
+            )}
+            {sensorType === "rfid" && (
+              <>
+                <mesh position={[0, 0.02, 0]}>
+                  <boxGeometry args={[0.1, 0.015, 0.08]} />
+                  <meshStandardMaterial color="#1e3a8a" metalness={0.6} roughness={0.4} />
+                </mesh>
+                <mesh
+                  ref={(el) => {
+                    sensorRefs.current[i] = el;
+                  }}
+                  position={[0, 0.038, 0]}
+                  rotation={[-Math.PI / 2, 0, 0]}
+                >
+                  <ringGeometry args={[0.025, 0.03, 18]} />
+                  <meshStandardMaterial color="#22c55e" emissive="#22c55e" emissiveIntensity={0.6} transparent opacity={0.5} side={2} />
+                </mesh>
+              </>
+            )}
+            {sensorType === "fire" && (
+              <>
+                <mesh position={[0, 0.04, 0]}>
+                  <cylinderGeometry args={[0.04, 0.045, 0.04, 12]} />
+                  <meshStandardMaterial color="#7f1d1d" metalness={0.4} roughness={0.5} />
+                </mesh>
+                <mesh
+                  ref={(el) => {
+                    sensorRefs.current[i] = el;
+                  }}
+                  position={[0, 0.1, 0]}
+                >
+                  <coneGeometry args={[0.025, 0.08, 10]} />
+                  <meshStandardMaterial color="#f97316" emissive="#ea580c" emissiveIntensity={0.3} transparent opacity={0.85} />
+                </mesh>
+              </>
+            )}
+            {sensorType === "flow_liquid" && (
+              <>
+                <mesh position={[0, 0.06, 0]} rotation={[0, 0, Math.PI / 2]}>
+                  <cylinderGeometry args={[0.02, 0.02, 0.16, 10, 1, true]} />
+                  <meshStandardMaterial color="#94a3b8" transparent opacity={0.35} side={2} />
+                </mesh>
+                <mesh position={[-0.08, 0.06, 0]} rotation={[0, 0, Math.PI / 2]}>
+                  <cylinderGeometry args={[0.025, 0.025, 0.02, 10]} />
+                  <meshStandardMaterial color="#4b5563" metalness={0.7} roughness={0.3} />
+                </mesh>
+                <mesh position={[0.08, 0.06, 0]} rotation={[0, 0, Math.PI / 2]}>
+                  <cylinderGeometry args={[0.025, 0.025, 0.02, 10]} />
+                  <meshStandardMaterial color="#4b5563" metalness={0.7} roughness={0.3} />
+                </mesh>
+                <mesh
+                  ref={(el) => {
+                    sensorRefs.current[i] = el;
+                  }}
+                  position={[0, 0.06, 0]}
+                >
+                  <sphereGeometry args={[0.008, 6, 6]} />
+                  <meshStandardMaterial color="#3b82f6" emissive="#1d4ed8" emissiveIntensity={0.6} transparent opacity={0.85} />
+                </mesh>
+              </>
+            )}
+            {sensorType === "valve_signal" && (
+              <>
+                <mesh position={[0, 0.05, 0]}>
+                  <cylinderGeometry args={[0.04, 0.04, 0.04, 12]} />
+                  <meshStandardMaterial color="#6b7280" metalness={0.7} roughness={0.3} />
+                </mesh>
+                <mesh position={[0, 0.085, 0]}>
+                  <cylinderGeometry args={[0.006, 0.006, 0.03, 6]} />
+                  <meshStandardMaterial color="#9ca3af" metalness={0.8} roughness={0.2} />
+                </mesh>
+                <mesh
+                  ref={(el) => {
+                    sensorRefs.current[i] = el;
+                  }}
+                  position={[0, 0.105, 0]}
+                >
+                  <boxGeometry args={[0.09, 0.008, 0.015]} />
+                  <meshStandardMaterial color="#10b981" emissive="#10b981" emissiveIntensity={0.4} metalness={0.4} roughness={0.4} />
+                </mesh>
+              </>
+            )}
+            {sensorType === "flow_air" && (
+              <>
+                <mesh position={[0, 0.06, 0]} rotation={[0, 0, Math.PI / 2]}>
+                  <cylinderGeometry args={[0.022, 0.022, 0.16, 10, 1, true]} />
+                  <meshStandardMaterial color="#cbd5e1" transparent opacity={0.3} side={2} />
+                </mesh>
+                <mesh position={[-0.08, 0.06, 0]} rotation={[0, 0, Math.PI / 2]}>
+                  <cylinderGeometry args={[0.027, 0.027, 0.02, 10]} />
+                  <meshStandardMaterial color="#475569" metalness={0.6} roughness={0.4} />
+                </mesh>
+                <mesh position={[0.08, 0.06, 0]} rotation={[0, 0, Math.PI / 2]}>
+                  <cylinderGeometry args={[0.027, 0.027, 0.02, 10]} />
+                  <meshStandardMaterial color="#475569" metalness={0.6} roughness={0.4} />
+                </mesh>
+                <mesh
+                  ref={(el) => {
+                    sensorRefs.current[i] = el;
+                  }}
+                  position={[0, 0.06, 0]}
+                >
+                  <sphereGeometry args={[0.007, 6, 6]} />
+                  <meshStandardMaterial color="#f1f5f9" emissive="#e2e8f0" emissiveIntensity={0.4} transparent opacity={0.7} />
                 </mesh>
               </>
             )}

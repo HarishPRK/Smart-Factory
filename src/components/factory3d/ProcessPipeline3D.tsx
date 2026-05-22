@@ -1,5 +1,5 @@
 "use no memo";
-import React, { useState, useRef, useCallback, useMemo } from "react";
+import React, { useEffect, useRef, useCallback, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import ManufacturingStage3D from "./ManufacturingStage3D";
@@ -13,8 +13,19 @@ import { BlowMolderTunnel, CoolingTunnelInline } from "./InlineMachine3D";
 import ColaFillingStation3D from "./ColaFillingStation3D";
 import { CONVEYOR_PATH } from "./factoryLayout";
 import { STAGE_POSITIONS, STAGE_CONVEYOR_T } from "./digitalTwinLayout";
-import type { ManufacturingStage } from "../../types/digitalTwin";
+import type { ManufacturingStage, StageId } from "../../types/digitalTwin";
 import { useDigitalTwinStore } from "../../stores/digitalTwinStore";
+import { useSceneSelectionStore } from "../../stores/sceneSelectionStore";
+import { setCameraTarget, resetCameraView } from "./CameraController";
+
+// Front-view framing when a stage is focused.
+//   distance    — how far the camera sits from the machine, perpendicular to
+//                 the belt tangent (larger = less zoomed)
+//   cameraY     — camera height above the belt floor
+//   lookAtY     — look-target height (mid-machine)
+const FRONT_VIEW_DISTANCE = 5.5;
+const FRONT_VIEW_CAMERA_Y = 2.5;
+const FRONT_VIEW_LOOKAT_Y = 1.0;
 
 /**
  * ProcessPipeline3D — Zig-zag production line layout
@@ -27,18 +38,14 @@ import { useDigitalTwinStore } from "../../stores/digitalTwinStore";
  */
 const ProcessPipeline3D: React.FC = () => {
   const active = useDigitalTwinStore((s) => s.simulationActive);
-  const [selectedStage, setSelectedStage] = useState<ManufacturingStage | null>(
-    null,
-  );
+  const selectedStageId = useSceneSelectionStore((s) => s.selectedStageId);
+  const toggleSelectedStage = useSceneSelectionStore((s) => s.toggle);
+  const clearSelectedStage = useSceneSelectionStore((s) => s.clear);
 
   const stagesRef = useRef(useDigitalTwinStore.getState().stages);
   useFrame(() => {
     stagesRef.current = useDigitalTwinStore.getState().stages;
   });
-
-  const handleStageClick = useCallback((stage: ManufacturingStage) => {
-    setSelectedStage((prev) => (prev?.id === stage.id ? null : stage));
-  }, []);
 
   // ── Conveyor curve — used to compute exact in-line tunnel placements ──
   // Same CatmullRomCurve3 construction the belt + product flow use, so the
@@ -63,6 +70,59 @@ const ProcessPipeline3D: React.FC = () => {
       };
     };
   }, [curve]);
+
+  // Front-view camera framing for a given stage.
+  //
+  // Every stage is laid out with its "visible face" pointing in world +Z —
+  // that matches the default overview camera at [18, 14, 18] looking at the
+  // origin, which is how every machine was authored to appear. The tangent-
+  // perpendicular approach flipped between rows because the zig-zag belt
+  // reverses direction on row 2; the fixed world +Z offset below stays
+  // consistent for all seven stages.
+  const frontViewFor = useCallback((stageId: StageId) => {
+    const [x, y, z] = STAGE_POSITIONS[stageId];
+    return {
+      cameraPos: [
+        x,
+        y + FRONT_VIEW_CAMERA_Y,
+        z + FRONT_VIEW_DISTANCE,
+      ] as [number, number, number],
+      lookAt: [x, y + FRONT_VIEW_LOOKAT_Y, z] as [number, number, number],
+    };
+  }, []);
+
+  // Clicking a stage just flips the shared selection store — any other source
+  // (SensorHUD rows, ESC key) goes through the same store, and the camera
+  // reaction below reacts to store changes uniformly.
+  const handleStageClick = useCallback(
+    (stage: ManufacturingStage) => {
+      toggleSelectedStage(stage.id);
+    },
+    [toggleSelectedStage],
+  );
+
+  // Camera reaction — the single place that drives the fly-to. When a stage
+  // is selected we move to its front-on framing; when cleared we return to
+  // the overview view.
+  useEffect(() => {
+    if (selectedStageId) {
+      const { cameraPos, lookAt } = frontViewFor(selectedStageId);
+      setCameraTarget(cameraPos, lookAt);
+    } else {
+      resetCameraView();
+    }
+  }, [selectedStageId, frontViewFor]);
+
+  // ESC to deselect + return to overview camera.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && selectedStageId) {
+        clearSelectedStage();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedStageId, clearSelectedStage]);
 
   const formingTunnel = useMemo(
     () => placementAt(STAGE_CONVEYOR_T.forming),
@@ -94,7 +154,7 @@ const ProcessPipeline3D: React.FC = () => {
           key={stage.id}
           stageIndex={index}
           onClick={handleStageClick}
-          isSelected={selectedStage?.id === stage.id}
+          isSelected={selectedStageId === stage.id}
         />
       ))}
 
@@ -121,16 +181,21 @@ const ProcessPipeline3D: React.FC = () => {
         rotationY={fillingPlacement.rotationY}
       />
 
-      {/* ══════ CONTROL BOARDS - Billboard signs beside machines ══════ */}
+      {/* ══════ CONTROL BOARDS - Billboard signs beside machines ══════
+          Only the currently-selected stage mounts its <Html> overlay. Each
+          drei <Html> (even in screen-space mode) runs internal per-frame
+          work to reproject its position — having 7 of them mounted all the
+          time cost ~3–6 ms per frame and showed up as UI choppiness.
+          Live sensor values are still available globally via the SensorHUD
+          top-right overlay, so this purely removes in-scene duplication. */}
       {stagesRef.current.map((stage) => {
         const pos = stage.position;
-        // Billboard signs far to the left of each machine
         return (
           <ControlBoard3D
             key={`board-${stage.id}`}
             stage={stage}
             position={[pos[0] - 2.5, pos[1] - 0.5, pos[2]]}
-            visible
+            visible={selectedStageId === stage.id}
           />
         );
       })}

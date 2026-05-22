@@ -1,6 +1,7 @@
-import React, { useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useFilters } from "../context/FilterContext";
 import { kpis, getKpiForZone } from "../data/mockData";
+import KOSDispenseWidget from "./KOSDispenseWidget";
 
 const MiniSparkline: React.FC<{ data: number[]; color: string }> = ({
   data,
@@ -86,13 +87,57 @@ interface KPIBarProps {
 const KPIBar: React.FC<KPIBarProps> = ({ onOeeClick, onAnalyticsClick, onPredictClick, onDigitalTwinClick, predAlertCount = 0 }) => {
   const { state, dispatch } = useFilters();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateScrollState = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    setCanScrollLeft(el.scrollLeft > 4);
+    setCanScrollRight(el.scrollLeft < maxScroll - 4);
+  };
+
+  useEffect(() => {
+    updateScrollState();
+    const el = scrollRef.current;
+    if (!el) return;
+    el.addEventListener("scroll", updateScrollState, { passive: true });
+    const ro = new ResizeObserver(updateScrollState);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", updateScrollState);
+      ro.disconnect();
+    };
+  }, []);
+
+  const scrollByAmount = (dir: 1 | -1) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const step = Math.max(240, Math.round(el.clientWidth * 0.7));
+    el.scrollBy({ left: dir * step, behavior: "smooth" });
+  };
 
   return (
-    <div className="flex items-center justify-center w-full">
-      {/* KPI cards + action buttons (centered) */}
+    <div className="flex items-center gap-2 w-full">
+      <button
+        type="button"
+        onClick={() => scrollByAmount(-1)}
+        aria-label="Scroll KPIs left"
+        disabled={!canScrollLeft}
+        className={`flex-none w-8 h-8 rounded-full glass flex items-center justify-center text-cyan-100/80 hover:text-white transition-all duration-200 ${
+          canScrollLeft ? "opacity-100" : "opacity-30 cursor-not-allowed"
+        }`}
+      >
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+
+      {/* KPI cards + action buttons — single-row carousel */}
       <div
         ref={scrollRef}
-        className="flex gap-2.5 overflow-x-auto scroll-smooth justify-center flex-wrap"
+        className="flex gap-2.5 overflow-x-auto scroll-smooth flex-nowrap flex-1 min-w-0"
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
         {kpis.map((kpi, i) => {
@@ -109,7 +154,7 @@ const KPIBar: React.FC<KPIBarProps> = ({ onOeeClick, onAnalyticsClick, onPredict
                   dispatch({ type: "SET_KPI", kpi: kpi.id });
                 }
               }}
-              className={`card shimmer-border ${kpi.hoverBorder} p-3.5 flex flex-col justify-between h-[96px] min-w-[145px] flex-shrink-0 relative overflow-hidden animate-fade-in delay-${i + 1} group cursor-pointer transition-all duration-300 ${
+              className={`card shimmer-border ${kpi.hoverBorder} p-3.5 flex flex-col justify-between h-[96px] min-w-[145px] max-w-[260px] flex-1 basis-[145px] relative overflow-hidden animate-fade-in delay-${i + 1} group cursor-pointer transition-all duration-300 ${
                 isSelected
                   ? "ring-1 ring-white/20 shadow-[0_0_20px_rgba(59,130,246,0.15)] scale-[1.02]"
                   : ""
@@ -175,7 +220,7 @@ const KPIBar: React.FC<KPIBarProps> = ({ onOeeClick, onAnalyticsClick, onPredict
         {onAnalyticsClick && (
           <button
             onClick={onAnalyticsClick}
-            className="card shimmer-border hover:border-cyan-400/30 p-3.5 flex flex-col justify-between h-[96px] min-w-[145px] flex-shrink-0 relative overflow-hidden group/analytics cursor-pointer transition-all duration-300 text-left"
+            className="card shimmer-border hover:border-cyan-400/30 p-3.5 flex flex-col justify-between h-[96px] min-w-[145px] max-w-[260px] flex-1 basis-[145px] relative overflow-hidden group/analytics cursor-pointer transition-all duration-300 text-left"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/[0.12] to-blue-500/[0.04] opacity-0 group-hover/analytics:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
             <div className="absolute bottom-2 right-3 z-0 opacity-50 group-hover/analytics:opacity-75 transition-opacity duration-500">
@@ -211,7 +256,7 @@ const KPIBar: React.FC<KPIBarProps> = ({ onOeeClick, onAnalyticsClick, onPredict
         {onPredictClick && (
           <button
             onClick={onPredictClick}
-            className="card shimmer-border hover:border-purple-400/30 p-3.5 flex flex-col justify-between h-[96px] min-w-[145px] flex-shrink-0 relative overflow-hidden group/predict cursor-pointer transition-all duration-300 text-left"
+            className="card shimmer-border hover:border-purple-400/30 p-3.5 flex flex-col justify-between h-[96px] min-w-[145px] max-w-[260px] flex-1 basis-[145px] relative overflow-hidden group/predict cursor-pointer transition-all duration-300 text-left"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-purple-500/[0.14] to-fuchsia-500/[0.04] opacity-0 group-hover/predict:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
             <div className="absolute bottom-2 right-3 z-0 opacity-55 group-hover/predict:opacity-80 transition-opacity duration-500">
@@ -251,7 +296,7 @@ const KPIBar: React.FC<KPIBarProps> = ({ onOeeClick, onAnalyticsClick, onPredict
         {onDigitalTwinClick && (
           <button
             onClick={onDigitalTwinClick}
-            className="card shimmer-border hover:border-emerald-400/30 p-3.5 flex flex-col justify-between h-[96px] min-w-[145px] flex-shrink-0 relative overflow-hidden group/twin cursor-pointer transition-all duration-300 text-left"
+            className="card shimmer-border hover:border-emerald-400/30 p-3.5 flex flex-col justify-between h-[96px] min-w-[145px] max-w-[260px] flex-1 basis-[145px] relative overflow-hidden group/twin cursor-pointer transition-all duration-300 text-left"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/[0.12] to-teal-500/[0.04] opacity-0 group-hover/twin:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
             <div className="absolute bottom-2 right-3 z-0 opacity-55 group-hover/twin:opacity-80 transition-opacity duration-500">
@@ -281,8 +326,26 @@ const KPIBar: React.FC<KPIBarProps> = ({ onOeeClick, onAnalyticsClick, onPredict
             </div>
           </button>
         )}
+
+        {/* KOS dispenser feed — AWS IoT-forwarded pour + recommendation events.
+            Sits at the end of the KPI row so it doesn't push the existing
+            cards around when no data is flowing yet. */}
+        <KOSDispenseWidget />
       </div>
 
+      <button
+        type="button"
+        onClick={() => scrollByAmount(1)}
+        aria-label="Scroll KPIs right"
+        disabled={!canScrollRight}
+        className={`flex-none w-8 h-8 rounded-full glass flex items-center justify-center text-cyan-100/80 hover:text-white transition-all duration-200 ${
+          canScrollRight ? "opacity-100" : "opacity-30 cursor-not-allowed"
+        }`}
+      >
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
     </div>
   );
 };

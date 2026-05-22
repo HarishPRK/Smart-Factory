@@ -1,9 +1,8 @@
 "use no memo";
 import React, { useState, useMemo, useCallback } from "react";
 import { useDigitalTwinStore } from "../../stores/digitalTwinStore";
+import { useSceneSelectionStore } from "../../stores/sceneSelectionStore";
 import { isSensorLive } from "../../stores/digitalTwinSimulation";
-import { STAGE_POSITIONS } from "./digitalTwinLayout";
-import { setCameraTarget, resetCameraView } from "./CameraController";
 import type { StageId } from "../../types/digitalTwin";
 
 /**
@@ -17,33 +16,50 @@ import type { StageId } from "../../types/digitalTwin";
 
 const PRIMARY_SENSORS: { stageId: StageId; sensorId: string; label: string; stageLabel: string }[] = [
   // Intake
-  { stageId: "intake",    sensorId: "intake_gps",         label: "GPS",          stageLabel: "Intake" },
-  { stageId: "intake",    sensorId: "intake_lidar",       label: "LiDAR",        stageLabel: "Intake" },
-  { stageId: "intake",    sensorId: "intake_fingerprint", label: "Fingerprint",  stageLabel: "Intake" },
+  { stageId: "intake",    sensorId: "intake_gps",           label: "GPS",          stageLabel: "Intake" },
+  { stageId: "intake",    sensorId: "intake_lidar",         label: "LiDAR",        stageLabel: "Intake" },
+  { stageId: "intake",    sensorId: "intake_fingerprint",   label: "Fingerprint",  stageLabel: "Intake" },
+  { stageId: "intake",    sensorId: "intake_rfid",          label: "RFID",         stageLabel: "Intake" },
+  { stageId: "intake",    sensorId: "intake_optical",       label: "Optical",      stageLabel: "Intake" },
   // Mixing
-  { stageId: "mixing",    sensorId: "mixing_ph",          label: "pH",           stageLabel: "Mixing" },
-  { stageId: "mixing",    sensorId: "mixing_orp",         label: "ORP",          stageLabel: "Mixing" },
-  { stageId: "mixing",    sensorId: "mixing_turbidity",   label: "Turbidity",    stageLabel: "Mixing" },
-  { stageId: "mixing",    sensorId: "mixing_mq",          label: "MQ Gas",       stageLabel: "Mixing" },
+  { stageId: "mixing",    sensorId: "mixing_ph",            label: "pH",           stageLabel: "Mixing" },
+  { stageId: "mixing",    sensorId: "mixing_orp",           label: "ORP",          stageLabel: "Mixing" },
+  { stageId: "mixing",    sensorId: "mixing_turbidity",     label: "Turbidity",    stageLabel: "Mixing" },
+  { stageId: "mixing",    sensorId: "mixing_mq",            label: "MQ Gas",       stageLabel: "Mixing" },
+  { stageId: "mixing",    sensorId: "mixing_water_level",   label: "Syrup Tank",   stageLabel: "Mixing" },
+  { stageId: "mixing",    sensorId: "mixing_flow_liquid",   label: "Syrup Flow",   stageLabel: "Mixing" },
+  { stageId: "mixing",    sensorId: "mixing_valve",         label: "Fill Valve",   stageLabel: "Mixing" },
   // Forming
-  { stageId: "forming",   sensorId: "forming_pressure",   label: "Pressure",     stageLabel: "Forming" },
-  { stageId: "forming",   sensorId: "forming_light",      label: "Light",        stageLabel: "Forming" },
+  { stageId: "forming",   sensorId: "forming_pressure",     label: "Pressure",     stageLabel: "Forming" },
+  { stageId: "forming",   sensorId: "forming_light",        label: "Light",        stageLabel: "Forming" },
+  { stageId: "forming",   sensorId: "forming_proximity",    label: "Proximity",    stageLabel: "Forming" },
+  { stageId: "forming",   sensorId: "forming_flow_air",     label: "Blow Air",     stageLabel: "Forming" },
   // Curing
-  { stageId: "curing",    sensorId: "curing_o2",          label: "O2",           stageLabel: "Curing" },
-  { stageId: "curing",    sensorId: "curing_mq",          label: "MQ Gas",       stageLabel: "Curing" },
-  { stageId: "curing",    sensorId: "curing_motion",      label: "Motion",       stageLabel: "Curing" },
+  { stageId: "curing",    sensorId: "curing_o2",            label: "O2",           stageLabel: "Curing" },
+  { stageId: "curing",    sensorId: "curing_mq",            label: "MQ Gas",       stageLabel: "Curing" },
+  { stageId: "curing",    sensorId: "curing_motion",        label: "Motion",       stageLabel: "Curing" },
+  { stageId: "curing",    sensorId: "curing_fire",          label: "Fire",         stageLabel: "Curing" },
+  { stageId: "curing",    sensorId: "curing_flow_air",      label: "Cooling Air",  stageLabel: "Curing" },
   // Quality
-  { stageId: "quality",   sensorId: "quality_lidar",      label: "LiDAR",        stageLabel: "Quality" },
-  { stageId: "quality",   sensorId: "quality_light",      label: "Light",        stageLabel: "Quality" },
-  { stageId: "quality",   sensorId: "quality_turbidity",  label: "Turbidity",    stageLabel: "Quality" },
+  { stageId: "quality",   sensorId: "quality_lidar",        label: "LiDAR",        stageLabel: "Quality" },
+  { stageId: "quality",   sensorId: "quality_light",        label: "Light",        stageLabel: "Quality" },
+  { stageId: "quality",   sensorId: "quality_turbidity",    label: "Turbidity",    stageLabel: "Quality" },
+  { stageId: "quality",   sensorId: "quality_optical",      label: "Optical",      stageLabel: "Quality" },
   // Packaging
-  { stageId: "packaging", sensorId: "pkg_motion",         label: "Motion",       stageLabel: "Packaging" },
-  { stageId: "packaging", sensorId: "pkg_pressure",       label: "Pressure",     stageLabel: "Packaging" },
-  { stageId: "packaging", sensorId: "pkg_water",          label: "Water",        stageLabel: "Packaging" },
+  { stageId: "packaging", sensorId: "pkg_motion",           label: "Motion",       stageLabel: "Packaging" },
+  { stageId: "packaging", sensorId: "pkg_pressure",         label: "Pressure",     stageLabel: "Packaging" },
+  { stageId: "packaging", sensorId: "pkg_water",            label: "Water",        stageLabel: "Packaging" },
+  { stageId: "packaging", sensorId: "pkg_proximity",        label: "Proximity",    stageLabel: "Packaging" },
+  { stageId: "packaging", sensorId: "pkg_fire",             label: "Fire",         stageLabel: "Packaging" },
   // Dispatch
-  { stageId: "dispatch",  sensorId: "dispatch_gps",       label: "GPS",          stageLabel: "Dispatch" },
-  { stageId: "dispatch",  sensorId: "dispatch_fingerprint", label: "Fingerprint", stageLabel: "Dispatch" },
+  { stageId: "dispatch",  sensorId: "dispatch_gps",         label: "GPS",          stageLabel: "Dispatch" },
+  { stageId: "dispatch",  sensorId: "dispatch_fingerprint", label: "Fingerprint",  stageLabel: "Dispatch" },
+  { stageId: "dispatch",  sensorId: "dispatch_rfid",        label: "RFID",         stageLabel: "Dispatch" },
+  { stageId: "dispatch",  sensorId: "dispatch_touch",       label: "Confirm Pad",  stageLabel: "Dispatch" },
 ];
+
+// E-stop sensors — surfaced as a single line-wide pill at the top of the HUD.
+const ESTOP_SENSOR_IDS = ["forming_estop", "mixing_estop", "pkg_estop"] as const;
 
 const STATUS_COLORS: Record<string, string> = {
   normal: "#10b981",
@@ -90,7 +106,9 @@ const MiniSparkline: React.FC<{ data: number[]; color: string; width?: number; h
 
 const SensorHUD: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
-  const [activeStage, setActiveStage] = useState<StageId | null>(null);
+  const activeStage = useSceneSelectionStore((s) => s.selectedStageId);
+  const toggleStage = useSceneSelectionStore((s) => s.toggle);
+  const clearStage = useSceneSelectionStore((s) => s.clear);
 
   const tick = useDigitalTwinStore((s) => s.tick);
 
@@ -118,22 +136,29 @@ const SensorHUD: React.FC = () => {
     });
   }, [tick]);
 
-  const handleStageClick = useCallback((stageId: StageId) => {
-    if (activeStage === stageId) {
-      // Click again to reset to overview
-      setActiveStage(null);
-      resetCameraView();
-      return;
-    }
-
-    setActiveStage(stageId);
-    const pos = STAGE_POSITIONS[stageId];
-    // Camera flies to a position offset from the stage (elevated + angled)
-    setCameraTarget(
-      [pos[0] + 3, pos[1] + 4, pos[2] + 5],
-      [pos[0], pos[1], pos[2]],
+  // Line-wide E-stop status — any critical reading across the three operator panels
+  // freezes the whole line (see digitalTwinSimulation.evaluateThresholds).
+  const estopCritical = useMemo(() => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    tick;
+    const stages = useDigitalTwinStore.getState().stages;
+    return stages.some((stage) =>
+      stage.sensors.some(
+        (s) => ESTOP_SENSOR_IDS.includes(s.sensorId as typeof ESTOP_SENSOR_IDS[number]) && s.status === "critical",
+      ),
     );
-  }, [activeStage]);
+  }, [tick]);
+
+  // Clicking a row toggles the shared selection store. ProcessPipeline3D's
+  // effect reacts to this and flies the camera to the stage's front-on view;
+  // ControlBoard3D reacts by enlarging the matching banner. Keeps the HUD,
+  // the 3D click path, and ESC all in lock-step.
+  const handleStageClick = useCallback(
+    (stageId: StageId) => {
+      toggleStage(stageId);
+    },
+    [toggleStage],
+  );
 
   return (
     <div
@@ -204,7 +229,7 @@ const SensorHUD: React.FC = () => {
             </span>
             {activeStage && (
               <button
-                onClick={() => { setActiveStage(null); resetCameraView(); }}
+                onClick={() => { clearStage(); }}
                 style={{
                   background: "rgba(100,116,139,0.2)",
                   border: "none",
@@ -218,6 +243,58 @@ const SensorHUD: React.FC = () => {
                 RESET VIEW
               </button>
             )}
+          </div>
+
+          {/* Line-wide E-stop pill */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "5px 6px",
+              marginBottom: "6px",
+              borderRadius: "5px",
+              background: estopCritical
+                ? "rgba(239, 68, 68, 0.18)"
+                : "rgba(16, 185, 129, 0.10)",
+              border: `1px solid ${
+                estopCritical ? "rgba(239,68,68,0.6)" : "rgba(16,185,129,0.35)"
+              }`,
+              boxShadow: estopCritical ? "0 0 8px rgba(239,68,68,0.55)" : "none",
+            }}
+          >
+            <span
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                color: estopCritical ? "#fca5a5" : "#94a3b8",
+                fontSize: "9px",
+                fontWeight: 700,
+                letterSpacing: "0.08em",
+              }}
+            >
+              <span
+                style={{
+                  width: "8px",
+                  height: "8px",
+                  borderRadius: "50%",
+                  background: estopCritical ? "#ef4444" : "#10b981",
+                  boxShadow: estopCritical ? "0 0 6px #ef4444" : "none",
+                }}
+              />
+              EMERGENCY STOP
+            </span>
+            <span
+              style={{
+                color: estopCritical ? "#fca5a5" : "#3fa66a",
+                fontSize: "9px",
+                fontWeight: 800,
+                letterSpacing: "0.1em",
+              }}
+            >
+              {estopCritical ? "TRIGGERED" : "CLEAR"}
+            </span>
           </div>
 
           {/* Sensor rows */}
@@ -274,33 +351,9 @@ const SensorHUD: React.FC = () => {
                       fontSize: "10px",
                       fontWeight: 600,
                       lineHeight: 1.2,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px",
                     }}
                   >
                     {s.label}
-                    {/* LIVE vs SIM chip — tells the operator whether this row
-                        is fed by the real MQTT payload or simulated drift. */}
-                    <span
-                      title={
-                        s.live
-                          ? "Live — driven by the PLC MQTT payload"
-                          : "Simulated — no matching payload key"
-                      }
-                      style={{
-                        fontSize: "7px",
-                        fontWeight: 800,
-                        letterSpacing: "0.1em",
-                        padding: "1px 4px",
-                        borderRadius: "2px",
-                        border: `1px solid ${s.live ? "rgba(63,166,106,0.5)" : "rgba(138,151,168,0.35)"}`,
-                        color: s.live ? "#3fa66a" : "#8a97a8",
-                        background: s.live ? "rgba(63,166,106,0.10)" : "transparent",
-                      }}
-                    >
-                      {s.live ? "LIVE" : "SIM"}
-                    </span>
                   </div>
                 </div>
 
