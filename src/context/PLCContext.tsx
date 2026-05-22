@@ -127,6 +127,52 @@ export const PLCProvider: React.FC<{ children: React.ReactNode }> = ({
     setDigitalTwinPLCFeed(live.params, effectiveOutputs);
   }, [live.params, live.outputs, rfidOverride]);
 
+  // Sample live PLC values into the history ring buffers at 2 Hz so the
+  // prediction engine has data to work with in MQTT/IoT-Core modes. The
+  // mock plcSimulation already does this when active, but in live mode
+  // there's no other writer — without this the prediction panel stays
+  // empty because usePredictions early-returns on historyVoltage.length<5.
+  useEffect(() => {
+    const MAX_HISTORY = 100;
+    const hV: number[] = [];
+    const hC: number[] = [];
+    const hP: number[] = [];
+    const hT: number[] = [];
+
+    const id = setInterval(() => {
+      const params = usePLCStore.getState().params;
+      const find = (paramId: string): number | null => {
+        const p = params.find((x) => x.id === paramId);
+        if (!p || p.kind !== "analog") return null;
+        if (p.placeholder) return null;
+        return typeof p.value === "number" ? p.value : null;
+      };
+      const v = find("voltage");
+      const c = find("current");
+      const ph = find("ph");
+      const t = find("temperature");
+      if (v === null && c === null && ph === null && t === null) return;
+
+      const push = (arr: number[], val: number | null) => {
+        if (val === null) return;
+        arr.push(val);
+        if (arr.length > MAX_HISTORY) arr.shift();
+      };
+      push(hV, v);
+      push(hC, c);
+      push(hP, ph);
+      push(hT, t);
+
+      usePLCStore.setState({
+        historyVoltage: [...hV],
+        historyCurrent: [...hC],
+        historyPH: [...hP],
+        historyTemp: [...hT],
+      });
+    }, 500);
+    return () => clearInterval(id);
+  }, []);
+
   // Run prediction engine continuously
   usePredictions();
 

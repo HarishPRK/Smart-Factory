@@ -5,6 +5,7 @@ import { Html } from "@react-three/drei";
 import * as THREE from "three";
 import type { ManufacturingStage } from "../../types/digitalTwin";
 import { useDigitalTwinStore } from "../../stores/digitalTwinStore";
+import { useSceneSelectionStore } from "../../stores/sceneSelectionStore";
 
 interface ControlBoard3DProps {
   stage: ManufacturingStage;
@@ -32,6 +33,14 @@ const ControlBoard3D: React.FC<ControlBoard3DProps> = ({
   const stage = liveStage ?? stageProp;
   // eslint-disable-next-line @typescript-eslint/no-unused-expressions
   tick;
+
+  // Scene-wide "focused machine" selection. When this stage is the focused
+  // one, the banner renders larger with a highlighted border + glow; when
+  // another stage is focused, this one dims so the eye is drawn to the
+  // selected machine's banner.
+  const selectedStageId = useSceneSelectionStore((s) => s.selectedStageId);
+  const isSelected = selectedStageId === stage.id;
+  const anySelected = selectedStageId != null;
 
   useFrame(({ clock }) => {
     if (!screenRef.current) return;
@@ -84,32 +93,43 @@ const ControlBoard3D: React.FC<ControlBoard3DProps> = ({
         />
       </mesh>
 
-      {/* Display content — only mount heavy DOM overlays for the selected stage */}
+      {/* Display content — only mount heavy DOM overlays for the selected stage.
+          `transform` was removed: drei's transform mode runs a full CSS 3D
+          projection + DOM reflow every frame for every <Html>, and with 7
+          stage boards mounted simultaneously that was ~8 ms/frame of pure
+          perf cost. Screen-space mode (default) keeps the overlays readable,
+          still uses `distanceFactor` for scale, and barely costs anything. */}
       {visible && (
         <Html
           position={[0, 0.72, 0.015]}
           center
-          distanceFactor={2.5}
-          transform
+          distanceFactor={isSelected ? 1.4 : 2.5}
           style={{ pointerEvents: "none" }}
         >
           <div
             style={{
-              width: "150px",
-              background: "#0a1628",
-              border: `1px solid ${statusColor}`,
-              borderRadius: "6px",
-              padding: "8px",
+              width: isSelected ? "260px" : "150px",
+              background: isSelected ? "#0b1a2e" : "#0a1628",
+              border: `${isSelected ? "2px" : "1px"} solid ${statusColor}`,
+              borderRadius: isSelected ? "10px" : "6px",
+              padding: isSelected ? "14px" : "8px",
               fontFamily: "'Inter', system-ui",
-              fontSize: "9px",
+              fontSize: isSelected ? "13px" : "9px",
+              opacity: anySelected && !isSelected ? 0.3 : 1,
+              boxShadow: isSelected
+                ? `0 0 18px ${statusColor}, 0 8px 24px rgba(0,0,0,0.55)`
+                : "none",
+              transition:
+                "opacity 200ms ease, box-shadow 200ms ease, border-color 200ms ease",
             }}
           >
             <div
               style={{
                 fontWeight: 800,
                 color: "#e2e8f0",
-                fontSize: "10px",
-                marginBottom: "4px",
+                fontSize: isSelected ? "15px" : "10px",
+                marginBottom: isSelected ? "8px" : "4px",
+                letterSpacing: isSelected ? "0.02em" : "0",
               }}
             >
               {stage.label}
@@ -198,6 +218,21 @@ const ControlBoard3D: React.FC<ControlBoard3DProps> = ({
                 </span>
               </div>
             ))}
+            {isSelected && (
+              <div
+                style={{
+                  marginTop: "10px",
+                  paddingTop: "8px",
+                  borderTop: "1px dashed rgba(148, 163, 184, 0.3)",
+                  fontSize: "10px",
+                  color: "#64748b",
+                  textAlign: "center",
+                  letterSpacing: "0.08em",
+                }}
+              >
+                Click machine again or press ESC to exit
+              </div>
+            )}
           </div>
         </Html>
       )}

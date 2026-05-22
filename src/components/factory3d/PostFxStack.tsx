@@ -47,17 +47,21 @@ export default function PostFxStack() {
         radius={0.8}
       />
       <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
-      {enableGrading && (
+      {enableGrading ? (
         <BrightnessContrast
           brightness={-0.02}
           contrast={postFxQuality === "ultra" ? 0.06 : 0.04}
         />
+      ) : (
+        <></>
       )}
-      {enableGrading && (
+      {enableGrading ? (
         <HueSaturation
           hue={0}
           saturation={postFxQuality === "ultra" ? 0.08 : 0.04}
         />
+      ) : (
+        <></>
       )}
       <Vignette offset={0.2} darkness={vignetteDarkness} />
       <SMAA />

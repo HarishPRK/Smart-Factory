@@ -10,6 +10,24 @@ import * as THREE from "three";
  * aligns perfectly with the belt direction at its conveyorT.
  */
 
+/**
+ * Blow-molder press cycle timing (shared with ProductFlow3D so bottles can
+ * disappear *inside* the closed mold rather than visibly sliding through it).
+ *
+ *   cycle = (time * 0.25) % 1
+ *   0.00 – 0.30  descending  (die dropping onto preform)
+ *   0.30 – 0.70  held closed (forming the bottle — nothing should be visible)
+ *   0.70 – 1.00  ascending   (die retracting, bottle released)
+ *
+ * `isBlowMolderEngaged` returns true for the whole close-hold-open arc with a
+ * small buffer, so products are hidden from the moment the die starts closing
+ * until it has fully retracted.
+ */
+export function isBlowMolderEngaged(time: number): boolean {
+  const cycle = (time * 0.25) % 1.0;
+  return cycle >= 0.15 && cycle <= 0.9;
+}
+
 interface TunnelProps {
   position: [number, number, number];
   rotationY: number;
@@ -57,8 +75,31 @@ export const BlowMolderTunnel: React.FC<TunnelProps> = ({
       yOffset = -0.35 + eased * 0.35; // -0.35 to 0 smoothly
     }
 
-    if (upperDieRef1.current) upperDieRef1.current.position.y = 0.85 + yOffset;
-    if (upperDieRef2.current) upperDieRef2.current.position.y = 0.85 + yOffset;
+    // Horizontal clamp: dies sit at rest at ±0.18 and squeeze toward ±0.10
+    // while the press is closed, giving the visual of mold halves wrapping
+    // around the bottle. Synced to the same cycle so the clamp closes with
+    // the descent and releases with the ascent.
+    const openX = 0.18;
+    const closedX = 0.10;
+    let clampX = openX;
+    if (cycle < 0.3) {
+      const t = cycle / 0.3;
+      clampX = openX - easeInOutCubic(t) * (openX - closedX);
+    } else if (cycle < 0.7) {
+      clampX = closedX;
+    } else {
+      const t = (cycle - 0.7) / 0.3;
+      clampX = closedX + easeInOutCubic(t) * (openX - closedX);
+    }
+
+    if (upperDieRef1.current) {
+      upperDieRef1.current.position.y = 0.85 + yOffset;
+      upperDieRef1.current.position.x = -clampX;
+    }
+    if (upperDieRef2.current) {
+      upperDieRef2.current.position.y = 0.85 + yOffset;
+      upperDieRef2.current.position.x = clampX;
+    }
     if (ramRef1.current) ramRef1.current.position.y = 1.5 + yOffset;
     if (ramRef2.current) ramRef2.current.position.y = 1.5 + yOffset;
   });
@@ -105,8 +146,11 @@ export const BlowMolderTunnel: React.FC<TunnelProps> = ({
         </mesh>
       ))}
 
-      {/* 2 hydraulic rams on top - animated */}
-      <group ref={ramRef1} position={[-0.25, 1.5, 0]}>
+      {/* 2 hydraulic rams on top - animated.
+          Rams hug the belt centerline at ±0.18 so the descending dies land
+          directly over bottles travelling along x=0, giving the visual of the
+          mold closing *on* the bottle rather than next to it. */}
+      <group ref={ramRef1} position={[-0.18, 1.5, 0]}>
         <mesh castShadow>
           <cylinderGeometry args={[0.08, 0.08, 0.5, 10]} />
           <meshStandardMaterial
@@ -124,7 +168,7 @@ export const BlowMolderTunnel: React.FC<TunnelProps> = ({
           />
         </mesh>
       </group>
-      <group ref={ramRef2} position={[0.25, 1.5, 0]}>
+      <group ref={ramRef2} position={[0.18, 1.5, 0]}>
         <mesh castShadow>
           <cylinderGeometry args={[0.08, 0.08, 0.5, 10]} />
           <meshStandardMaterial
@@ -143,12 +187,15 @@ export const BlowMolderTunnel: React.FC<TunnelProps> = ({
         </mesh>
       </group>
 
-      {/* ── BOTTLE-SHAPED MOLD DIES ── */}
+      {/* ── BOTTLE-SHAPED MOLD DIES ──
+          Bottles are ~0.16 wide (diameter 0.156), so dies sit at x=±0.18 with
+          a 0.20-wide block each. That leaves a ~0.16-unit gap centred on the
+          belt — bottles travel straight through the mold cavity. */}
       {/* Upper die (bottle-shaped cavity) - descends from hydraulic rams - ANIMATED */}
-      <group ref={upperDieRef1} position={[-0.25, 0.85, 0]}>
+      <group ref={upperDieRef1} position={[-0.18, 0.85, 0]}>
         {/* Die block housing */}
         <mesh position={[0, 0, 0]} castShadow>
-          <boxGeometry args={[0.25, 0.4, 0.35]} />
+          <boxGeometry args={[0.20, 0.4, 0.35]} />
           <meshStandardMaterial
             color="#1e40af"
             metalness={0.8}
@@ -158,17 +205,18 @@ export const BlowMolderTunnel: React.FC<TunnelProps> = ({
           />
         </mesh>
 
-        {/* Glass viewing window showing bottle cavity */}
+        {/* Glass viewing window showing bottle cavity — meshStandardMaterial
+            (not Physical with transmission) because the transmission render
+            pass was eating ~3 ms/frame per window and the visual difference
+            at this size is imperceptible. */}
         <mesh position={[0, -0.05, 0.18]}>
           <boxGeometry args={[0.18, 0.3, 0.02]} />
-          <meshPhysicalMaterial
+          <meshStandardMaterial
             color="#87ceeb"
             transparent
             opacity={0.25}
             metalness={0.1}
             roughness={0.05}
-            transmission={0.85}
-            thickness={0.5}
           />
         </mesh>
 
@@ -184,10 +232,10 @@ export const BlowMolderTunnel: React.FC<TunnelProps> = ({
           />
         </mesh>
       </group>
-      <group ref={upperDieRef2} position={[0.25, 0.85, 0]}>
+      <group ref={upperDieRef2} position={[0.18, 0.85, 0]}>
         {/* Die block housing */}
         <mesh position={[0, 0, 0]} castShadow>
-          <boxGeometry args={[0.25, 0.4, 0.35]} />
+          <boxGeometry args={[0.20, 0.4, 0.35]} />
           <meshStandardMaterial
             color="#1e40af"
             metalness={0.8}
@@ -197,17 +245,15 @@ export const BlowMolderTunnel: React.FC<TunnelProps> = ({
           />
         </mesh>
 
-        {/* Glass viewing window showing bottle cavity */}
+        {/* Glass viewing window — meshStandardMaterial; see upper-die-1 note. */}
         <mesh position={[0, -0.05, 0.18]}>
           <boxGeometry args={[0.18, 0.3, 0.02]} />
-          <meshPhysicalMaterial
+          <meshStandardMaterial
             color="#87ceeb"
             transparent
             opacity={0.25}
             metalness={0.1}
             roughness={0.05}
-            transmission={0.85}
-            thickness={0.5}
           />
         </mesh>
 
@@ -224,12 +270,14 @@ export const BlowMolderTunnel: React.FC<TunnelProps> = ({
         </mesh>
       </group>
 
-      {/* Lower die (bottle-shaped cavity) - fixed at belt level */}
-      {[-0.25, 0.25].map((x, i) => (
+      {/* Lower die (bottle-shaped cavity) - fixed at belt level.
+          Matches the upper die spacing (x=±0.18, width 0.20) so the clamshell
+          halves line up perfectly when the press closes. */}
+      {[-0.18, 0.18].map((x, i) => (
         <group key={`lower-die-${i}`} position={[x, 0.18, 0]}>
           {/* Die block base */}
           <mesh castShadow>
-            <boxGeometry args={[0.25, 0.35, 0.35]} />
+            <boxGeometry args={[0.20, 0.35, 0.35]} />
             <meshStandardMaterial
               color="#1e40af"
               metalness={0.8}
@@ -239,17 +287,15 @@ export const BlowMolderTunnel: React.FC<TunnelProps> = ({
             />
           </mesh>
 
-          {/* Glass viewing window */}
+          {/* Glass viewing window — meshStandardMaterial; see upper-die-1 note. */}
           <mesh position={[0, 0, 0.18]}>
             <boxGeometry args={[0.18, 0.3, 0.02]} />
-            <meshPhysicalMaterial
+            <meshStandardMaterial
               color="#87ceeb"
               transparent
               opacity={0.25}
               metalness={0.1}
               roughness={0.05}
-              transmission={0.85}
-              thickness={0.5}
             />
           </mesh>
 

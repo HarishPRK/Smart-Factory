@@ -34,12 +34,25 @@ export interface SceneSettingsStore {
 }
 
 export const useSceneSettingsStore = create<SceneSettingsStore>((set) => ({
-  particlesEnabled: true,
-  extrasEnabled: true,
-  cctvEnabled: true,
+  // `extras` + `particles` + `cctv` toggles govern background eye-candy that
+  // each run their own useFrame loops (wind socks, anemometers, QR beams,
+  // forklift animations, flag waves, steam particles, CCTV camera rotation,
+  // etc.). They're off by default so the factory-floor scene has maximum
+  // frame-budget headroom for live MQTT traffic. Users can turn any of them
+  // back on from the scene-settings toggles (FunControls, lower-left of the
+  // 3D canvas) once their hardware has spare capacity.
+  particlesEnabled: false,
+  extrasEnabled: false,
+  cctvEnabled: false,
   labelsVisible: true,
-  quality: "high",
-  postFxQuality: QUALITY_TO_POSTFX.high,
+  // Default quality lowered from "high" → "medium" so the post-processing
+  // stack (Bloom + ToneMapping + BrightnessContrast + HueSaturation + Vignette
+  // + SMAA) runs in its lighter configuration. The "high" preset was eating
+  // ~20 ms of every animation frame on mid-range laptops, which pushed the
+  // whole dashboard past the 33 ms frame budget and starved MQTT/UI updates.
+  // Users can still switch back to "high"/"ultra" from the settings toggle.
+  quality: "medium",
+  postFxQuality: QUALITY_TO_POSTFX.medium,
 
   setParticles: (v) => set({ particlesEnabled: v }),
   setExtras: (v) => set({ extrasEnabled: v }),

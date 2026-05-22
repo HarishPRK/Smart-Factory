@@ -2,6 +2,7 @@ import React from "react";
 import type { PLCParameter } from "../types";
 import { usePLCContext } from "../context/PLCContext";
 import { usePLCStore } from "../stores/plcStore";
+import { useTweenedNumber } from "../hooks/useTweenedNumber";
 
 /* ── Status badge ──────────────────────────────────────── */
 
@@ -26,28 +27,78 @@ const statusConfig = {
   },
 };
 
+/* ── Label rendering ──────────────────────────────────── */
+
+// Cramped sensor cells can't fit two-word labels at 13px (the global font
+// bump). The internal id stays the same; we just display a shorter label
+// here so it fits on one line. Full name still tooltipped on hover.
+const SHORT_LABELS: Record<string, string> = {
+  forming_pressure: "Pressure",
+  forming_light: "Light",
+  mixing_turbidity: "Turbidity",
+  mixing_orp: "ORP",
+  curing_mq: "MQ Gas",
+  photoE: "Photo-E",
+  metal: "Metal Det.",
+};
+
+const SensorLabel: React.FC<{ param: PLCParameter; className?: string }> = ({
+  param,
+  className = "",
+}) => {
+  const display = SHORT_LABELS[param.id] ?? param.label;
+  return (
+    <span
+      className={`text-blue-200/80 uppercase tracking-[0.06em] font-medium whitespace-nowrap ${className}`}
+      title={param.label}
+      // Pinned inline so the universal text-[Xpx] bump in index.css can't
+      // grow this back beyond the cell width.
+      style={{ fontSize: "11px" }}
+    >
+      {display}
+    </span>
+  );
+};
+
+const StatusBadge: React.FC<{
+  cfg: { label: string; dot: string; glow: string; text: string };
+}> = ({ cfg }) => (
+  <span
+    className={`font-semibold px-1.5 py-0.5 rounded-md bg-white/[0.03] border border-white/[0.05] flex items-center gap-1 whitespace-nowrap ${cfg.text}`}
+    style={{ fontSize: "9.5px" }}
+  >
+    <span className={`w-1 h-1 rounded-full ${cfg.dot} ${cfg.glow}`} />
+    {cfg.label}
+  </span>
+);
+
 /* ── Analog card ──────────────────────────────────────── */
 
 const AnalogCard: React.FC<{ param: PLCParameter }> = ({ param }) => {
   const cfg = statusConfig[param.status];
-  const value = param.value ?? 0;
+  const rawValue = param.value ?? 0;
   const min = param.min ?? 0;
   const max = param.max ?? 100;
+  // Smoothly animate both the readout text and the progress fill so live
+  // sensor jitter reads as motion rather than rapid snaps. Bar tween picks
+  // up the same eased value so number + bar stay locked together.
+  const value = useTweenedNumber(rawValue, 280);
   const pct = Math.max(0, Math.min(1, (value - min) / (max - min)));
+  const glowClass =
+    param.status === "warning"
+      ? "status-warn-glow"
+      : param.status === "critical"
+        ? "status-alarm-glow"
+        : "";
 
   return (
-    <div className="card-inner p-2.5 flex flex-col justify-between transition-all duration-300 relative overflow-hidden group/card">
+    <div
+      className={`card-inner p-2 flex flex-col justify-between transition-all duration-300 relative overflow-hidden group/card ${glowClass}`}
+    >
       {/* Top row: label + status */}
-      <div className="flex justify-between items-center relative z-10">
-        <span className="text-[11px] text-blue-200/80 uppercase tracking-[0.14em] font-medium">
-          {param.label}
-        </span>
-        <span
-          className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-white/[0.03] border border-white/[0.05] flex items-center gap-1 ${cfg.text}`}
-        >
-          <span className={`w-1 h-1 rounded-full ${cfg.dot} ${cfg.glow}`} />
-          {cfg.label}
-        </span>
+      <div className="flex justify-between items-center gap-1 relative z-10">
+        <SensorLabel param={param} />
+        <StatusBadge cfg={cfg} />
       </div>
 
       {/* Center: large value */}
@@ -66,8 +117,11 @@ const AnalogCard: React.FC<{ param: PLCParameter }> = ({ param }) => {
       {/* Bottom: progress bar + range */}
       <div className="relative z-10">
         <div className="w-full h-1.5 rounded-full bg-white/[0.04] overflow-hidden">
+          {/* No CSS transition here — the tweened `value` already drives a
+              smooth width update on every rAF, and stacking another
+              transition-all on top makes the bar lag behind the number. */}
           <div
-            className="h-full rounded-full transition-all duration-500"
+            className="h-full rounded-full"
             style={{
               width: `${pct * 100}%`,
               backgroundColor: param.accentHex,
@@ -75,17 +129,23 @@ const AnalogCard: React.FC<{ param: PLCParameter }> = ({ param }) => {
             }}
           />
         </div>
-        <div className="flex justify-between mt-1">
-          <span className="text-[10px] text-blue-200/65 font-medium">
+        <div className="flex justify-between items-center mt-1 gap-1">
+          <span
+            className="text-blue-200/65 font-medium"
+            style={{ fontSize: "9.5px" }}
+          >
             {min}
           </span>
           <span
-            className="text-[9px] font-medium"
-            style={{ color: `${param.accentHex}80` }}
+            className="font-medium whitespace-nowrap"
+            style={{ fontSize: "8.5px", color: `${param.accentHex}80` }}
           >
             {param.nominal?.toFixed(param.decimals ?? 1)} nom
           </span>
-          <span className="text-[10px] text-blue-200/65 font-medium">
+          <span
+            className="text-blue-200/65 font-medium"
+            style={{ fontSize: "9.5px" }}
+          >
             {max}
           </span>
         </div>
@@ -111,7 +171,7 @@ const DigitalCard: React.FC<{ param: PLCParameter; onToggle?: () => void }> = ({
 
   return (
     <div
-      className={`card-inner p-2.5 flex flex-col justify-between transition-all duration-500 relative overflow-hidden group/card ${
+      className={`card-inner p-2 flex flex-col justify-between transition-all duration-500 relative overflow-hidden group/card ${
         onToggle ? "cursor-pointer active:scale-[0.97]" : ""
       }`}
       onClick={onToggle}
@@ -121,13 +181,12 @@ const DigitalCard: React.FC<{ param: PLCParameter; onToggle?: () => void }> = ({
       }}
     >
       {/* Top row: label */}
-      <div className="flex justify-between items-center relative z-10">
-        <span className="text-[11px] text-blue-200/80 uppercase tracking-[0.14em] font-medium">
-          {param.label}
-        </span>
+      <div className="flex justify-between items-center gap-1 relative z-10">
+        <SensorLabel param={param} />
         <span
-          className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md flex items-center gap-1 transition-all duration-500"
+          className="font-semibold px-1.5 py-0.5 rounded-md flex items-center gap-1 transition-all duration-500 whitespace-nowrap"
           style={{
+            fontSize: "9.5px",
             color: active ? hex : `${hex}60`,
             backgroundColor: active ? `${hex}12` : "rgba(255,255,255,0.02)",
             borderWidth: 1,
@@ -213,20 +272,25 @@ const RelayCard: React.FC<{ param: PLCParameter }> = ({ param }) => {
   const hex = param.accentHex;
   const label =
     hex === "#10b981" ? "Healthy" : hex === "#f59e0b" ? "Partial" : "Offline";
+  const glowClass =
+    hex === "#f59e0b"
+      ? "status-warn-glow"
+      : hex === "#ef4444" || label === "Offline"
+        ? "status-alarm-glow"
+        : "";
 
   return (
     <div
-      className="card-inner p-2.5 flex flex-col justify-between transition-all duration-500 relative overflow-hidden group/card"
+      className={`card-inner p-2 flex flex-col justify-between transition-all duration-500 relative overflow-hidden group/card ${glowClass}`}
       style={{ borderColor: `${hex}30`, backgroundColor: `${hex}06` }}
     >
       {/* Top: label + status */}
-      <div className="flex justify-between items-center relative z-10">
-        <span className="text-[11px] text-blue-200/80 uppercase tracking-[0.14em] font-medium">
-          {param.label}
-        </span>
+      <div className="flex justify-between items-center gap-1 relative z-10">
+        <SensorLabel param={param} />
         <span
-          className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md flex items-center gap-1"
+          className="font-semibold px-1.5 py-0.5 rounded-md flex items-center gap-1 whitespace-nowrap"
           style={{
+            fontSize: "9.5px",
             color: hex,
             backgroundColor: `${hex}15`,
             border: `1px solid ${hex}25`,
@@ -539,7 +603,10 @@ const PLCParametersWidget: React.FC<{ className?: string }> = ({
         </div>
       </div>
 
-      {/* Sensor grid — 3 cols now that we surface the full board-A set */}
+      {/* Sensor grid — 3 cols. Adding more columns on wide screens just
+          makes each cell narrower, which forces multi-word labels like
+          "Forming Pressure" / "Curing MQ Gas" to wrap. Keep 3 always and
+          let the cards expand horizontally with the right column instead. */}
       <div className="grid grid-cols-3 gap-2 flex-grow overflow-y-auto pr-1">
         {displayParams.map((p) =>
           p.kind === "analog" ? (

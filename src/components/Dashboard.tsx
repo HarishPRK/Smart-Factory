@@ -13,12 +13,14 @@ import { computeOverviewChips } from "../data/mockData";
 import PLCParametersWidget from "./PLCParametersWidget";
 import MotorFanWidget from "./MotorFanWidget";
 import EmergencyLightWidget from "./EmergencyLightWidget";
+import ThreePhaseMotorWidget from "./ThreePhaseMotorWidget";
 import { AIFloatingButton } from "./AIAssistantModal";
 import { usePredictionStore } from "../stores/predictionStore";
 
 const FactoryScene = lazy(() => import("./factory3d/FactoryScene"));
 const PLCControlRoom = lazy(() => import("./factory3d/PLCControlRoom"));
 const AIAssistantModal = lazy(() => import("./AIAssistantModal"));
+const LanggraphAgentPanel = lazy(() => import("./LanggraphAgentPanel"));
 const NotificationDrawer = lazy(() => import("./NotificationDrawer"));
 const KPIAnalyticsPanel = lazy(() => import("./KPIAnalyticsPanel"));
 const OEEPanel = lazy(() => import("./OEEPanel"));
@@ -209,32 +211,39 @@ const Dashboard: React.FC = () => {
       <div className="grid grid-cols-12 gap-4 flex-grow min-h-0 overflow-hidden">
         {/* Center Content — expanded for larger factory floor */}
         <div className="col-span-9 flex flex-col gap-4 h-full min-h-0">
-          <div className="relative flex items-end px-1 animate-fade-in delay-1">
-            <div className="w-full text-center">
-              <div className="section-title mx-auto inline-flex items-center gap-2">
-                <span className="ind-live-dot" />
-                Operations Snapshot
-              </div>
-              <div className="text-[18px] font-semibold text-slate-100 mt-2 tracking-tight leading-tight">
-                Monitor alerts, machine health, and plant KPIs in one view.
-              </div>
-              <div className="divider-animated mt-3 mx-auto" style={{ maxWidth: 320 }} />
-            </div>
-            <div className="absolute right-1 bottom-0 flex items-center gap-2 flex-wrap justify-end">
-              {overviewChips.map((chip) => (
-                <div
-                  key={chip.label}
-                  className={`px-3 py-2 rounded-md ${chip.tone}`}
-                  style={{ border: "1px solid #2a3444", background: "rgba(20,27,39,0.7)" }}
-                >
-                  <div className="text-[8px] uppercase tracking-[0.18em] font-semibold text-slate-400">
-                    {chip.label}
-                  </div>
-                  <div className="text-sm font-semibold mt-0.5 ind-data">
-                    {chip.value}
-                  </div>
+          <div className="relative flex items-center gap-4 px-1 animate-fade-in delay-1">
+            {/* Hero — left-aligned with accent bar so it stops floating */}
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <span className="hero-accent flex-none" />
+              <div className="min-w-0">
+                <div className="section-title inline-flex items-center gap-2">
+                  <span className="ind-live-dot" />
+                  Operations Snapshot
                 </div>
-              ))}
+                <div className="text-[15px] font-semibold text-slate-100 mt-1.5 tracking-tight leading-tight truncate">
+                  Monitor alerts, machine health, and plant KPIs in one view.
+                </div>
+              </div>
+            </div>
+            {/* Bloomberg-style command strip */}
+            <div className="flex items-stretch gap-2 flex-none">
+              {overviewChips.map((chip) => {
+                const tone =
+                  chip.label.toLowerCase() === "critical"
+                    ? "tone-alarm"
+                    : chip.label.toLowerCase() === "warnings"
+                      ? "tone-warn"
+                      : "tone-ok";
+                return (
+                  <div key={chip.label} className={`cmd-chip ${tone}`}>
+                    <div className="cmd-chip-label">{chip.label}</div>
+                    <div className="cmd-chip-value">
+                      <span className="dot" />
+                      {chip.value}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
           <FilterBar />
@@ -417,18 +426,23 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Sidebar — PLC + motor/emergency only */}
+        {/* Right Sidebar — PLC + motor/emergency + thin 3-phase strip
+            (click strip to open per-phase detail drawer) */}
         <div className="col-span-3 flex flex-col gap-3 h-full min-h-0">
           <PLCParametersWidget className="flex-[3] min-h-0" />
           <div className="flex-[1] min-h-0 flex gap-3">
             <MotorFanWidget className="flex-1 min-h-0" />
             <EmergencyLightWidget className="flex-1 min-h-0" />
           </div>
+          <ThreePhaseMotorWidget className="flex-none" />
         </div>
       </div>
 
       <AIFloatingButton onClick={() => setAiChatOpen(true)} />
       <Suspense fallback={null}>
+        {/* Langgraph agent — always mounted so its own floating button is
+            available in the corner. Talks to VITE_LANGGRAPH_API_BASE. */}
+        <LanggraphAgentPanel />
         {aiChatOpen && (
           <AIAssistantModal
             open={aiChatOpen}
