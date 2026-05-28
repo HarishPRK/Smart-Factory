@@ -51,12 +51,12 @@ const ConveyorBelt: React.FC<ConveyorBeltProps> = ({ path, running }) => {
   const upVec = useMemo(() => new THREE.Vector3(0, 1, 0), []);
   const unitScale = useMemo(() => new THREE.Vector3(1, 1, 1), []);
 
-  // Pre-built segment colors. Every Nth segment is "highlight" Coke red, the
+  // Pre-built segment colors. Every Nth segment is "highlight" Pepsi blue, the
   // rest are dark grey. Because the segments themselves move along the curve,
   // the colored highlights visibly travel — making belt motion obvious.
   const COLOR_BASE = useMemo(() => new THREE.Color("#1f2937"), []);
-  const COLOR_HIGHLIGHT = useMemo(() => new THREE.Color("#dc2626"), []);
-  const COLOR_HIGHLIGHT_DIM = useMemo(() => new THREE.Color("#7f1d1d"), []);
+  const COLOR_HIGHLIGHT = useMemo(() => new THREE.Color("#004B93"), []);
+  const COLOR_HIGHLIGHT_DIM = useMemo(() => new THREE.Color("#001f4d"), []);
 
   useEffect(() => {
     if (!instanceRef.current) return;

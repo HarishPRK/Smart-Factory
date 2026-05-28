@@ -353,9 +353,9 @@ const MaterialSourceDest3D: React.FC = () => {
   return (
     <group>
       {/* ══ RAW MATERIAL DELIVERY ══ */}
-      {/* Tallest silo painted Coca-Cola red so the brand is visible behind the
+      {/* Tallest silo painted Pepsi blue so the brand is visible behind the
           intake stage. The other two stay grey/tan for visual variety. */}
-      <BulkSilo position={[intake[0] - 2.0, 0, intake[2] - 2.0]} height={2.8} color="#dc2626" />
+      <BulkSilo position={[intake[0] - 2.0, 0, intake[2] - 2.0]} height={2.8} color="#004B93" />
       <BulkSilo position={[intake[0] - 0.5, 0, intake[2] - 2.0]} height={2.2} color="#78716c" />
       <BulkSilo position={[intake[0] + 1.0, 0, intake[2] - 2.0]} height={1.8} color="#6b7280" />
       {/* Silo bands */}
@@ -374,7 +374,7 @@ const MaterialSourceDest3D: React.FC = () => {
       {/* ══ DISPATCH ══
           Removed the off-floor truck-loading bay (truck, forklift, staged
           pallets) — they sat outside the factory floor and looked detached.
-          The dispatch stage's own palletizer + Coke crates inside the factory
+          The dispatch stage's own palletizer + Pepsi crates inside the factory
           floor (rendered by StageEquipment3D) tell the shipping story now. */}
 
       {/* ══ SIGNS ══ */}

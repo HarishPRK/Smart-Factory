@@ -342,22 +342,22 @@ const RobotArm3D: React.FC<RobotArm3DProps> = ({
                             <meshStandardMaterial color="#9ca3af" metalness={0.85} roughness={0.15} />
                           </mesh>
 
-                          {/* ── Held bottle (Coca-Cola, visible only when grip closed) ── */}
+                          {/* ── Held bottle (Pepsi, visible only when grip closed) ── */}
                           <group ref={heldBottleRef} position={[0, 0.07, 0]} visible={false}>
-                            {/* Bottle body — dark cola brown (cola inside clear PET) */}
+                            {/* Bottle body — dark cola brown (Pepsi inside clear PET) */}
                             <mesh>
                               <cylinderGeometry args={[0.018, 0.018, 0.08, 10]} />
                               <meshStandardMaterial color="#1c0a00" transparent opacity={0.88} metalness={0.15} roughness={0.15} />
                             </mesh>
-                            {/* Red Coca-Cola label band */}
+                            {/* Blue Pepsi label band */}
                             <mesh position={[0, 0, 0]}>
                               <cylinderGeometry args={[0.0185, 0.0185, 0.025, 10]} />
-                              <meshStandardMaterial color="#dc2626" emissive="#dc2626" emissiveIntensity={0.3} metalness={0.1} roughness={0.4} />
+                              <meshStandardMaterial color="#004B93" emissive="#004B93" emissiveIntensity={0.3} metalness={0.1} roughness={0.4} />
                             </mesh>
-                            {/* Red bottle cap */}
+                            {/* Blue bottle cap */}
                             <mesh position={[0, 0.045, 0]}>
                               <cylinderGeometry args={[0.012, 0.012, 0.012, 8]} />
-                              <meshStandardMaterial color="#dc2626" metalness={0.3} roughness={0.35} />
+                              <meshStandardMaterial color="#004B93" metalness={0.3} roughness={0.35} />
                             </mesh>
                           </group>
                         </group>

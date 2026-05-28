@@ -6,7 +6,7 @@ interface State {
 }
 
 /**
- * Root error boundary — renders a readable debug panel instead of a white screen.
+ * Root error boundary Ã¢â‚¬â€ renders a readable debug panel instead of a white screen.
  */
 export class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -33,7 +33,7 @@ export class ErrorBoundary extends React.Component<
             padding: 24,
             background: "#0b1117",
             color: "#e4ebf3",
-            fontFamily: "'Inter', system-ui, sans-serif",
+            fontFamily: "'Montserrat', system-ui, sans-serif",
             overflow: "auto",
             zIndex: 999999,
           }}
@@ -54,11 +54,11 @@ export class ErrorBoundary extends React.Component<
                 fontSize: 10,
                 letterSpacing: "0.2em",
                 textTransform: "uppercase",
-                color: "#c0392b",
+                color: "#EE1C25",
                 fontWeight: 700,
               }}
             >
-              ● Runtime Error
+              Ã¢â€”Â Runtime Error
             </div>
             <h2
               style={{
@@ -122,7 +122,7 @@ export class ErrorBoundary extends React.Component<
               style={{
                 marginTop: 16,
                 padding: "8px 16px",
-                background: "#3aa9c0",
+                background: "#75b0ea",
                 border: "none",
                 borderRadius: 4,
                 color: "#0b1117",

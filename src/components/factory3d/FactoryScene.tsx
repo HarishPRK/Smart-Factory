@@ -32,15 +32,15 @@ import { usePLCStore } from "../../stores/plcStore";
 import { useCaptureMode } from "../../hooks/useCaptureMode";
 import { useSceneSettingsStore } from "../../stores/sceneSettingsStore";
 
-/* ── 🎉 EASTER EGG: Disco Party Mode (Konami Code) ──── */
+/* â”€â”€ ðŸŽ‰ EASTER EGG: Disco Party Mode (Konami Code) â”€â”€â”€â”€ */
 
 const SECRET_WORD = "party";
 // Cap the canvas pixel ratio at 1.0. On HiDPI displays (Retina, 4K at scaling)
-// the browser's default devicePixelRatio is 2.0–3.0, which means the renderer
-// has to fill 4–9× as many pixels per frame for no perceptible quality gain
+// the browser's default devicePixelRatio is 2.0â€“3.0, which means the renderer
+// has to fill 4â€“9Ã— as many pixels per frame for no perceptible quality gain
 // on a 3D scene of this complexity. Clamping to 1.0 is the single biggest
 // fragment-shader-cost saving we can make; users on sharp displays lose a
-// tiny amount of edge crispness but gain ~2–3× frame headroom.
+// tiny amount of edge crispness but gain ~2â€“3Ã— frame headroom.
 const MAX_DPR =
   typeof window === "undefined"
     ? 1
@@ -119,7 +119,7 @@ const DiscoBall: React.FC = () => {
   );
 };
 
-/* ── Emergency Light ─────────────────────────────────── */
+/* â”€â”€ Emergency Light â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 const EmergencyLight: React.FC<{ active: boolean }> = ({ active }) => {
   const lightRef = useRef<THREE.PointLight>(null);
@@ -154,7 +154,7 @@ const EmergencyLight: React.FC<{ active: boolean }> = ({ active }) => {
   );
 };
 
-/* ── Ambient Dust Particles ──────────────────────────── */
+/* â”€â”€ Ambient Dust Particles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 const AmbientParticles: React.FC = () => {
   const instanceRef = useRef<THREE.InstancedMesh>(null);
@@ -195,7 +195,7 @@ const AmbientParticles: React.FC = () => {
   );
 };
 
-/* ── Modern Factory Building ─────────────────────────── */
+/* â”€â”€ Modern Factory Building â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 const OpenFloor: React.FC = () => {
   const W = 46; // floor width (X)
@@ -203,15 +203,15 @@ const OpenFloor: React.FC = () => {
 
   const postFxQuality = useSceneSettingsStore((s) => s.postFxQuality);
   // MeshReflectorMaterial runs a second render pass of the scene for the
-  // reflection — reserved for "high"/"ultra" only. At "medium" (the new
+  // reflection â€” reserved for "high"/"ultra" only. At "medium" (the new
   // default) and below we fall through to a plain glossy meshStandardMaterial
   // floor, saving ~0.7 ms/frame.
   const reflectiveFloor = postFxQuality === "high" || postFxQuality === "ultra";
 
   return (
     <group>
-      {/* ═══ REFLECTIVE EPOXY FLOOR ═══ */}
-      {/* Outer ground — lifted from near-black to mid-graphite so the
+      {/* â•â•â• REFLECTIVE EPOXY FLOOR â•â•â• */}
+      {/* Outer ground â€” lifted from near-black to mid-graphite so the
           factory floor reads "polished concrete" instead of "void". */}
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
@@ -222,7 +222,7 @@ const OpenFloor: React.FC = () => {
         <meshStandardMaterial color="#1f2937" metalness={0.2} roughness={0.78} />
       </mesh>
 
-      {/* Main factory floor — high-gloss epoxy (mirror-reflective on MED+) */}
+      {/* Main factory floor â€” high-gloss epoxy (mirror-reflective on MED+) */}
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, 0.0, 0]}
@@ -253,7 +253,7 @@ const OpenFloor: React.FC = () => {
         )}
       </mesh>
 
-      {/* Floor grid lines — subtle modern pattern */}
+      {/* Floor grid lines â€” subtle modern pattern */}
       {Array.from({ length: 16 }, (_, i) => i - 7).map((x) => (
         <mesh
           key={`gx${x}`}
@@ -261,7 +261,7 @@ const OpenFloor: React.FC = () => {
           position={[x * 2, 0.003, 0]}
         >
           <planeGeometry args={[0.008, D]} />
-          <meshBasicMaterial color="#5a7090" transparent opacity={0.22} />
+          <meshBasicMaterial color="#6b7468" transparent opacity={0.22} />
         </mesh>
       ))}
       {Array.from({ length: 12 }, (_, i) => i - 5).map((z) => (
@@ -271,15 +271,15 @@ const OpenFloor: React.FC = () => {
           position={[0, 0.003, z * 2]}
         >
           <planeGeometry args={[0.008, W]} />
-          <meshBasicMaterial color="#5a7090" transparent opacity={0.22} />
+          <meshBasicMaterial color="#6b7468" transparent opacity={0.22} />
         </mesh>
       ))}
 
-      {/* Row pathway highlights */}
+      {/* Row pathway highlights — neutral lavender, no colour accent */}
       {[
-        { z: 4, color: "#10b981" },
-        { z: 0, color: "#3b82f6" },
-        { z: -4, color: "#8b5cf6" },
+        { z: 4, color: "#9a93b8" },
+        { z: 0, color: "#9a93b8" },
+        { z: -4, color: "#9a93b8" },
       ].map(({ z, color }, i) => (
         <group key={`row-${i}`}>
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, z]}>
@@ -298,11 +298,11 @@ const OpenFloor: React.FC = () => {
         </group>
       ))}
 
-      {/* Steel frame structure and glass walls removed — open factory floor
+      {/* Steel frame structure and glass walls removed â€” open factory floor
           with no surrounding enclosure, per the user's request. Roof was
           already removed earlier for top-down visibility. */}
 
-      {/* LED ceiling panels removed — overhead fixtures were visible through
+      {/* LED ceiling panels removed â€” overhead fixtures were visible through
           the open roof and distracted from the factory floor. Core directional +
           hemisphere + pointLights from SceneContent already provide lighting. */}
 
@@ -330,7 +330,7 @@ const OpenFloor: React.FC = () => {
   );
 };
 
-/* ── Day/Night Lighting Adjuster ─────────────────────── */
+/* â”€â”€ Day/Night Lighting Adjuster â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 const DayNightLighting: React.FC<{ isNight: boolean; useIBL: boolean }> = ({
   isNight,
@@ -347,7 +347,7 @@ const DayNightLighting: React.FC<{ isNight: boolean; useIBL: boolean }> = ({
     if (scene.background instanceof THREE.Color) {
       scene.background.lerp(targetBg, 0.02);
     }
-    // Ambient — legacy fill uses full intensity; IBL tier uses a tiny top-up
+    // Ambient â€” legacy fill uses full intensity; IBL tier uses a tiny top-up
     if (ambientRef.current) {
       const nightTarget = useIBL ? 0.12 : 1.05;
       const dayTarget = useIBL ? 0.3 : 2.1;
@@ -367,7 +367,7 @@ const DayNightLighting: React.FC<{ isNight: boolean; useIBL: boolean }> = ({
 };
 
 /**
- * Legacy fill rig — hemisphere + 3 overhead HID point lights + a fill
+ * Legacy fill rig â€” hemisphere + 3 overhead HID point lights + a fill
  * directional. Used on HIGH/MED/LOW tiers where HDRI IBL isn't active.
  * On ULTRA the HDRI environment replaces all of these.
  */
@@ -424,7 +424,7 @@ const LiveEmergencyLight: React.FC = React.memo(() => {
   return <EmergencyLight active={emergencyLightOn} />;
 });
 
-/* ── Scene Content ───────────────────────────────────── */
+/* â”€â”€ Scene Content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 const SceneContent: React.FC<{
   isNight: boolean;
@@ -444,8 +444,8 @@ const SceneContent: React.FC<{
         position={[15, 30, 12]}
         intensity={1.8}
         castShadow
-        // Shadow map dropped 4096² → 2048² (quarter the pixels). This was the
-        // single most expensive per-frame cost — a 4k depth rasterization
+        // Shadow map dropped 4096Â² â†’ 2048Â² (quarter the pixels). This was the
+        // single most expensive per-frame cost â€” a 4k depth rasterization
         // across ~50 cast-shadow meshes. At this frame target (120 Hz) 2k is
         // still visually identical on a full-screen canvas.
         shadow-mapSize-width={2048}
@@ -465,7 +465,7 @@ const SceneContent: React.FC<{
         scale={80}
         blur={2.4}
         far={6}
-        // 1024 → 512: contact shadows are soft anyway, half-res is imperceptible.
+        // 1024 â†’ 512: contact shadows are soft anyway, half-res is imperceptible.
         resolution={512}
         frames={1}
       />
@@ -480,7 +480,7 @@ const SceneContent: React.FC<{
       />
       <pointLight
         position={[0, 0.3, 0]}
-        color="#3b82f6"
+        color="#75b0ea"
         intensity={0.18}
         distance={8}
         decay={2}
@@ -493,7 +493,7 @@ const SceneContent: React.FC<{
         decay={2}
       />
 
-      {/* Depth fog — lighter & further-out so the brighter concrete floor
+      {/* Depth fog â€” lighter & further-out so the brighter concrete floor
           doesn't get drowned in haze on wider screens. */}
       <fog attach="fog" args={["#1a2638", 60, 110]} />
 
@@ -527,7 +527,7 @@ const SceneContent: React.FC<{
       />
       <CameraController />
 
-      {/* Open floor — no walls or roof */}
+      {/* Open floor â€” no walls or roof */}
       <OpenFloor />
       {particlesEnabled && <AmbientParticles />}
 
@@ -537,49 +537,49 @@ const SceneContent: React.FC<{
       {/* Digital Twin Manufacturing Pipeline (stages + robots + workers) */}
       <ProcessPipeline3D />
 
-      {/* Animated atmosphere — steam, sparks, glowing effects */}
+      {/* Animated atmosphere â€” steam, sparks, glowing effects */}
       {particlesEnabled && <FactoryAtmosphere3D />}
 
-      {/* Ground infrastructure — pipe racks, walkways, signage */}
+      {/* Ground infrastructure â€” pipe racks, walkways, signage */}
       <FactoryInfrastructure3D />
 
       {/* Raw material source + finished goods dispatch */}
       <MaterialSourceDest3D />
 
-      {/* Animated machinery overlays — spinning, pressing, sweeping */}
+      {/* Animated machinery overlays â€” spinning, pressing, sweeping */}
       <AnimatedMachinery3D />
 
-      {/* Interactive overlays — click workers, robots, silos, trucks */}
+      {/* Interactive overlays â€” click workers, robots, silos, trucks */}
       <InteractiveOverlay3D />
 
-      {/* Emergency response — workers run to faulted stages */}
+      {/* Emergency response â€” workers run to faulted stages */}
       <EmergencyResponse3D />
 
       {/* Water filling, capping, labeling & rejection stations */}
       <BottleProcessing3D />
 
-      {/* Extra details — reservoir, counters, energy meter, shift, QR scanner */}
+      {/* Extra details â€” reservoir, counters, energy meter, shift, QR scanner */}
       {extrasEnabled && <FactoryExtras3D />}
 
-      {/* Premium features — CCTV, clock, smoke, LEDs, bins, antenna, waves, turntables */}
+      {/* Premium features â€” CCTV, clock, smoke, LEDs, bins, antenna, waves, turntables */}
       {cctvEnabled && <FactoryPremium3D />}
 
-      {/* Factory compound — parking, solar, cooling tower, guard booth, flags */}
+      {/* Factory compound â€” parking, solar, cooling tower, guard booth, flags */}
       {extrasEnabled && <FactoryCompound3D />}
 
-      {/* Showpiece — AI orb, data streams, helicopter, scoreboard, welding, holo table */}
+      {/* Showpiece â€” AI orb, data streams, helicopter, scoreboard, welding, holo table */}
       {extrasEnabled && <FactoryShowpiece3D />}
 
       {/* Emergency light */}
       <LiveEmergencyLight />
 
-      {/* 🎉 Easter Egg: Disco Ball */}
+      {/* ðŸŽ‰ Easter Egg: Disco Ball */}
       {discoMode && <DiscoBall />}
     </>
   );
 });
 
-/* ── Main exported component ─────────────────────────── */
+/* â”€â”€ Main exported component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 const FactoryScene: React.FC = () => {
   const [isNight, setIsNight] = useState(true);
@@ -593,7 +593,7 @@ const FactoryScene: React.FC = () => {
     setIsNight(night);
   }, []);
 
-  // 🎉 Secret word listener — type "party" to toggle disco mode
+  // ðŸŽ‰ Secret word listener â€” type "party" to toggle disco mode
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (
@@ -713,7 +713,7 @@ const FactoryScene: React.FC = () => {
           cursor: "pointer",
           fontSize: "11px",
           fontWeight: 600,
-          fontFamily: "'Inter', system-ui, sans-serif",
+          fontFamily: "'Montserrat', system-ui, sans-serif",
           display: "flex",
           alignItems: "center",
           gap: "6px",
@@ -731,7 +731,7 @@ const FactoryScene: React.FC = () => {
         }}
       >
         <span style={{ fontSize: "16px", lineHeight: 1 }}>
-          {isFullscreen ? "⛶" : "⛶"}
+          {isFullscreen ? "â›¶" : "â›¶"}
         </span>
         {isFullscreen ? "EXIT FULLSCREEN" : "FULLSCREEN"}
       </button>

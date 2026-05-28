@@ -148,7 +148,7 @@ const EmergencyLightWidget: React.FC<EmergencyLightWidgetProps> = ({
     const relayState = turningOn ? 1 : 0;
     sendCommand("emergency_light", {
       _topic: "plc/control",
-      _rawPayload: { boardA_8ch_relay_alarm: relayState },
+      _rawPayload: { boardA_relay_alarm: relayState },
     }).catch(() => {});
   };
 

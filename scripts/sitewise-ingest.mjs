@@ -104,7 +104,7 @@ function mapPayload(raw) {
     voltage: ["boardA_voltage_pot_1", "voltage_pot"],
     current: ["boardA_current_pot", "current_pot"],
     temperature: ["boardA_temperature", "boardB_esp32_temperature", "temperature"],
-    pH: ["boardA_8ch_analog_1_ph_sensor", "pH"],
+    pH: ["boardA_ph_sensor", "pH"],
   };
 
   for (const [swName, mqttKeys] of Object.entries(analogMap)) {
@@ -119,14 +119,14 @@ function mapPayload(raw) {
   // Digital sensors (INTEGER)
   const digitalMap = {
     photoE_sensor: ["boardA_photoelectric_sensor", "photoE_sensor"],
-    metal_sensor: ["boardA_metal_sensor", "boardB_8ch_io_metal_sensor", "metal_sensor"],
+    metal_sensor: ["boardA_metal_sensor", "boardB_io_metal_sensor", "metal_sensor"],
     push_button: [
       "boardA_green_push_button",
-      "boardB_8ch_io_green_button",
-      "boardB_8ch_io_push_lock_button",
+      "boardB_io_green_button",
+      "boardB_io_push_lock_button",
       "push_button",
     ],
-    motor: ["boardA_8ch_relay_motor"],
+    motor: ["boardA_relay_motor"],
   };
 
   for (const [swName, mqttKeys] of Object.entries(digitalMap)) {
@@ -140,14 +140,14 @@ function mapPayload(raw) {
 
   // 8-channel relay (INTEGER)
   const relays = [
-    resolveBit(raw, ["boardA_8ch_relay_motor"], `${PREFIX}/relay_ch0/state`, 0),
-    resolveBit(raw, ["boardA_8ch_relay_alarm"], `${PREFIX}/relay_ch1/state`, 0),
-    resolveBit(raw, ["boardA_alert_relays_red", "boardB_8ch_io_output_red"], `${PREFIX}/relay_ch2/state`, 0),
-    resolveBit(raw, ["boardA_alert_relays_yellow", "boardB_8ch_io_output_yellow"], `${PREFIX}/relay_ch3/state`, 0),
-    resolveBit(raw, ["boardA_alert_relays_green", "boardB_8ch_io_output_green"], `${PREFIX}/relay_ch4/state`, 0),
-    resolveBit(raw, ["boardA_alert_relays_buzzer", "boardB_8ch_io_output_buzzer"], `${PREFIX}/relay_ch5/state`, 0),
+    resolveBit(raw, ["boardA_relay_motor"], `${PREFIX}/relay_ch0/state`, 0),
+    resolveBit(raw, ["boardA_relay_alarm"], `${PREFIX}/relay_ch1/state`, 0),
+    resolveBit(raw, ["boardA_alert_relays_red", "boardB_io_output_red"], `${PREFIX}/relay_ch2/state`, 0),
+    resolveBit(raw, ["boardA_alert_relays_yellow", "boardB_io_output_yellow"], `${PREFIX}/relay_ch3/state`, 0),
+    resolveBit(raw, ["boardA_alert_relays_green", "boardB_io_output_green"], `${PREFIX}/relay_ch4/state`, 0),
+    resolveBit(raw, ["boardA_alert_relays_buzzer", "boardB_io_output_buzzer"], `${PREFIX}/relay_ch5/state`, 0),
     resolveBit(raw, ["boardA_green_push_button"], `${PREFIX}/relay_ch6/state`, 0),
-    resolveBit(raw, ["boardA_metal_sensor", "boardB_8ch_io_metal_sensor"], `${PREFIX}/relay_ch7/state`, 0),
+    resolveBit(raw, ["boardA_metal_sensor", "boardB_io_metal_sensor"], `${PREFIX}/relay_ch7/state`, 0),
   ];
 
   const legacyRelays = raw["8ch_relay_1"];
@@ -175,10 +175,10 @@ function mapPayload(raw) {
 
   // Alerts (INTEGER)
   const alerts = [
-    resolveBit(raw, ["boardA_alert_relays_red", "boardB_8ch_io_output_red"], `${PREFIX}/alert_0`, 0),
-    resolveBit(raw, ["boardA_alert_relays_yellow", "boardB_8ch_io_output_yellow"], `${PREFIX}/alert_1`, 0),
-    resolveBit(raw, ["boardA_alert_relays_buzzer", "boardB_8ch_io_output_buzzer"], `${PREFIX}/alert_2`, 0),
-    resolveBit(raw, ["boardA_8ch_relay_alarm"], `${PREFIX}/alert_3`, 0),
+    resolveBit(raw, ["boardA_alert_relays_red", "boardB_io_output_red"], `${PREFIX}/alert_0`, 0),
+    resolveBit(raw, ["boardA_alert_relays_yellow", "boardB_io_output_yellow"], `${PREFIX}/alert_1`, 0),
+    resolveBit(raw, ["boardA_alert_relays_buzzer", "boardB_io_output_buzzer"], `${PREFIX}/alert_2`, 0),
+    resolveBit(raw, ["boardA_relay_alarm"], `${PREFIX}/alert_3`, 0),
   ];
 
   const legacyAlerts = raw.alerts;

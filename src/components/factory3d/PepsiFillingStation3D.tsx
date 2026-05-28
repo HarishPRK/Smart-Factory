@@ -4,20 +4,20 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useDigitalTwinStore } from "../../stores/digitalTwinStore";
 
-interface ColaFillingStation3DProps {
+interface PepsiFillingStation3DProps {
   position: [number, number, number];
   rotationY: number;
 }
 
 /**
- * ColaFillingStation3D — Inline Coca-Cola filling station
+ * PepsiFillingStation3D — Inline Pepsi filling station
  *
  * A linear filling machine where bottles pass through on the conveyor
- * and get filled with Coca-Cola from overhead nozzles. Simpler design
+ * and get filled with Pepsi from overhead nozzles. Simpler design
  * than the rotary carousel, with bottles staying on the main belt.
  *
  * Visual elements:
- *  - Red Coca-Cola tank mounted on top
+ *  - Blue Pepsi tank mounted on top
  *  - Multiple filling nozzles in a row
  *  - Animated brown liquid streams from nozzles to bottles
  *  - Frame structure around the filling zone
@@ -27,7 +27,7 @@ interface ColaFillingStation3DProps {
 const NOZZLE_COUNT = 4;
 const STREAM_COUNT = 8;
 
-const ColaFillingStation3D: React.FC<ColaFillingStation3DProps> = ({
+const PepsiFillingStation3D: React.FC<PepsiFillingStation3DProps> = ({
   position,
   rotationY,
 }) => {
@@ -107,23 +107,23 @@ const ColaFillingStation3D: React.FC<ColaFillingStation3DProps> = ({
         <meshStandardMaterial color="#4b5563" metalness={0.8} roughness={0.2} />
       </mesh>
 
-      {/* ── Coca-Cola syrup tank on top ── */}
+      {/* ── Pepsi syrup tank on top ── */}
       <mesh position={[0, 2.1, 0]} castShadow>
         <cylinderGeometry args={[0.4, 0.4, 0.7, 16]} />
         <meshStandardMaterial
-          color="#dc2626"
+          color="#004B93"
           metalness={0.6}
           roughness={0.3}
-          emissive="#991b1b"
+          emissive="#001f4d"
           emissiveIntensity={0.15}
         />
       </mesh>
       {/* Tank top cap */}
       <mesh position={[0, 2.5, 0]}>
         <cylinderGeometry args={[0.42, 0.42, 0.08, 16]} />
-        <meshStandardMaterial color="#991b1b" metalness={0.7} roughness={0.2} />
+        <meshStandardMaterial color="#001f4d" metalness={0.7} roughness={0.2} />
       </mesh>
-      {/* White Coca-Cola band on tank */}
+      {/* White Pepsi band on tank */}
       <mesh position={[0, 2.1, 0]}>
         <cylinderGeometry args={[0.405, 0.405, 0.15, 16, 1, true]} />
         <meshStandardMaterial
@@ -173,7 +173,7 @@ const ColaFillingStation3D: React.FC<ColaFillingStation3DProps> = ({
         );
       })}
 
-      {/* ── Animated filling streams (brown Coca-Cola liquid) ── */}
+      {/* ── Animated filling streams (brown Pepsi liquid) ── */}
       <instancedMesh
         ref={streamRef}
         args={[undefined, undefined, STREAM_COUNT]}
@@ -269,4 +269,4 @@ const ColaFillingStation3D: React.FC<ColaFillingStation3DProps> = ({
   );
 };
 
-export default ColaFillingStation3D;
+export default PepsiFillingStation3D;

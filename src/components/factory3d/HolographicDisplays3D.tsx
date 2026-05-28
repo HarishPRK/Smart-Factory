@@ -6,7 +6,7 @@ import * as THREE from "three";
 import { useDigitalTwinStore } from "../../stores/digitalTwinStore";
 
 /**
- * HolographicDisplays3D — Floating holographic stat screens in 3D space
+ * HolographicDisplays3D â€” Floating holographic stat screens in 3D space
  *
  * Large transparent panels floating above the factory showing live KPIs.
  * Gently rotating, with scan-line effects.
@@ -44,7 +44,7 @@ const HolographicDisplays3D: React.FC = () => {
 
   return (
     <group>
-      {/* ── Main KPI Hologram — left side of factory ── */}
+      {/* â”€â”€ Main KPI Hologram â€” left side of factory â”€â”€ */}
       <group ref={panel1Ref} position={[-10, 3.8, 2]}>
         {/* Holographic frame */}
         <mesh>
@@ -65,7 +65,7 @@ const HolographicDisplays3D: React.FC = () => {
         <Html position={[0, 0, 0.02]} center distanceFactor={8} style={{ pointerEvents: "none", willChange: "transform" }}>
           <div style={{
             width: "240px",
-            fontFamily: "'Inter', system-ui, sans-serif",
+            fontFamily: "'Montserrat', system-ui, sans-serif",
             color: "#93c5fd",
             textAlign: "center",
           }}>
@@ -94,7 +94,7 @@ const HolographicDisplays3D: React.FC = () => {
             </div>
             {scenario && (
               <div style={{ marginTop: "6px", fontSize: "9px", color: "#ef4444", fontWeight: 700, animation: "pulse 1s infinite" }}>
-                ⚠ SCENARIO: {scenario.replace(/_/g, " ").toUpperCase()}
+                âš  SCENARIO: {scenario.replace(/_/g, " ").toUpperCase()}
               </div>
             )}
           </div>
@@ -103,7 +103,7 @@ const HolographicDisplays3D: React.FC = () => {
         <pointLight position={[0, -0.8, 0]} color="#3b82f6" intensity={0.15} distance={3} decay={2} />
       </group>
 
-      {/* ── Quality Hologram — right side ── */}
+      {/* â”€â”€ Quality Hologram â€” right side â”€â”€ */}
       <group ref={panel2Ref} position={[10, 3.8, -2]}>
         <mesh>
           <planeGeometry args={[2.0, 1.2]} />
@@ -116,7 +116,7 @@ const HolographicDisplays3D: React.FC = () => {
         <Html position={[0, 0, 0.02]} center distanceFactor={8} style={{ pointerEvents: "none", willChange: "transform" }}>
           <div style={{
             width: "200px",
-            fontFamily: "'Inter', system-ui, sans-serif",
+            fontFamily: "'Montserrat', system-ui, sans-serif",
             color: "#86efac",
             textAlign: "center",
           }}>

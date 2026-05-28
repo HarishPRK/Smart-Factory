@@ -289,11 +289,11 @@ const FactoryExtras3D: React.FC = () => {
               fontSize: "8px",
               fontWeight: 700,
               color: "#93c5fd",
-              fontFamily: "'Inter', system-ui",
+              fontFamily: "'Montserrat', system-ui",
               whiteSpace: "nowrap",
             }}
           >
-            COCA-COLA PROCESS WATER — 5000L
+            PEPSICO PROCESS WATER — 5000L
           </div>
         </Html>
         {/* Tank supports */}
@@ -375,7 +375,7 @@ const FactoryExtras3D: React.FC = () => {
           style={{ pointerEvents: "none", willChange: "transform" }}
         >
           <div
-            style={{ textAlign: "center", fontFamily: "'Inter', system-ui" }}
+            style={{ textAlign: "center", fontFamily: "'Montserrat', system-ui" }}
           >
             <div
               ref={energyValueRef}
@@ -429,7 +429,7 @@ const FactoryExtras3D: React.FC = () => {
               fontSize: "8px",
               fontWeight: 700,
               color: "#fbbf24",
-              fontFamily: "'Inter', system-ui",
+              fontFamily: "'Montserrat', system-ui",
               whiteSpace: "nowrap",
             }}
           >
@@ -482,7 +482,7 @@ const FactoryExtras3D: React.FC = () => {
             borderRadius: "6px",
             padding: "6px 12px",
             textAlign: "center",
-            fontFamily: "'Inter', system-ui",
+            fontFamily: "'Montserrat', system-ui",
           }}
         >
           <div
@@ -557,7 +557,7 @@ const FactoryExtras3D: React.FC = () => {
               borderRadius: "4px",
               padding: "3px 8px",
               textAlign: "center",
-              fontFamily: "'Inter', system-ui",
+              fontFamily: "'Montserrat', system-ui",
             }}
           >
             <div

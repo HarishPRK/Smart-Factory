@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useFilters } from "../context/FilterContext";
 import { kpis, getKpiForZone } from "../data/mockData";
 import KOSDispenseWidget from "./KOSDispenseWidget";
+import LorawanWidget from "./LorawanWidget";
 
 const MiniSparkline: React.FC<{ data: number[]; color: string }> = ({
   data,
@@ -81,10 +82,12 @@ interface KPIBarProps {
   onAnalyticsClick?: () => void;
   onPredictClick?: () => void;
   onDigitalTwinClick?: () => void;
+  onDpsClick?: () => void;
+  onVideoClick?: () => void;
   predAlertCount?: number;
 }
 
-const KPIBar: React.FC<KPIBarProps> = ({ onOeeClick, onAnalyticsClick, onPredictClick, onDigitalTwinClick, predAlertCount = 0 }) => {
+const KPIBar: React.FC<KPIBarProps> = ({ onOeeClick, onAnalyticsClick, onPredictClick, onDigitalTwinClick, onDpsClick, onVideoClick, predAlertCount = 0 }) => {
   const { state, dispatch } = useFilters();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -134,11 +137,19 @@ const KPIBar: React.FC<KPIBarProps> = ({ onOeeClick, onAnalyticsClick, onPredict
         </svg>
       </button>
 
-      {/* KPI cards + action buttons — single-row carousel */}
+      {/* KPI cards + action buttons — single-row carousel.
+          Edge-fade mask only on the side(s) with hidden cards, so the cut-off
+          card fades out instead of hard-clipping — a clear "scroll for more"
+          affordance that pairs with the chevron buttons. */}
       <div
         ref={scrollRef}
         className="flex gap-2.5 overflow-x-auto scroll-smooth flex-nowrap flex-1 min-w-0"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        style={{
+          scrollbarWidth: "none",
+          msOverflowStyle: "none",
+          maskImage: `linear-gradient(90deg, ${canScrollLeft ? "transparent 0, #000 40px" : "#000 0"}, ${canScrollRight ? "#000 calc(100% - 48px), transparent 100%" : "#000 100%"})`,
+          WebkitMaskImage: `linear-gradient(90deg, ${canScrollLeft ? "transparent 0, #000 40px" : "#000 0"}, ${canScrollRight ? "#000 calc(100% - 48px), transparent 100%" : "#000 100%"})`,
+        }}
       >
         {kpis.map((kpi, i) => {
           const isSelected = state.selectedKpi === kpi.id;
@@ -156,7 +167,7 @@ const KPIBar: React.FC<KPIBarProps> = ({ onOeeClick, onAnalyticsClick, onPredict
               }}
               className={`card shimmer-border ${kpi.hoverBorder} p-3.5 flex flex-col justify-between h-[96px] min-w-[145px] max-w-[260px] flex-1 basis-[145px] relative overflow-hidden animate-fade-in delay-${i + 1} group cursor-pointer transition-all duration-300 ${
                 isSelected
-                  ? "ring-1 ring-white/20 shadow-[0_0_20px_rgba(59,130,246,0.15)] scale-[1.02]"
+                  ? "ring-1 ring-white/20 shadow-[0_0_20px_rgba(0,92,185,0.20)] scale-[1.02]"
                   : ""
               }`}
             >
@@ -327,10 +338,90 @@ const KPIBar: React.FC<KPIBarProps> = ({ onOeeClick, onAnalyticsClick, onPredict
           </button>
         )}
 
+        {/* Dynamic Path Selection — opens DPS modal */}
+        {onDpsClick && (
+          <button
+            onClick={onDpsClick}
+            className="card shimmer-border hover:border-blue-400/30 p-3.5 flex flex-col justify-between h-[96px] min-w-[145px] max-w-[260px] flex-1 basis-[145px] relative overflow-hidden group/dps cursor-pointer transition-all duration-300 text-left"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/[0.14] to-sky-500/[0.04] opacity-0 group-hover/dps:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+            <div className="absolute bottom-2 right-3 z-0 opacity-55 group-hover/dps:opacity-80 transition-opacity duration-500">
+              <svg width="60" height="24" viewBox="0 0 60 24" fill="none">
+                {/* Two parallel underlay paths converging on a gateway */}
+                <path d="M2 6 Q14 6 22 12 Q34 18 56 18" stroke="#60a5fa" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+                <path d="M2 18 Q14 18 22 12 Q34 6 56 6" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="3 2" fill="none" />
+                <circle cx="22" cy="12" r="2.2" fill="#ffffff" />
+                <circle cx="56" cy="6"  r="1.6" fill="#60a5fa" />
+                <circle cx="56" cy="18" r="1.6" fill="#3b82f6" />
+              </svg>
+            </div>
+            <div className="flex justify-between items-start relative z-10">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 bg-blue-500/[0.12] rounded-lg flex items-center justify-center border border-blue-400/[0.16] shadow-[0_0_10px_rgba(59,130,246,0.12)] transition-all duration-300 group-hover/dps:scale-105">
+                  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" className="text-blue-200">
+                    <path d="M2 5 Q8 5 10 10 Q12 15 18 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+                    <path d="M2 15 Q8 15 10 10 Q12 5 18 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="2 2" fill="none" opacity="0.7" />
+                    <circle cx="10" cy="10" r="1.8" fill="currentColor" />
+                  </svg>
+                </div>
+                <span className="text-[11px] text-blue-100/90 uppercase tracking-[0.12em] font-semibold">DPS</span>
+              </div>
+            </div>
+            <div className="flex items-baseline gap-1.5 mt-auto relative z-10">
+              <span className="text-[14px] font-semibold text-blue-200/90 leading-none tracking-tight">Paths</span>
+              <span className="text-[10px] text-blue-300/60 font-medium">fiber · 5G</span>
+            </div>
+          </button>
+        )}
+
+        {/* Video Analytics — opens video modal */}
+        {onVideoClick && (
+          <button
+            onClick={onVideoClick}
+            className="card shimmer-border hover:border-rose-400/30 p-3.5 flex flex-col justify-between h-[96px] min-w-[145px] max-w-[260px] flex-1 basis-[145px] relative overflow-hidden group/video cursor-pointer transition-all duration-300 text-left"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-rose-500/[0.12] to-red-500/[0.04] opacity-0 group-hover/video:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+            <div className="absolute bottom-2 right-3 z-0 opacity-55 group-hover/video:opacity-80 transition-opacity duration-500">
+              <svg width="60" height="24" viewBox="0 0 60 24" fill="none">
+                {/* Grid of inference tiles */}
+                <rect x="2"  y="3"  width="13" height="8"  rx="1.5" fill="#fb7185" opacity="0.85" />
+                <rect x="17" y="3"  width="13" height="8"  rx="1.5" fill="#f43f5e" opacity="0.75" />
+                <rect x="32" y="3"  width="13" height="8"  rx="1.5" fill="#fb7185" opacity="0.65" />
+                <rect x="2"  y="13" width="13" height="8"  rx="1.5" fill="#f43f5e" opacity="0.75" />
+                <rect x="17" y="13" width="13" height="8"  rx="1.5" fill="#fb7185" opacity="0.85" />
+                <rect x="32" y="13" width="13" height="8"  rx="1.5" fill="#f43f5e" opacity="0.65" />
+                <circle cx="50" cy="6"  r="1.8" fill="#ef4444" />
+                <circle cx="50" cy="18" r="1.8" fill="#ef4444" opacity="0.55" />
+              </svg>
+            </div>
+            <div className="flex justify-between items-start relative z-10">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 bg-rose-500/[0.12] rounded-lg flex items-center justify-center border border-rose-400/[0.16] shadow-[0_0_10px_rgba(244,63,94,0.12)] transition-all duration-300 group-hover/video:scale-105">
+                  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" className="text-rose-200">
+                    <rect x="2" y="3" width="12" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.4" fill="none" />
+                    <path d="M14 6L18 4V11L14 9V6Z" fill="currentColor" />
+                    <circle cx="8" cy="7.5" r="1.4" fill="currentColor" opacity="0.8" />
+                  </svg>
+                </div>
+                <span className="text-[11px] text-rose-100/90 uppercase tracking-[0.12em] font-semibold">Video</span>
+              </div>
+            </div>
+            <div className="flex items-baseline gap-1.5 mt-auto relative z-10">
+              <span className="text-[14px] font-semibold text-rose-200/90 leading-none tracking-tight">Streams</span>
+              <span className="text-[10px] text-rose-300/60 font-medium">edge · AI</span>
+            </div>
+          </button>
+        )}
+
         {/* KOS dispenser feed — AWS IoT-forwarded pour + recommendation events.
             Sits at the end of the KPI row so it doesn't push the existing
             cards around when no data is flowing yet. */}
         <KOSDispenseWidget />
+
+        {/* LoRaWAN soil/irrigation sensors — local MQTT-bridged feed.
+            Click opens a drawer with per-device soil temp / moisture /
+            conductivity / battery readings and sparklines. */}
+        <LorawanWidget />
       </div>
 
       <button

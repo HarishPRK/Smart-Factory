@@ -7,7 +7,7 @@ import React, {
 } from "react";
 import { usePLCContext } from "../context/PLCContext";
 
-/* ── Types ── */
+/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Types ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */
 interface Message {
   role: "user" | "assistant";
   content: string;
@@ -16,7 +16,7 @@ interface Message {
 type Tab = "chat" | "insights" | "analytics" | "prompts";
 const AI_PROXY_URL = "http://localhost:9002/chat";
 
-/* ── PLC context builder ── */
+/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ PLC context builder ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */
 function buildPLCContext(
   params: ReturnType<typeof usePLCContext>["params"],
   outputs: ReturnType<typeof usePLCContext>["outputs"],
@@ -25,7 +25,7 @@ function buildPLCContext(
   for (const p of params) {
     if (p.kind === "analog")
       lines.push(
-        `${p.label}: ${p.value?.toFixed(p.decimals ?? 1)} ${p.unit ?? ""} (range ${p.min}–${p.max}, nominal ${p.nominal}, status: ${p.status})`,
+        `${p.label}: ${p.value?.toFixed(p.decimals ?? 1)} ${p.unit ?? ""} (range ${p.min}ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“${p.max}, nominal ${p.nominal}, status: ${p.status})`,
       );
     else if (p.kind === "digital")
       lines.push(`${p.label}: ${p.active ? "ACTIVE" : "INACTIVE"}`);
@@ -40,7 +40,7 @@ function buildPLCContext(
   return lines.join("\n");
 }
 
-/* ── Derive insights from live PLC ── */
+/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Derive insights from live PLC ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */
 function deriveInsights(
   params: ReturnType<typeof usePLCContext>["params"],
   outputs: ReturnType<typeof usePLCContext>["outputs"],
@@ -60,7 +60,7 @@ function deriveInsights(
       if (p.status === "critical")
         insights.push({
           title: `${p.label} Critical`,
-          body: `Reading ${p.value?.toFixed(p.decimals ?? 1)} ${p.unit ?? ""} — outside safe range (${p.min}–${p.max}).`,
+          body: `Reading ${p.value?.toFixed(p.decimals ?? 1)} ${p.unit ?? ""} ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â outside safe range (${p.min}ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“${p.max}).`,
           tone: "critical",
           metric: pct != null ? `${pct}%` : undefined,
         });
@@ -95,84 +95,37 @@ function deriveInsights(
   return insights;
 }
 
-/* ── Prompt categories ── */
+/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Prompt categories ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */
 const PROMPT_CATEGORIES = [
   {
-    label: "Diagnostics",
+    label: "Operations & Status",
     color: "cyan",
-    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>`,
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>`,
     prompts: [
-      "Run a full health check on all PLC parameters",
-      "Compare current readings against last shift baseline",
-      "Identify parameters drifting toward warning thresholds",
-      "List sensors that triggered alerts recently",
-      "Check for intermittent signal noise across all channels",
-      "Validate sensor calibration based on nominal values",
+      "How is my overall system performance?",
+      "How many units have been produced so far?",
+      "What is the downtime of my system?",
     ],
   },
   {
-    label: "Optimization",
+    label: "Diagnostics & Analysis",
     color: "emerald",
-    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>`,
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>`,
     prompts: [
-      "Suggest energy-saving adjustments based on current load",
-      "What's the optimal motor fan duty cycle right now?",
-      "Recommend pH correction steps for current readings",
-      "Analyze voltage stability and suggest improvements",
-      "Calculate optimal operating ranges for current conditions",
-      "Identify power factor improvement opportunities",
+      "List all devices connected through modbus/rs485 with plc.",
+      "Which sensors are reporting abnormal values?",
+      "Analyze the power consumption, voltage and current of 1-phase motor.",
+      "Analyze ph and pressure sensor data.",
     ],
   },
   {
-    label: "Predictive",
-    color: "violet",
-    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>`,
-    prompts: [
-      "Predict which sensor is most likely to alert next",
-      "Estimate time before current reaches upper threshold",
-      "Forecast maintenance needs based on trend analysis",
-      "What patterns do you see in today's anomaly data?",
-      "Calculate remaining useful life for each monitored component",
-      "Detect early signs of sensor degradation",
-    ],
-  },
-  {
-    label: "Safety & Compliance",
+    label: "Emergency & Predictive",
     color: "red",
-    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/></svg>`,
     prompts: [
-      "Perform a safety assessment of all parameters",
-      "Check compliance with operational thresholds",
-      "Identify potential cascade failure scenarios",
-      "Assess risk of equipment damage at current readings",
-      "Verify emergency shutdown readiness",
-      "Rate current conditions for operator safety",
-    ],
-  },
-  {
-    label: "Reports & Export",
-    color: "blue",
-    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>`,
-    prompts: [
-      "Generate a comprehensive shift summary",
-      "Create an anomaly report for the past 4 hours",
-      "Summarize factory KPIs in natural language",
-      "Draft an incident report for the latest alert",
-      "Produce an executive briefing of factory status",
-      "Build a maintenance recommendation document",
-    ],
-  },
-  {
-    label: "Correlation & Trends",
-    color: "pink",
-    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>`,
-    prompts: [
-      "Find correlations between voltage and current trends",
-      "How does pH level correlate with other sensor readings?",
-      "Detect cyclic patterns in today's sensor data",
-      "Compare this shift's performance vs historical average",
-      "Identify leading indicators for equipment failure",
-      "Analyze sensor response time and latency patterns",
+      "The system is in emergency state. How to restart the plant?",
+      "How many times has the system entered emergency state?",
+      "Predict downtime risk for the plant.",
     ],
   },
 ];
@@ -204,9 +157,9 @@ const TONE = {
   },
 };
 
-/* ══════════════════════════════════════════
+/* ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
    MAIN MODAL
-   ══════════════════════════════════════════ */
+   ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â */
 interface AIAssistantModalProps {
   open: boolean;
   onClose: () => void;
@@ -301,14 +254,14 @@ const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
 
   return (
     <>
-      {/* Backdrop — graphite scrim, no heavy blur */}
+      {/* Backdrop ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â graphite scrim, no heavy blur */}
       <div
         className="fixed inset-0 z-[9990] animate-[fadeIn_0.25s_ease]"
         style={{ background: "rgba(6, 10, 16, 0.78)" }}
         onClick={onClose}
       />
 
-      {/* ── Modal ── */}
+      {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Modal ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
       <div className="fixed inset-0 z-[9991] flex items-center justify-center p-5 pointer-events-none">
         <div
           className="pointer-events-auto w-full max-w-[1280px] h-[88vh] max-h-[860px] rounded-[10px] overflow-hidden flex relative animate-[modalIn_0.35s_cubic-bezier(0.16,1,0.3,1)]"
@@ -317,7 +270,7 @@ const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
               "linear-gradient(180deg, #141b27 0%, #0f1520 100%)",
             border: "1px solid #2a3444",
             boxShadow:
-              "0 1px 0 rgba(255,255,255,0.03) inset, 0 20px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(58,169,192,0.08)",
+              "0 1px 0 rgba(255,255,255,0.03) inset, 0 20px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(117,176,234,0.08)",
           }}
         >
           {/* Industrial precision grid + subtle accent line */}
@@ -326,7 +279,7 @@ const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
               className="absolute inset-0 opacity-40"
               style={{
                 backgroundImage:
-                  "linear-gradient(rgba(58,169,192,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(58,169,192,0.025) 1px, transparent 1px)",
+                  "linear-gradient(rgba(117,176,234,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(117,176,234,0.025) 1px, transparent 1px)",
                 backgroundSize: "48px 48px",
               }}
             />
@@ -335,13 +288,13 @@ const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
               className="absolute top-0 left-0 right-0 h-px"
               style={{
                 background:
-                  "linear-gradient(90deg, transparent, #3aa9c0 50%, transparent)",
+                  "linear-gradient(90deg, transparent, #75b0ea 50%, transparent)",
                 opacity: 0.5,
               }}
             />
           </div>
 
-          {/* ════════ LEFT SIDEBAR ════════ */}
+          {/* ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â LEFT SIDEBAR ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â */}
           <div
             className="w-[280px] flex-shrink-0 flex flex-col relative"
             style={{
@@ -388,7 +341,7 @@ const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
                       cy="18"
                       r="15"
                       fill="none"
-                      stroke="rgba(0,200,255,0.05)"
+                      stroke="rgba(155,199,242,0.05)"
                       strokeWidth="2.5"
                     />
                     <circle
@@ -461,10 +414,10 @@ const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
                   onClick={() => setTab(t.id)}
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded text-[11px] font-medium transition-all duration-150 group/t"
                   style={{
-                    background: tab === t.id ? "rgba(58,169,192,0.10)" : "transparent",
+                    background: tab === t.id ? "rgba(117,176,234,0.10)" : "transparent",
                     color: tab === t.id ? "#e4ebf3" : "#8a97a8",
-                    border: tab === t.id ? "1px solid rgba(58,169,192,0.45)" : "1px solid transparent",
-                    borderLeft: tab === t.id ? "2px solid #3aa9c0" : "2px solid transparent",
+                    border: tab === t.id ? "1px solid rgba(117,176,234,0.45)" : "1px solid transparent",
+                    borderLeft: tab === t.id ? "2px solid #75b0ea" : "2px solid transparent",
                   }}
                 >
                   <span
@@ -476,8 +429,8 @@ const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
                     <span
                       className="ml-auto min-w-[20px] h-[18px] rounded-sm text-[9px] font-bold flex items-center justify-center px-1.5"
                       style={{
-                        background: t.id === "insights" ? "rgba(192,57,43,0.15)" : "rgba(138,151,168,0.10)",
-                        border: t.id === "insights" ? "1px solid rgba(192,57,43,0.4)" : "1px solid #2a3444",
+                        background: t.id === "insights" ? "rgba(238,28,37,0.15)" : "rgba(138,151,168,0.10)",
+                        border: t.id === "insights" ? "1px solid rgba(238,28,37,0.4)" : "1px solid #2a3444",
                         color: t.id === "insights" ? "#d65544" : "#8a97a8",
                       }}
                     >
@@ -581,7 +534,7 @@ const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
             </div>
           </div>
 
-          {/* ════════ MAIN CONTENT ════════ */}
+          {/* ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â MAIN CONTENT ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â */}
           <div className="flex-1 flex flex-col min-w-0 relative">
             {/* Top Bar */}
             <div className="relative flex items-center justify-between px-7 py-4 border-b border-white/[0.04] flex-shrink-0">
@@ -677,7 +630,7 @@ const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
             <div className="flex-1 min-h-0 flex">
               {/* Main Panel */}
               <div className="flex-1 flex flex-col min-w-0">
-                {/* ─── CHAT TAB ─── */}
+                {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ CHAT TAB ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
                 {tab === "chat" && (
                   <div className="flex-1 flex flex-col min-h-0">
                     <div className="flex-1 overflow-y-auto px-7 py-6 space-y-5">
@@ -965,13 +918,13 @@ const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
                       <div ref={bottomRef} />
                     </div>
 
-                    {/* Input — industrial console entry */}
+                    {/* Input ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â industrial console entry */}
                     <div
                       className="px-7 py-4 flex-shrink-0"
                       style={{ borderTop: "1px solid #2a3444" }}
                     >
                       <div
-                        className="flex items-center gap-3 px-4 py-3 transition-all duration-150 focus-within:border-[#3aa9c0]"
+                        className="flex items-center gap-3 px-4 py-3 transition-all duration-150 focus-within:border-[#75b0ea]"
                         style={{
                           background: "#1b2330",
                           border: "1px solid #2a3444",
@@ -992,17 +945,17 @@ const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
                         <button
                           onClick={() => sendMessage()}
                           disabled={loading || !input.trim()}
-                          className="w-9 h-9 flex items-center justify-center transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#3aa9c015]"
+                          className="w-9 h-9 flex items-center justify-center transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#75b0ea15]"
                           style={{
                             background: "#141b27",
-                            border: "1px solid #3aa9c0",
+                            border: "1px solid #75b0ea",
                             borderRadius: "4px",
                           }}
                         >
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                             <path
                               d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"
-                              stroke="#3aa9c0"
+                              stroke="#75b0ea"
                               strokeWidth="1.6"
                               strokeLinecap="round"
                               strokeLinejoin="round"
@@ -1025,7 +978,7 @@ const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
                   </div>
                 )}
 
-                {/* ─── INSIGHTS ─── */}
+                {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ INSIGHTS ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
                 {tab === "insights" && (
                   <div className="flex-1 overflow-y-auto px-7 py-6 space-y-3">
                     {/* Summary */}
@@ -1131,7 +1084,7 @@ const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
                   </div>
                 )}
 
-                {/* ─── ANALYTICS ─── */}
+                {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ ANALYTICS ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
                 {tab === "analytics" && (
                   <div className="flex-1 overflow-y-auto px-7 py-6 space-y-5">
                     {/* KPI Summary Row */}
@@ -1161,7 +1114,7 @@ const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
                         },
                         {
                           label: "Uptime",
-                          value: outputs.motorFanOn ? "99.2%" : "—",
+                          value: outputs.motorFanOn ? "99.2%" : "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â",
                           sub: "This shift",
                           clr: "violet",
                         },
@@ -1493,7 +1446,7 @@ const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
                   </div>
                 )}
 
-                {/* ─── PROMPTS ─── */}
+                {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ PROMPTS ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
                 {tab === "prompts" && (
                   <div className="flex-1 overflow-y-auto px-7 py-6 space-y-6">
                     {PROMPT_CATEGORIES.map((cat, ci) => (
@@ -1535,7 +1488,7 @@ const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
                 )}
               </div>
 
-              {/* ════════ RIGHT CONTEXT PANEL ════════ */}
+              {/* ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â RIGHT CONTEXT PANEL ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â */}
               {showContext && (
                 <div className="w-[240px] flex-shrink-0 border-l border-white/[0.03] flex flex-col bg-white/[0.005] animate-[fadeSlideIn_0.3s_ease]">
                   <div className="px-5 py-4 border-b border-white/[0.03]">
@@ -1670,7 +1623,7 @@ const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
   );
 };
 
-/* ── AI Avatar — industrial instrument dial ── */
+/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ AI Avatar ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â industrial instrument dial ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */
 const AIAvatar: React.FC<{ size?: number }> = ({ size = 40 }) => (
   <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
     {/* Outer graphite ring with accent tick */}
@@ -1680,7 +1633,7 @@ const AIAvatar: React.FC<{ size?: number }> = ({ size = 40 }) => (
     >
       <div
         className="absolute -top-[2px] left-1/2 -translate-x-1/2 w-1 h-1 rounded-full"
-        style={{ background: "#3aa9c0" }}
+        style={{ background: "#75b0ea" }}
       />
     </div>
     {/* Inner dial */}
@@ -1704,7 +1657,7 @@ const AIAvatar: React.FC<{ size?: number }> = ({ size = 40 }) => (
       >
         <path
           d="M12 2a10 10 0 100 20 10 10 0 000-20z"
-          stroke="#3aa9c0"
+          stroke="#75b0ea"
           strokeWidth="1.4"
           fill="none"
         />
@@ -1719,7 +1672,7 @@ const AIAvatar: React.FC<{ size?: number }> = ({ size = 40 }) => (
   </div>
 );
 
-/* ── Floating Button — AI hero pill, instantly recognizable ── */
+/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Floating Button ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â AI hero pill, instantly recognizable ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */
 export const AIFloatingButton: React.FC<{ onClick: () => void }> = ({
   onClick,
 }) => (
@@ -1727,37 +1680,37 @@ export const AIFloatingButton: React.FC<{ onClick: () => void }> = ({
     onClick={onClick}
     className="fixed bottom-7 right-7 z-[9980] group/fab"
     aria-label="Open AI Assistant"
-    style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
+    style={{ fontFamily: "'Montserrat', system-ui, sans-serif" }}
   >
-    {/* Outer pulse ring — signals "live" */}
+    {/* Outer pulse ring ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â signals "live" */}
     <span
       className="absolute inset-0 rounded-full animate-[fabPing_2.6s_ease-out_infinite]"
       style={{
-        border: "1px solid rgba(92, 192, 212, 0.5)",
+        border: "1px solid rgba(155, 199, 242, 0.5)",
         pointerEvents: "none",
       }}
     />
     <span
       className="absolute inset-0 rounded-full animate-[fabPing_2.6s_ease-out_infinite]"
       style={{
-        border: "1px solid rgba(92, 192, 212, 0.3)",
+        border: "1px solid rgba(155, 199, 242, 0.3)",
         pointerEvents: "none",
         animationDelay: "1.2s",
       }}
     />
 
-    {/* Main pill — icon + label + sparkle */}
+    {/* Main pill ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â icon + label + sparkle */}
     <div
       className="relative flex items-center gap-2.5 pl-2 pr-4 h-[52px] rounded-full transition-all duration-200 group-hover/fab:scale-[1.03]"
       style={{
         background:
           "linear-gradient(135deg, #0f2a33 0%, #173e4a 45%, #0f2a33 100%)",
-        border: "1px solid rgba(92, 192, 212, 0.55)",
+        border: "1px solid rgba(155, 199, 242, 0.55)",
         boxShadow:
           "inset 0 1px 0 rgba(255,255,255,0.08)," +
-          "inset 0 0 0 1px rgba(58,169,192,0.15)," +
+          "inset 0 0 0 1px rgba(117,176,234,0.15)," +
           "0 8px 24px rgba(0,0,0,0.55)," +
-          "0 0 32px rgba(58,169,192,0.22)",
+          "0 0 32px rgba(117,176,234,0.22)",
       }}
     >
       {/* Icon puck */}
@@ -1765,9 +1718,9 @@ export const AIFloatingButton: React.FC<{ onClick: () => void }> = ({
         className="relative w-9 h-9 flex items-center justify-center rounded-full flex-shrink-0"
         style={{
           background:
-            "radial-gradient(circle at 30% 30%, #5cc0d4 0%, #3aa9c0 55%, #1e6a7b 100%)",
+            "radial-gradient(circle at 30% 30%, #9bc7f2 0%, #75b0ea 55%, #1e6a7b 100%)",
           boxShadow:
-            "inset 0 1px 0 rgba(255,255,255,0.25), 0 0 14px rgba(92,192,212,0.55)",
+            "inset 0 1px 0 rgba(255,255,255,0.25), 0 0 14px rgba(155,199,242,0.55)",
         }}
       >
         {/* Neural / spark glyph */}
@@ -1801,14 +1754,14 @@ export const AIFloatingButton: React.FC<{ onClick: () => void }> = ({
         />
       </span>
 
-      {/* Text label — always visible, instantly identifies the button */}
+      {/* Text label ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â always visible, instantly identifies the button */}
       <span className="flex flex-col items-start leading-none">
         <span
           style={{
             fontSize: "13px",
             fontWeight: 700,
             letterSpacing: "0.02em",
-            background: "linear-gradient(180deg, #ffffff 0%, #cfe4ec 100%)",
+            background: "linear-gradient(180deg, #ffffff 0%, #cfdfec 100%)",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
             backgroundClip: "text",
@@ -1822,7 +1775,7 @@ export const AIFloatingButton: React.FC<{ onClick: () => void }> = ({
             fontSize: "8px",
             fontWeight: 700,
             letterSpacing: "0.22em",
-            color: "#5cc0d4",
+            color: "#9bc7f2",
             textTransform: "uppercase",
           }}
         >
@@ -1835,7 +1788,7 @@ export const AIFloatingButton: React.FC<{ onClick: () => void }> = ({
       </span>
     </div>
 
-    {/* Keyboard hint — appears on hover */}
+    {/* Keyboard hint ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â appears on hover */}
     <span
       className="absolute right-full mr-3 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-sm whitespace-nowrap opacity-0 -translate-x-1 group-hover/fab:opacity-100 group-hover/fab:translate-x-0 transition-all duration-200 pointer-events-none"
       style={{
@@ -1854,7 +1807,7 @@ export const AIFloatingButton: React.FC<{ onClick: () => void }> = ({
   </button>
 );
 
-/* ── Icon maps ── */
+/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Icon maps ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */
 const TAB_ICONS: Record<string, string> = {
   chat: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.956L3 21l1.5-4.5C3.56 15.07 3 13.59 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/><path d="M8 12h.01M12 12h.01M16 12h.01"/></svg>`,
   insights: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`,

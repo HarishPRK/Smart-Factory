@@ -10,7 +10,7 @@ interface RotaryFiller3DProps {
 }
 
 /**
- * RotaryFiller3D — Rotary carousel filling station for Coca-Cola.
+ * RotaryFiller3D — Rotary carousel filling station for Pepsi.
  *
  * A spinning turntable sits beside the belt. Bottles transfer onto it,
  * rotate under filling nozzles, and transfer back. The carousel spins
@@ -19,7 +19,7 @@ interface RotaryFiller3DProps {
  * Visual elements:
  *  - Large turntable disc (spins)
  *  - 8 filling nozzle arms radiating from center
- *  - Central column with Coke-red tank on top
+ *  - Central column with Pepsi-blue tank on top
  *  - Animated brown "liquid streams" dropping from nozzles
  *  - Guard ring around the carousel
  *  - Transfer guides connecting to belt
@@ -107,7 +107,7 @@ const RotaryFiller3D: React.FC<RotaryFiller3DProps> = ({ position, rotationY }) 
         {/* Turntable accent ring */}
         <mesh position={[0, 0.01, 0]}>
           <torusGeometry args={[1.15, 0.015, 4, 24]} />
-          <meshStandardMaterial color="#dc2626" emissive="#dc2626" emissiveIntensity={0.3} />
+          <meshStandardMaterial color="#004B93" emissive="#004B93" emissiveIntensity={0.3} />
         </mesh>
 
         {/* 8 bottle pocket positions (small circular guides on turntable) */}
@@ -129,17 +129,17 @@ const RotaryFiller3D: React.FC<RotaryFiller3DProps> = ({ position, rotationY }) 
         <meshStandardMaterial color="#52525b" metalness={0.8} roughness={0.2} />
       </mesh>
 
-      {/* ── Coca-Cola syrup tank on top ── */}
+      {/* ── Pepsi syrup tank on top ── */}
       <mesh position={[0, 1.7, 0]} castShadow>
         <cylinderGeometry args={[0.35, 0.35, 0.6, 16]} />
-        <meshStandardMaterial color="#dc2626" metalness={0.6} roughness={0.3} />
+        <meshStandardMaterial color="#004B93" metalness={0.6} roughness={0.3} />
       </mesh>
       {/* Tank top cap */}
       <mesh position={[0, 2.05, 0]}>
         <cylinderGeometry args={[0.36, 0.36, 0.06, 16]} />
-        <meshStandardMaterial color="#991b1b" metalness={0.7} roughness={0.2} />
+        <meshStandardMaterial color="#001f4d" metalness={0.7} roughness={0.2} />
       </mesh>
-      {/* White Coca-Cola band on tank */}
+      {/* White Pepsi band on tank */}
       <mesh position={[0, 1.7, 0]}>
         <cylinderGeometry args={[0.355, 0.355, 0.12, 16, 1, true]} />
         <meshStandardMaterial color="#f8fafc" metalness={0.1} roughness={0.5} side={THREE.DoubleSide} />
@@ -168,7 +168,7 @@ const RotaryFiller3D: React.FC<RotaryFiller3DProps> = ({ position, rotationY }) 
         );
       })}
 
-      {/* ── Animated filling streams (brown Coca-Cola liquid) ── */}
+      {/* ── Animated filling streams (brown Pepsi liquid) ── */}
       <instancedMesh
         ref={streamRef}
         args={[undefined, undefined, STREAM_COUNT]}

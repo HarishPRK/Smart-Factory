@@ -34,7 +34,7 @@ const Stage = {
 
 type Stage = (typeof Stage)[keyof typeof Stage];
 
-// New Coca-Cola bottling sequence conveyor t-values:
+// New Pepsi bottling sequence conveyor t-values:
 //   intake=0.04 → forming=0.18 (center) → filling=0.40 → cooling=0.55 →
 //   quality=0.72 → packaging=0.85 → dispatch=0.96
 // Blow molder spans: entrance ~0.16, center 0.18, exit ~0.20
@@ -247,14 +247,14 @@ const ProductFlow3D: React.FC<ProductFlow3DProps> = ({ path }) => {
           // Bottle appearance depends on whether it's been through the
           // filling station (STAGE_CONVEYOR_T.mixing = 0.40).
           // Before filling: clear/empty bottle (light blue transparent).
-          // After filling: dark cola-filled bottle (dark brown).
+          // After filling: dark Pepsi-filled bottle (dark brown).
           sx = 0.18;
           sy = 0.2;
           sz = 0.18;
           if (product.progress < 0.42) {
             color = "#bfdbfe"; // clear empty PET bottle (light blue)
           } else {
-            color = "#1c0a00"; // dark brown — cola inside clear PET
+            color = "#1c0a00"; // dark brown — Pepsi inside clear PET
           }
           break;
         }
@@ -371,8 +371,8 @@ const ProductFlow3D: React.FC<ProductFlow3DProps> = ({ path }) => {
         />
       </instancedMesh>
 
-      {/* Stage 3: Coca-Cola bottle body — color set per-instance:
-          clear blue (empty, pre-filling) or dark brown (filled with cola) */}
+      {/* Stage 3: Pepsi bottle body — color set per-instance:
+          clear blue (empty, pre-filling) or dark brown (filled with Pepsi) */}
       <instancedMesh
         ref={bottleRef}
         args={[bottleGeo, undefined, MAX_PRODUCTS]}
@@ -391,7 +391,7 @@ const ProductFlow3D: React.FC<ProductFlow3DProps> = ({ path }) => {
         />
       </instancedMesh>
 
-      {/* Coca-Cola red label band — cylinder wrapping around mid-body.
+      {/* Pepsi blue label band — cylinder wrapping around mid-body.
           Radius 0.078 sits just outside the bottle body (0.076 at widest).
           Height 0.10 covers roughly the label area. */}
       <instancedMesh
@@ -401,15 +401,15 @@ const ProductFlow3D: React.FC<ProductFlow3DProps> = ({ path }) => {
       >
         <cylinderGeometry args={[0.078, 0.078, 0.1, 12]} />
         <meshStandardMaterial
-          color="#dc2626"
-          emissive="#dc2626"
+          color="#004B93"
+          emissive="#004B93"
           emissiveIntensity={0.35}
           metalness={0.1}
           roughness={0.4}
         />
       </instancedMesh>
 
-      {/* Red bottle cap — small cylinder at the top */}
+      {/* Blue bottle cap — small cylinder at the top */}
       <instancedMesh
         ref={capRef}
         args={[undefined, undefined, MAX_PRODUCTS]}
@@ -417,8 +417,8 @@ const ProductFlow3D: React.FC<ProductFlow3DProps> = ({ path }) => {
       >
         <cylinderGeometry args={[0.028, 0.028, 0.025, 8]} />
         <meshStandardMaterial
-          color="#dc2626"
-          emissive="#991b1b"
+          color="#004B93"
+          emissive="#001f4d"
           emissiveIntensity={0.3}
           metalness={0.3}
           roughness={0.35}

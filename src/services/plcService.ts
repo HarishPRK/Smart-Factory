@@ -16,7 +16,7 @@ export interface RawPLCPayload {
   boardA_alert_relays_yellow?: number;
   boardA_alert_relays_green?: number;
   boardA_alert_relays_buzzer?: number;
-  // Current flat payload keys (board A relays + analog channels)
+  // Flat payload keys — board A relays + analog channels (current schema).
   boardA_rfid_authorized_user?: number;
   boardA_relay_motor?: number;
   boardA_relay_alarm?: number;
@@ -28,17 +28,7 @@ export interface RawPLCPayload {
   boardA_turbidity_sensor?: number;
   boardA_light_sensor?: number;
   boardA_orp_sensor?: number;
-  // Legacy "8ch_analog_1"-prefixed names kept as aliases for older firmware.
-  boardA_8ch_relay_motor?: number;
-  boardA_8ch_relay_alarm?: number;
-  boardA_8ch_analog_1_pressure_sensor?: number;
-  boardA_8ch_analog_1_microwave_motion_sensor?: number;
-  boardA_8ch_analog_1_ph_sensor?: number;
-  boardA_8ch_analog_1_metaloxide_sensor?: number;
-  boardA_8ch_analog_1_turbidity_sensor?: number;
-  boardA_8ch_analog_1_light_sensor?: number;
-  boardA_8ch_analog_1_orp_sensor?: number;
-  // Board B IO (new flat names)
+  // Board B IO — flat names (current schema).
   boardB_io_metal_sensor?: number;
   boardB_io_green_button?: number;
   boardB_io_push_lock_button?: number;
@@ -46,14 +36,6 @@ export interface RawPLCPayload {
   boardB_io_output_yellow?: number;
   boardB_io_output_green?: number;
   boardB_io_output_buzzer?: number;
-  // Board B legacy "8ch_io"-prefixed aliases
-  boardB_8ch_io_metal_sensor?: number;
-  boardB_8ch_io_green_button?: number;
-  boardB_8ch_io_push_lock_button?: number;
-  boardB_8ch_io_output_red?: number;
-  boardB_8ch_io_output_yellow?: number;
-  boardB_8ch_io_output_green?: number;
-  boardB_8ch_io_output_buzzer?: number;
   // Board B analog extras
   boardB_analog_8ch_b_fire_sensor?: number;
   boardB_analog_8ch_b_water_leakage_sensor?: number;
@@ -62,34 +44,34 @@ export interface RawPLCPayload {
   // state remains a single bit. The older single-channel keys (temperature,
   // freq, plain _act_power/_current/_voltage/_pf) are kept below as legacy
   // fallbacks for older firmware that still ships the aggregated shape.
-  boardB_shelly_proEM_data_a_act_power?: number;
-  boardB_shelly_proEM_data_a_aprt_power?: number;
-  boardB_shelly_proEM_data_a_current?: number;
-  boardB_shelly_proEM_data_a_pf?: number;
-  boardB_shelly_proEM_data_a_voltage?: number;
-  boardB_shelly_proEM_data_b_act_power?: number;
-  boardB_shelly_proEM_data_b_aprt_power?: number;
-  boardB_shelly_proEM_data_b_current?: number;
-  boardB_shelly_proEM_data_b_pf?: number;
-  boardB_shelly_proEM_data_b_voltage?: number;
-  boardB_shelly_proEM_data_c_act_power?: number;
-  boardB_shelly_proEM_data_c_aprt_power?: number;
-  boardB_shelly_proEM_data_c_current?: number;
-  boardB_shelly_proEM_data_c_pf?: number;
-  boardB_shelly_proEM_data_c_voltage?: number;
-  boardB_shelly_proEM_data_n_current?: number;
-  boardB_shelly_proEM_data_total_act_power?: number;
-  boardB_shelly_proEM_data_total_aprt_power?: number;
-  boardB_shelly_proEM_data_total_current?: number;
-  boardB_shelly_proEM_relay_1_state?: number;
+  boardB_shellypro3em_data_a_act_power?: number;
+  boardB_shellypro3em_data_a_aprt_power?: number;
+  boardB_shellypro3em_data_a_current?: number;
+  boardB_shellypro3em_data_a_pf?: number;
+  boardB_shellypro3em_data_a_voltage?: number;
+  boardB_shellypro3em_data_b_act_power?: number;
+  boardB_shellypro3em_data_b_aprt_power?: number;
+  boardB_shellypro3em_data_b_current?: number;
+  boardB_shellypro3em_data_b_pf?: number;
+  boardB_shellypro3em_data_b_voltage?: number;
+  boardB_shellypro3em_data_c_act_power?: number;
+  boardB_shellypro3em_data_c_aprt_power?: number;
+  boardB_shellypro3em_data_c_current?: number;
+  boardB_shellypro3em_data_c_pf?: number;
+  boardB_shellypro3em_data_c_voltage?: number;
+  boardB_shellypro3em_data_n_current?: number;
+  boardB_shellypro3em_data_total_act_power?: number;
+  boardB_shellypro3em_data_total_aprt_power?: number;
+  boardB_shellypro3em_data_total_current?: number;
+  boardB_shellypro3em_relay_1_state?: number;
   // Legacy single-channel proEM keys (pre-2026-04 firmware)
-  boardB_shelly_proEM_data_temperature?: number;
-  boardB_shelly_proEM_data_act_power?: number;
-  boardB_shelly_proEM_data_aprt_power?: number;
-  boardB_shelly_proEM_data_current?: number;
-  boardB_shelly_proEM_data_voltage?: number;
-  boardB_shelly_proEM_data_freq?: number;
-  boardB_shelly_proEM_data_pf?: number;
+  boardB_shellyproem_data_temperature?: number;
+  boardB_shellyproem_data_act_power?: number;
+  boardB_shellyproem_data_aprt_power?: number;
+  boardB_shellyproem_data_current?: number;
+  boardB_shellyproem_data_voltage?: number;
+  boardB_shellyproem_data_freq?: number;
+  boardB_shellyproem_data_pf?: number;
   // Shelly Pro3 — 3-channel relay device with built-in metering
   boardB_shelly_pro3_data_temperature?: number;
   boardB_shelly_pro3_data_act_power?: number;
@@ -194,6 +176,27 @@ function emitKOSMessage(topic: string, payload: unknown) {
   for (const cb of kosMessageListeners) cb(topic, payload);
 }
 
+/* ── LoRaWAN topic broadcaster ───────────────────────────
+ * Soil moisture / irrigation sensors publish on `lorawan/data` (forwarded
+ * from the LoRaWAN gateway through the local broker). Payload shape:
+ *   { timestamp, device_name, dev_eui, soil_temp_c, soil_moisture_pct,
+ *     conductivity_us_cm, battery_v }
+ * The useLorawanSensors hook fans these out per-device.
+ */
+export type LorawanMessageListener = (topic: string, payload: unknown) => void;
+const lorawanMessageListeners = new Set<LorawanMessageListener>();
+
+export function subscribeLorawanMessage(cb: LorawanMessageListener): () => void {
+  lorawanMessageListeners.add(cb);
+  return () => {
+    lorawanMessageListeners.delete(cb);
+  };
+}
+
+function emitLorawanMessage(topic: string, payload: unknown) {
+  for (const cb of lorawanMessageListeners) cb(topic, payload);
+}
+
 // Module-level memory of the previous E-stop signal state. Used to detect
 // the rising edge (inactive → active) for the RFID latch clear path, so a
 // firmware-side latched "was in emergency" bit doesn't keep re-clearing the
@@ -252,13 +255,15 @@ function deriveStatus(
   value: number,
   nominal: number,
   min: number,
-  max: number
+  max: number,
+  warningFrac = 0.2,
+  criticalFrac = 0.4,
 ): "normal" | "warning" | "critical" {
   const range = max - min;
   if (range === 0) return "normal";
   const deviation = Math.abs(value - nominal) / range;
-  if (deviation > 0.4) return "critical";
-  if (deviation > 0.2) return "warning";
+  if (deviation > criticalFrac) return "critical";
+  if (deviation > warningFrac) return "warning";
   return "normal";
 }
 
@@ -402,6 +407,12 @@ function analogParam(config: {
   nominal: number;
   decimals: number;
   accentHex: string;
+  /** Optional override for the warning trigger (fraction of range from nominal).
+   *  Default 0.2 means a deviation >20% of (max-min) raises a warning. Raise
+   *  this for sensors with naturally wide normal swings (e.g. ambient light). */
+  warningFrac?: number;
+  /** Optional override for the critical trigger. Default 0.4. */
+  criticalFrac?: number;
 }): PLCParameter {
   return {
     id: config.id,
@@ -415,7 +426,14 @@ function analogParam(config: {
     decimals: config.decimals,
     accentHex: config.accentHex,
     status: config.hasReal
-      ? deriveStatus(config.value, config.nominal, config.min, config.max)
+      ? deriveStatus(
+          config.value,
+          config.nominal,
+          config.min,
+          config.max,
+          config.warningFrac,
+          config.criticalFrac,
+        )
       : "normal",
     placeholder: !config.hasReal,
   };
@@ -451,8 +469,8 @@ export function isRawPLCPayload(data: unknown): data is RawPLCPayload {
     "boardA_pressure_sensor",
     "boardB_io_green_button",
     // Legacy keys (pre-2026-04)
-    "boardA_8ch_analog_1_ph_sensor",
-    "boardA_8ch_analog_1_pressure_sensor",
+    "boardA_ph_sensor",
+    "boardA_pressure_sensor",
     "voltage_pot",
     "current_pot",
     "photoE_sensor",
@@ -485,7 +503,7 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
   );
   const ph = readSignal(
     raw,
-    ["boardA_ph_sensor", "boardA_8ch_analog_1_ph_sensor", "pH"],
+    ["boardA_ph_sensor", "boardA_ph_sensor", "pH"],
     prevNum(prevState, "ph", 7),
     prevKnown(prevState, "ph"),
   );
@@ -498,7 +516,7 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
   const metal = readBitSignal(
     raw,
     // plc/data uses the flat `boardA_metal_sensor` / `boardB_io_metal_sensor`
-    // keys. The legacy `boardB_8ch_io_metal_sensor` key was dropped from the
+    // keys. The legacy `boardB_io_metal_sensor` key was dropped from the
     // payload; we stop reading it here (it's still sent on plc/control for
     // firmware compatibility).
     ["boardA_metal_sensor", "boardB_io_metal_sensor", "metal_sensor"],
@@ -552,7 +570,7 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
     raw,
     [
       "boardB_io_push_lock_button",
-      "boardB_8ch_io_push_lock_button",
+      "boardB_io_push_lock_button",
       "boardA_push_lock_button",
       "push_lock_button",
     ],
@@ -562,7 +580,7 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
   // ── Relay / alert reads from plc/data ──
   // plc/data publishes the new flat keys only (boardA_relay_motor,
   // boardA_relay_alarm, boardA_alert_relays_*, boardB_io_output_*). The
-  // `boardA_8ch_relay_*` and `boardB_8ch_io_*` names are no longer in the
+  // `boardA_relay_*` and `boardB_io_*` names are no longer in the
   // inbound payload — they're retained only on plc/control publishes for
   // firmware-side backwards compatibility.
   const motorRelay = readBitSignal(
@@ -662,7 +680,7 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
     raw,
     [
       "boardA_pressure_sensor",
-      "boardA_8ch_analog_1_pressure_sensor",
+      "boardA_pressure_sensor",
       "boardB_esp32_pressure",
     ],
     prevNum(prevState, "forming_pressure", 0),
@@ -676,7 +694,7 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
     raw,
     [
       "boardA_microwave_motion_sensor",
-      "boardA_8ch_analog_1_microwave_motion_sensor",
+      "boardA_microwave_motion_sensor",
       "boardB_esp32_touch_event",
     ],
     prevNum(prevState, "curing_motion", 0),
@@ -687,7 +705,7 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
     raw,
     [
       "boardA_metaloxide_sensor",
-      "boardA_8ch_analog_1_metaloxide_sensor",
+      "boardA_metaloxide_sensor",
       "boardB_esp32_bme_gas",
       "boardB_esp32_voc",
       "boardB_esp32_co",
@@ -704,21 +722,21 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
   );
   const turbidity = readScaledSignal(
     raw,
-    ["boardA_turbidity_sensor", "boardA_8ch_analog_1_turbidity_sensor"],
+    ["boardA_turbidity_sensor", "boardA_turbidity_sensor"],
     prevNum(prevState, "mixing_turbidity", 0),
     prevKnown(prevState, "mixing_turbidity"),
     (value) => (value <= 100 ? value : scaleLinear(value, 0, 5000, 0, 50)),
   );
   const light = readScaledSignal(
     raw,
-    ["boardA_light_sensor", "boardA_8ch_analog_1_light_sensor"],
+    ["boardA_light_sensor", "boardA_light_sensor"],
     prevNum(prevState, "forming_light", 0),
     prevKnown(prevState, "forming_light"),
     (value) => (value <= 1000 ? value : scaleLinear(value, 0, 5000, 0, 1000)),
   );
   const orp = readScaledSignal(
     raw,
-    ["boardA_orp_sensor", "boardA_8ch_analog_1_orp_sensor"],
+    ["boardA_orp_sensor", "boardA_orp_sensor"],
     prevNum(prevState, "mixing_orp", 0),
     prevKnown(prevState, "mixing_orp"),
     (value) =>
@@ -815,7 +833,7 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
   collectFallbackDebug(
     raw,
     "metal",
-    ["boardA_metal_sensor", "boardB_io_metal_sensor", "boardB_8ch_io_metal_sensor", "metal_sensor"],
+    ["boardA_metal_sensor", "boardB_io_metal_sensor", "boardB_io_metal_sensor", "metal_sensor"],
     metal.hasReal,
     metal.value,
     debugEvents,
@@ -827,8 +845,8 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
       "boardA_green_push_button",
       "boardB_io_green_button",
       "boardB_io_push_lock_button",
-      "boardB_8ch_io_green_button",
-      "boardB_8ch_io_push_lock_button",
+      "boardB_io_green_button",
+      "boardB_io_push_lock_button",
       "push_button",
     ],
     pushButton.hasReal,
@@ -838,7 +856,7 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
   collectFallbackDebug(
     raw,
     "forming_pressure",
-    ["boardA_pressure_sensor", "boardA_8ch_analog_1_pressure_sensor", "boardB_esp32_pressure"],
+    ["boardA_pressure_sensor", "boardA_pressure_sensor", "boardB_esp32_pressure"],
     formingPressure.hasReal,
     formingPressure.value,
     debugEvents,
@@ -846,7 +864,7 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
   collectFallbackDebug(
     raw,
     "mixing_ph",
-    ["boardA_ph_sensor", "boardA_8ch_analog_1_ph_sensor", "pH"],
+    ["boardA_ph_sensor", "boardA_ph_sensor", "pH"],
     ph.hasReal,
     ph.value,
     debugEvents,
@@ -856,7 +874,7 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
     "mixing_mq",
     [
       "boardA_metaloxide_sensor",
-      "boardA_8ch_analog_1_metaloxide_sensor",
+      "boardA_metaloxide_sensor",
       "boardB_esp32_bme_gas",
       "boardB_esp32_voc",
       "boardB_esp32_co",
@@ -1045,6 +1063,11 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
       nominal: 500,
       decimals: 0,
       accentHex: "#eab308",
+      // Indoor / factory-floor illuminance swings widely (200–1000 lux is
+      // routinely normal). Widen the tolerance so common bright readings
+      // like 870 lux don't trip a warning.
+      warningFrac: 0.45,
+      criticalFrac: 0.65,
     }),
     analogParam({
       id: "curing_o2",
@@ -1104,6 +1127,10 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
       max: 1000,
       nominal: 600,
       decimals: 0,
+      // Inspection-lane lighting follows the same wide-tolerance reasoning
+      // as forming_light above.
+      warningFrac: 0.45,
+      criticalFrac: 0.65,
       accentHex: "#eab308",
     }),
     analogParam({
@@ -1162,9 +1189,15 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
       unit: "",
       min: 0,
       max: 100,
-      nominal: 0,
+      // Inverted semantics: high reading = safe, low reading = smoke / flame.
+      // Nominal sits near the top of the range and the wide tolerance keeps
+      // the param GREEN in the normal "no fire" band; readings only flag
+      // critical once they drop below ~60 (i.e. real smoke detection).
+      nominal: 95,
       decimals: 0,
       accentHex: "#ef4444",
+      warningFrac: 0.20,
+      criticalFrac: 0.35,
     }),
     analogParam({
       id: "intake_gps",
@@ -1796,6 +1829,12 @@ export class MosquittoPLCService implements PLCService {
         // also tolerant of dot-separated topic styles).
         if (msg.topic && /^kos[\/.]/i.test(msg.topic)) {
           emitKOSMessage(msg.topic, msg.payload);
+          return;
+        }
+
+        // LoRaWAN soil/irrigation telemetry (lorawan/data + any subtopic).
+        if (msg.topic && /^lorawan[\/.]/i.test(msg.topic)) {
+          emitLorawanMessage(msg.topic, msg.payload);
           return;
         }
 

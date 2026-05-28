@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import ReactDOM from "react-dom";
 import { useKOSDispenses, type KOSPourEvent } from "../hooks/useKOSDispenses";
+import PepsiLogo from "./PepsiLogo";
 
 interface KOSDetailDrawerProps {
   open: boolean;
@@ -58,7 +59,7 @@ const KOSDetailDrawer: React.FC<KOSDetailDrawerProps> = ({ open, onClose }) => {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="KOS dispenser detail"
+        aria-label="Pepsi dispenser detail"
         onClick={(e) => e.stopPropagation()}
         style={{
           position: "absolute",
@@ -67,12 +68,12 @@ const KOSDetailDrawer: React.FC<KOSDetailDrawerProps> = ({ open, onClose }) => {
           bottom: 0,
           width: "min(560px, 92vw)",
           background: "rgba(10, 14, 22, 0.97)",
-          borderLeft: "1px solid rgba(244, 63, 94, 0.28)",
+          borderLeft: "1px solid rgba(0, 75, 147, 0.45)",
           boxShadow: "-12px 0 40px rgba(0,0,0,0.55)",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
-          fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
+          fontFamily: "'Montserrat', 'Segoe UI', system-ui, sans-serif",
           color: "#e5e7eb",
           animation: "kos-drawer-slide 220ms ease-out",
         }}
@@ -84,32 +85,38 @@ const KOSDetailDrawer: React.FC<KOSDetailDrawerProps> = ({ open, onClose }) => {
             alignItems: "center",
             justifyContent: "space-between",
             padding: "16px 20px",
-            borderBottom: "1px solid rgba(244, 63, 94, 0.18)",
+            borderBottom: "1px solid rgba(0, 75, 147, 0.35)",
             background:
-              "linear-gradient(180deg, rgba(159, 18, 57, 0.22), rgba(76, 5, 25, 0.0))",
+              "linear-gradient(180deg, rgba(0, 75, 147, 0.28), rgba(0, 31, 77, 0.0))",
           }}
         >
-          <div>
-            <div
-              style={{
-                fontSize: "11px",
-                fontWeight: 700,
-                letterSpacing: "0.12em",
-                color: "#fda4af",
-                textTransform: "uppercase",
-              }}
-            >
-              KOS Dispenser
-            </div>
-            <div
-              style={{
-                fontSize: "16px",
-                fontWeight: 700,
-                color: "#fff5f5",
-                marginTop: "2px",
-              }}
-            >
-              Live feed · AWS IoT
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <PepsiLogo
+              size={36}
+              style={{ filter: "drop-shadow(0 0 8px rgba(0,75,147,0.45))", flex: "0 0 auto" }}
+            />
+            <div>
+              <div
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  letterSpacing: "0.12em",
+                  color: "#93c5fd",
+                  textTransform: "uppercase",
+                }}
+              >
+                Pepsi Dispenser
+              </div>
+              <div
+                style={{
+                  fontSize: "16px",
+                  fontWeight: 700,
+                  color: "#f0f9ff",
+                  marginTop: "2px",
+                }}
+              >
+                Live feed · AWS IoT
+              </div>
             </div>
           </div>
           <button
@@ -119,9 +126,9 @@ const KOSDetailDrawer: React.FC<KOSDetailDrawerProps> = ({ open, onClose }) => {
               width: "28px",
               height: "28px",
               borderRadius: "8px",
-              border: "1px solid rgba(244, 63, 94, 0.28)",
-              background: "rgba(244, 63, 94, 0.08)",
-              color: "#fecaca",
+              border: "1px solid rgba(0, 75, 147, 0.45)",
+              background: "rgba(0, 75, 147, 0.15)",
+              color: "#bfdbfe",
               cursor: "pointer",
               fontSize: "14px",
               lineHeight: 1,
@@ -147,8 +154,8 @@ const KOSDetailDrawer: React.FC<KOSDetailDrawerProps> = ({ open, onClose }) => {
             {latestRecommendation ? (
               <div
                 style={{
-                  background: "rgba(244, 63, 94, 0.07)",
-                  border: "1px solid rgba(244, 63, 94, 0.24)",
+                  background: "rgba(0, 75, 147, 0.10)",
+                  border: "1px solid rgba(0, 75, 147, 0.40)",
                   borderRadius: "12px",
                   padding: "14px 16px",
                 }}
@@ -160,9 +167,9 @@ const KOSDetailDrawer: React.FC<KOSDetailDrawerProps> = ({ open, onClose }) => {
                       fontSize: "10px",
                       fontWeight: 700,
                       letterSpacing: "0.1em",
-                      color: "#fecdd3",
-                      background: "rgba(244, 63, 94, 0.15)",
-                      border: "1px solid rgba(244, 63, 94, 0.35)",
+                      color: "#dbeafe",
+                      background: "rgba(0, 75, 147, 0.25)",
+                      border: "1px solid rgba(0, 75, 147, 0.50)",
                       padding: "3px 8px",
                       borderRadius: "999px",
                       marginBottom: "10px",
@@ -177,7 +184,7 @@ const KOSDetailDrawer: React.FC<KOSDetailDrawerProps> = ({ open, onClose }) => {
                     style={{
                       fontSize: "15px",
                       fontWeight: 700,
-                      color: "#fff5f5",
+                      color: "#f0f9ff",
                       lineHeight: 1.4,
                       marginBottom: "6px",
                     }}
@@ -273,7 +280,7 @@ const KOSDetailDrawer: React.FC<KOSDetailDrawerProps> = ({ open, onClose }) => {
                           style={{
                             width: `${pct}%`,
                             height: "100%",
-                            background: "linear-gradient(90deg, #fb7185, #fda4af)",
+                            background: "linear-gradient(90deg, #004B93, #60a5fa)",
                             borderRadius: "999px",
                           }}
                         />

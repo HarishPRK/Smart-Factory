@@ -17,7 +17,7 @@ import { STAGE_POSITIONS } from "./digitalTwinLayout";
 import { useSceneSettingsStore } from "../../stores/sceneSettingsStore";
 
 /**
- * FunControls — Interactive control panel for playing with the factory
+ * FunControls â€” Interactive control panel for playing with the factory
  *
  * Features:
  *  - Conveyor speed slider (0.1x to 3x)
@@ -128,7 +128,7 @@ const FunControls: React.FC<{
 
   const handleSpeedChange = useCallback((newSpeed: number) => {
     setSpeed(newSpeed);
-    // Set the user override — simulation combines this with threshold speed
+    // Set the user override â€” simulation combines this with threshold speed
     useDigitalTwinStore.setState({ userSpeedMultiplier: newSpeed });
   }, []);
 
@@ -223,7 +223,7 @@ const FunControls: React.FC<{
     bottom: "12px",
     left: "12px",
     zIndex: 10,
-    fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
+    fontFamily: "'Montserrat', 'Segoe UI', system-ui, sans-serif",
     userSelect: "none",
     willChange: "transform",
   };
@@ -243,7 +243,7 @@ const FunControls: React.FC<{
             border: "1px solid rgba(59,130,246,0.3)",
             borderRadius: "12px",
             padding: "20px",
-            fontFamily: "'Inter', system-ui, sans-serif",
+            fontFamily: "'Montserrat', system-ui, sans-serif",
             color: "#e2e8f0",
             minWidth: "280px",
           }}
@@ -322,7 +322,7 @@ const FunControls: React.FC<{
               marginBottom: "8px",
             }}
           >
-            {/* ── Speed Control ── */}
+            {/* â”€â”€ Speed Control â”€â”€ */}
             <div style={{ marginBottom: "10px" }}>
               <div
                 style={{
@@ -394,7 +394,7 @@ const FunControls: React.FC<{
               </div>
             </div>
 
-            {/* ── Scenario Triggers ── */}
+            {/* â”€â”€ Scenario Triggers â”€â”€ */}
             <div style={{ marginBottom: "10px" }}>
               <span
                 style={{
@@ -453,7 +453,7 @@ const FunControls: React.FC<{
               </div>
             </div>
 
-            {/* ── Camera Presets ── */}
+            {/* â”€â”€ Camera Presets â”€â”€ */}
             <div style={{ marginBottom: "10px" }}>
               <span
                 style={{
@@ -509,7 +509,7 @@ const FunControls: React.FC<{
               </div>
             </div>
 
-            {/* ── Display Toggles ── */}
+            {/* â”€â”€ Display Toggles â”€â”€ */}
             <div style={{ marginBottom: "10px" }}>
               <span
                 style={{
@@ -624,7 +624,7 @@ const FunControls: React.FC<{
               </div>
             </div>
 
-            {/* ── Auto Tour ── */}
+            {/* â”€â”€ Auto Tour â”€â”€ */}
             <button
               onClick={() => {
                 if (isAutoTourActive()) {
@@ -661,7 +661,7 @@ const FunControls: React.FC<{
                 : "START FACTORY TOUR"}
             </button>
 
-            {/* ── Day/Night Toggle ── */}
+            {/* â”€â”€ Day/Night Toggle â”€â”€ */}
             <div style={{ display: "flex", gap: "6px" }}>
               <button
                 onClick={handleDayNight}
@@ -710,7 +710,7 @@ const FunControls: React.FC<{
             order, so the panel anchors this button to its bottom (12px from
             the 3D-scene container's bottom). The expanded content can grow
             upward and even get clipped at the top by the scene's overflow:
-            hidden — this trigger remains visible and clickable, so the user
+            hidden â€” this trigger remains visible and clickable, so the user
             can always close the panel. */}
         <button
           onClick={() => setExpanded((e) => !e)}
@@ -738,7 +738,7 @@ const FunControls: React.FC<{
           }}
         >
           <span style={{ fontSize: "14px", lineHeight: 1 }}>
-            {expanded ? "✕" : "▲"}
+            {expanded ? "âœ•" : "â–²"}
           </span>
           {expanded ? "CLOSE CONTROLS" : "CONTROLS"}
         </button>

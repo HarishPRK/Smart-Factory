@@ -124,7 +124,7 @@ const MotorFanWidget: React.FC<MotorFanWidgetProps> = ({ className = "" }) => {
     const relayState = turningOn ? 1 : 0;
     sendCommand("motor_fan", {
       _topic: "plc/control",
-      _rawPayload: { boardA_8ch_relay_motor: relayState },
+      _rawPayload: { boardA_relay_motor: relayState },
     }).catch(() => {});
   };
 

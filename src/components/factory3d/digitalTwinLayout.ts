@@ -14,7 +14,7 @@ import type {
 
 // ── Stage positions along the zig-zag conveyor (x, y, z) ──
 //
-// Real Coca-Cola bottling sequence:
+// Real Pepsi bottling sequence:
 //   INTAKE → BLOW MOLDING → FILLING → COOLING → QC → PACKING → DISPATCH
 //
 // Row 1 (z=8):  INTAKE ────── BLOW MOLDING ──────┐
@@ -29,7 +29,7 @@ import type {
 export const STAGE_POSITIONS: Record<StageId, [number, number, number]> = {
   intake:    [ -13,  0.5,  8],   // Row 1 left — PET resin intake
   forming:   [   0,  0.5,  8],   // Row 1 center — blow molding (was "mixing" position)
-  mixing:    [   6,  0.5,  0],   // Row 2 right — Coca-Cola filling (was "forming" position)
+  mixing:    [   6,  0.5,  0],   // Row 2 right — Pepsi filling (was "forming" position)
   curing:    [  -4,  0.5,  0],   // Row 2 left — cooling tunnel
   quality:   [  -6,  0.5, -8],   // Row 3 left — quality inspection
   packaging: [   4,  0.5, -8],   // Row 3 center — case packing
@@ -37,12 +37,12 @@ export const STAGE_POSITIONS: Record<StageId, [number, number, number]> = {
 };
 
 // Parametric t-values (0–1) along the zig-zag conveyor path.
-// Ordered by the REAL Coca-Cola bottling sequence:
+// Ordered by the REAL Pepsi bottling sequence:
 //   intake → forming(blow mold) → mixing(filling) → curing(cooling) → ...
 export const STAGE_CONVEYOR_T: Record<StageId, number> = {
   intake:    0.04,   // Row 1 left — pellets enter
   forming:   0.18,   // Row 1 center — blow molding
-  mixing:    0.40,   // Row 2 right — Coca-Cola filling
+  mixing:    0.40,   // Row 2 right — Pepsi filling
   curing:    0.55,   // Row 2 left — cooling tunnel
   quality:   0.72,   // Row 3 left — quality inspection
   packaging: 0.85,   // Row 3 center — case packing
@@ -170,7 +170,7 @@ const MIXING_DEVICES: OutputDeviceConfig[] = [
 const FORMING_DEVICES: OutputDeviceConfig[] = [
   { deviceId: "forming_motor",       type: "motor",             label: "Press Motor",     defaultActive: true, defaultRpm: 60 },
   // 3-phase blow-molder drive — metered by Shelly proEM. Live per-phase data
-  // (boardB_shelly_proEM_data_a/b/c_*) is read by ThreePhaseMotorWidget.
+  // (boardB_shellyproem_data_a/b/c_*) is read by ThreePhaseMotorWidget.
   { deviceId: "forming_3phase_motor", type: "three_phase_motor", label: "3-Phase Motor",   defaultActive: true, defaultPowerW: 2200 },
   { deviceId: "forming_power",       type: "power_meter",       label: "Power Meter",     defaultActive: true, defaultPowerW: 1800 },
 ];
@@ -313,8 +313,8 @@ export const STAGE_CONFIGS: StageConfig[] = [
   },
   {
     id: "mixing",
-    label: "Coca-Cola Filling",
-    description: "Empty bottles filled with carbonated Coca-Cola syrup mixture",
+    label: "Pepsi Filling",
+    description: "Empty bottles filled with carbonated Pepsi syrup mixture",
     position: STAGE_POSITIONS.mixing,
     conveyorT: STAGE_CONVEYOR_T.mixing,
     dwellTimeSec: 12,
