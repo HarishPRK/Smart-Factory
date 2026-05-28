@@ -3,6 +3,7 @@ import React from "react";
 import { Html } from "@react-three/drei";
 import * as THREE from "three";
 import type { StageId } from "../../types/digitalTwin";
+import pepsicoLogo from "../../assets/pepsico-logo.png";
 
 /**
  * StageEquipment3D — Large-scale PET bottle manufacturing equipment
@@ -96,16 +97,18 @@ const PipeRun: React.FC<{ from: [number, number, number]; to: [number, number, n
 /* ── Intake: Large PET Resin Silo + Vibratory Feeder ── */
 const IntakeEquipment: React.FC = () => (
   <group>
-    {/* Main silo — Coca-Cola red */}
+    {/* Main silo — Pepsi blue */}
     <mesh position={[0, 1.4, -1.0]} castShadow>
       <cylinderGeometry args={[0.7, 0.7, 1.8, 16]} />
-      <meshStandardMaterial color="#dc2626" {...S} />
+      <meshStandardMaterial color="#004B93" {...S} />
     </mesh>
     <mesh position={[0, 2.35, -1.0]}>
       <coneGeometry args={[0.7, 0.3, 16]} />
-      <meshStandardMaterial color="#dc2626" {...S} />
+      <meshStandardMaterial color="#004B93" {...S} />
     </mesh>
-    {/* Coca-Cola wordmark on silo (faces camera via drei <Html>) */}
+    {/* PepsiCo logo sign on silo — the official PNG, mounted on a clean white
+        plate so the colourful mark + navy wordmark read against the dark silo
+        (faces camera via drei <Html>) */}
     <Html
       position={[0, 1.4, -0.3]}
       center
@@ -114,17 +117,17 @@ const IntakeEquipment: React.FC = () => (
     >
       <div
         style={{
-          fontFamily: "'Brush Script MT', cursive, system-ui",
-          fontSize: "32px",
-          fontWeight: 900,
-          color: "#ffffff",
-          textShadow: "0 0 8px #dc2626, 0 0 16px #7f1d1d",
-          letterSpacing: "0.03em",
-          transform: "skewX(-6deg)",
-          whiteSpace: "nowrap",
+          background: "#ffffff",
+          borderRadius: "10px",
+          padding: "8px 12px",
+          boxShadow: "0 4px 14px rgba(0,0,0,0.5)",
         }}
       >
-        Coca-Cola
+        <img
+          src={pepsicoLogo}
+          alt="PepsiCo"
+          style={{ height: "70px", width: "auto", display: "block" }}
+        />
       </div>
     </Html>
     <mesh position={[0, 0.4, -1.0]}>
@@ -578,7 +581,7 @@ const DispatchEquipment: React.FC = () => (
       <cylinderGeometry args={[0.02, 0.02, 0.8, 6]} />
       <meshStandardMaterial {...YELLOW} />
     </mesh>
-    {/* Pallets with stacked Coca-Cola cartons */}
+    {/* Pallets with stacked Pepsi cartons */}
     {[0, 1, 2].map((i) => (
       <group key={i} position={[-0.1 + i * 0.5, 0, -1.2]}>
         {/* Wooden pallet */}
@@ -597,10 +600,10 @@ const DispatchEquipment: React.FC = () => (
                 metalness={0.05}
               />
             </mesh>
-            {/* Red Coca-Cola label panel — front */}
+            {/* Blue Pepsi label panel — front */}
             <mesh position={[0, 0, 0.176]}>
               <planeGeometry args={[0.32, 0.12]} />
-              <meshStandardMaterial color="#dc2626" emissive="#7f1d1d" emissiveIntensity={0.15} roughness={0.5} />
+              <meshStandardMaterial color="#004B93" emissive="#001f4d" emissiveIntensity={0.15} roughness={0.5} />
             </mesh>
             {/* White wave stripe across label */}
             <mesh position={[0, 0, 0.177]}>

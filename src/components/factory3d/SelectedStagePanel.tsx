@@ -7,7 +7,7 @@ import { useSceneSelectionStore } from "../../stores/sceneSelectionStore";
  *
  * Lives outside the R3F canvas so it's always on-screen regardless of where
  * the camera ends up. Renders the selected stage's sensor readings + output
- * device states, same content as the 3D billboard — but without relying on
+ * device states, same content as the 3D billboard â€” but without relying on
  * 3D positioning, so the user can see the machine's data even when the
  * front-view camera frames the machine differently from where the 3D
  * billboard happens to sit in world space.
@@ -53,7 +53,7 @@ const SelectedStagePanel: React.FC = () => {
         border: `2px solid ${statusColor}`,
         borderRadius: "12px",
         padding: "14px",
-        fontFamily: "'Inter', system-ui, sans-serif",
+        fontFamily: "'Montserrat', system-ui, sans-serif",
         fontSize: "12px",
         color: "#e2e8f0",
         boxShadow: `0 0 18px ${statusColor}55, 0 12px 28px rgba(0,0,0,0.55)`,
@@ -106,7 +106,7 @@ const SelectedStagePanel: React.FC = () => {
           }}
           title="Deselect (ESC)"
         >
-          ×
+          Ã—
         </button>
       </div>
 
@@ -207,29 +207,34 @@ const SelectedStagePanel: React.FC = () => {
       >
         DEVICES
       </div>
-      {stage.outputDevices.map((d) => (
-        <div
-          key={d.deviceId}
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: "5px 0",
-            borderBottom: "1px solid rgba(30, 41, 59, 0.5)",
-          }}
-        >
-          <span style={{ color: "#cbd5e1", fontSize: "11px" }}>{d.label}</span>
-          <span
+      {stage.outputDevices.map((d) => {
+        // Emergency light is the one device where ON = alarm (active alarm
+        // beacon) and OFF = normal. For every other device (motors, relays,
+        // gate signals, etc.) ON = running and OFF = idle — neither state
+        // is intrinsically a fault, so render OFF in neutral grey rather
+        // than firing-alarm red to avoid alarm-fatigue noise.
+        const isEmergencyBeacon = d.type === "emergency_light";
+        const activeColor = isEmergencyBeacon ? "#ef4444" : "#10b981";
+        const inactiveColor = "#64748b";
+        const color = d.active ? activeColor : inactiveColor;
+        return (
+          <div
+            key={d.deviceId}
             style={{
-              color: d.active ? "#10b981" : "#ef4444",
-              fontWeight: 700,
-              fontSize: "11px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: "5px 0",
+              borderBottom: "1px solid rgba(30, 41, 59, 0.5)",
             }}
           >
-            {d.active ? (d.rpm ? `${d.rpm} RPM` : "ON") : "OFF"}
-          </span>
-        </div>
-      ))}
+            <span style={{ color: "#cbd5e1", fontSize: "11px" }}>{d.label}</span>
+            <span style={{ color, fontWeight: 700, fontSize: "11px" }}>
+              {d.active ? (d.rpm ? `${d.rpm} RPM` : "ON") : "OFF"}
+            </span>
+          </div>
+        );
+      })}
 
       <div
         style={{

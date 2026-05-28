@@ -6,10 +6,10 @@ import { isSensorLive } from "../../stores/digitalTwinSimulation";
 import type { StageId } from "../../types/digitalTwin";
 
 /**
- * SensorHUD — Compact real-time sensor dashboard overlay
+ * SensorHUD â€” Compact real-time sensor dashboard overlay
  *
  * Positioned absolutely over the 3D canvas (top-right).
- * Subscribes to the store `tick` counter (500ms updates) — not per-frame.
+ * Subscribes to the store `tick` counter (500ms updates) â€” not per-frame.
  * Shows one primary sensor per key stage with mini sparklines.
  * Clicking a row flies the camera to that station.
  */
@@ -58,7 +58,7 @@ const PRIMARY_SENSORS: { stageId: StageId; sensorId: string; label: string; stag
   { stageId: "dispatch",  sensorId: "dispatch_touch",       label: "Confirm Pad",  stageLabel: "Dispatch" },
 ];
 
-// E-stop sensors — surfaced as a single line-wide pill at the top of the HUD.
+// E-stop sensors â€” surfaced as a single line-wide pill at the top of the HUD.
 const ESTOP_SENSOR_IDS = ["forming_estop", "mixing_estop", "pkg_estop"] as const;
 
 const STATUS_COLORS: Record<string, string> = {
@@ -136,7 +136,7 @@ const SensorHUD: React.FC = () => {
     });
   }, [tick]);
 
-  // Line-wide E-stop status — any critical reading across the three operator panels
+  // Line-wide E-stop status â€” any critical reading across the three operator panels
   // freezes the whole line (see digitalTwinSimulation.evaluateThresholds).
   const estopCritical = useMemo(() => {
     // eslint-disable-next-line @typescript-eslint/no-unused-expressions
@@ -167,7 +167,7 @@ const SensorHUD: React.FC = () => {
         top: "12px",
         right: "12px",
         zIndex: 10,
-        fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
+        fontFamily: "'Montserrat', 'Segoe UI', system-ui, sans-serif",
         userSelect: "none",
         willChange: "transform",
         contain: "layout style",
@@ -183,7 +183,7 @@ const SensorHUD: React.FC = () => {
           width: "28px",
           height: "28px",
           background: "rgba(10, 22, 40, 0.9)",
-          /* backdrop-filter removed for performance — causes repaint every frame */
+          /* backdrop-filter removed for performance â€” causes repaint every frame */
           border: "1px solid rgba(100,116,139,0.3)",
           borderRadius: "6px",
           color: "#94a3b8",

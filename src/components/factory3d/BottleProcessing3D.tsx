@@ -6,7 +6,7 @@ import * as THREE from "three";
 import { STAGE_POSITIONS } from "./digitalTwinLayout";
 
 /**
- * BottleProcessing3D — Animated water filling, capping & labeling stations
+ * BottleProcessing3D â€” Animated water filling, capping & labeling stations
  *
  * Placed between Quality Inspection and Packaging stages.
  * Shows the final steps before bottles are packaged:
@@ -38,7 +38,7 @@ const BottleProcessing3D: React.FC = () => {
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
 
-    // ── Water stream from nozzles ──
+    // â”€â”€ Water stream from nozzles â”€â”€
     if (nozzleStreamRef.current) {
       for (let i = 0; i < STREAM_COUNT; i++) {
         const phase = (t * 2 + i * 0.3) % 1.0;
@@ -53,30 +53,30 @@ const BottleProcessing3D: React.FC = () => {
       nozzleStreamRef.current.instanceMatrix.needsUpdate = true;
     }
 
-    // ── Fill level indicator (water rising in bottle) ──
+    // â”€â”€ Fill level indicator (water rising in bottle) â”€â”€
     if (fillLevelRef.current) {
       const fillCycle = (t * 0.5) % 1.0;
       fillLevelRef.current.scale.y = fillCycle;
       fillLevelRef.current.position.y = baseY + 0.15 + fillCycle * 0.2;
     }
 
-    // ── Capping head pressing down ──
+    // â”€â”€ Capping head pressing down â”€â”€
     if (capHeadRef.current) {
       const capCycle = Math.sin(t * 2);
       capHeadRef.current.position.y = baseY + 1.0 + capCycle * 0.15;
     }
 
-    // ── Cap feeder vibration ──
+    // â”€â”€ Cap feeder vibration â”€â”€
     if (capFeedRef.current) {
       capFeedRef.current.position.x = midX - 0.5 + Math.sin(t * 15) * 0.005;
     }
 
-    // ── Label roller spinning ──
+    // â”€â”€ Label roller spinning â”€â”€
     if (labelRollerRef.current) {
       labelRollerRef.current.rotation.z += 0.02;
     }
 
-    // ── Reject arm sweep ──
+    // â”€â”€ Reject arm sweep â”€â”€
     if (rejectArmRef.current) {
       const sweep = (t * 0.3) % 4;
       if (sweep < 0.5) {
@@ -91,7 +91,7 @@ const BottleProcessing3D: React.FC = () => {
 
   return (
     <group>
-      {/* ══════ WATER FILLING STATION ══════ */}
+      {/* â•â•â•â•â•â• WATER FILLING STATION â•â•â•â•â•â• */}
       <group position={[midX - 1.8, 0, midZ]}>
         {/* Filling machine frame */}
         <mesh position={[0, baseY + 0.7, 0]} castShadow>
@@ -129,7 +129,7 @@ const BottleProcessing3D: React.FC = () => {
         </mesh>
         {/* "FILLING" label */}
         <Html position={[0, baseY + 1.9, 0]} center distanceFactor={12} style={{ pointerEvents: "none", willChange: "transform" }}>
-          <div style={{ background: "rgba(10,22,40,0.9)", border: "1px solid rgba(59,130,246,0.3)", borderRadius: "4px", padding: "2px 8px", fontSize: "8px", fontWeight: 700, color: "#93c5fd", fontFamily: "'Inter', system-ui", whiteSpace: "nowrap" }}>
+          <div style={{ background: "rgba(10,22,40,0.9)", border: "1px solid rgba(59,130,246,0.3)", borderRadius: "4px", padding: "2px 8px", fontSize: "8px", fontWeight: 700, color: "#93c5fd", fontFamily: "'Montserrat', system-ui", whiteSpace: "nowrap" }}>
             WATER FILLING
           </div>
         </Html>
@@ -141,7 +141,7 @@ const BottleProcessing3D: React.FC = () => {
         <meshBasicMaterial color="#60a5fa" transparent opacity={0.5} />
       </instancedMesh>
 
-      {/* ══════ CAPPING STATION ══════ */}
+      {/* â•â•â•â•â•â• CAPPING STATION â•â•â•â•â•â• */}
       <group position={[midX - 0.5, 0, midZ]}>
         {/* Capper frame */}
         <mesh position={[0, baseY + 0.6, 0]} castShadow>
@@ -174,13 +174,13 @@ const BottleProcessing3D: React.FC = () => {
         </group>
         {/* "CAPPING" label */}
         <Html position={[0, baseY + 1.6, 0]} center distanceFactor={12} style={{ pointerEvents: "none", willChange: "transform" }}>
-          <div style={{ background: "rgba(10,22,40,0.9)", border: "1px solid rgba(16,185,129,0.3)", borderRadius: "4px", padding: "2px 8px", fontSize: "8px", fontWeight: 700, color: "#6ee7b7", fontFamily: "'Inter', system-ui", whiteSpace: "nowrap" }}>
+          <div style={{ background: "rgba(10,22,40,0.9)", border: "1px solid rgba(16,185,129,0.3)", borderRadius: "4px", padding: "2px 8px", fontSize: "8px", fontWeight: 700, color: "#6ee7b7", fontFamily: "'Montserrat', system-ui", whiteSpace: "nowrap" }}>
             CAPPING
           </div>
         </Html>
       </group>
 
-      {/* ══════ LABELING STATION ══════ */}
+      {/* â•â•â•â•â•â• LABELING STATION â•â•â•â•â•â• */}
       <group position={[midX + 0.8, 0, midZ]}>
         {/* Labeler frame */}
         <mesh position={[0, baseY + 0.5, 0]} castShadow>
@@ -211,13 +211,13 @@ const BottleProcessing3D: React.FC = () => {
         ))}
         {/* "LABELING" label */}
         <Html position={[0, baseY + 1.2, 0]} center distanceFactor={12} style={{ pointerEvents: "none", willChange: "transform" }}>
-          <div style={{ background: "rgba(10,22,40,0.9)", border: "1px solid rgba(124,58,237,0.3)", borderRadius: "4px", padding: "2px 8px", fontSize: "8px", fontWeight: 700, color: "#c4b5fd", fontFamily: "'Inter', system-ui", whiteSpace: "nowrap" }}>
+          <div style={{ background: "rgba(10,22,40,0.9)", border: "1px solid rgba(124,58,237,0.3)", borderRadius: "4px", padding: "2px 8px", fontSize: "8px", fontWeight: 700, color: "#c4b5fd", fontFamily: "'Montserrat', system-ui", whiteSpace: "nowrap" }}>
             LABELING
           </div>
         </Html>
       </group>
 
-      {/* ══════ REJECTION ARM ══════ */}
+      {/* â•â•â•â•â•â• REJECTION ARM â•â•â•â•â•â• */}
       <group position={[midX + 1.8, 0, midZ]}>
         {/* Arm base */}
         <mesh position={[0, baseY + 0.15, 0.3]} castShadow>
@@ -248,7 +248,7 @@ const BottleProcessing3D: React.FC = () => {
         </mesh>
       </group>
 
-      {/* ══════ CONVEYOR GUIDE RAILS between stations ══════ */}
+      {/* â•â•â•â•â•â• CONVEYOR GUIDE RAILS between stations â•â•â•â•â•â• */}
       {[-0.15, 0.15].map((z, i) => (
         <mesh key={`rail${i}`} position={[midX, baseY + 0.12, midZ + z]}>
           <boxGeometry args={[4.5, 0.02, 0.02]} />
@@ -256,7 +256,7 @@ const BottleProcessing3D: React.FC = () => {
         </mesh>
       ))}
 
-      {/* ══════ STATUS LIGHTS (green running indicators) ══════ */}
+      {/* â•â•â•â•â•â• STATUS LIGHTS (green running indicators) â•â•â•â•â•â• */}
       {[-1.8, -0.5, 0.8].map((dx, i) => (
         <mesh key={`sled${i}`} position={[midX + dx, baseY + 1.35 + (i === 0 ? 0.45 : 0), midZ + 0.25]}>
           <sphereGeometry args={[0.025, 6, 6]} />

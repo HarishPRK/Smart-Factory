@@ -93,7 +93,7 @@ const ControlBoard3D: React.FC<ControlBoard3DProps> = ({
         />
       </mesh>
 
-      {/* Display content — only mount heavy DOM overlays for the selected stage.
+      {/* Display content â€” only mount heavy DOM overlays for the selected stage.
           `transform` was removed: drei's transform mode runs a full CSS 3D
           projection + DOM reflow every frame for every <Html>, and with 7
           stage boards mounted simultaneously that was ~8 ms/frame of pure
@@ -113,7 +113,7 @@ const ControlBoard3D: React.FC<ControlBoard3DProps> = ({
               border: `${isSelected ? "2px" : "1px"} solid ${statusColor}`,
               borderRadius: isSelected ? "10px" : "6px",
               padding: isSelected ? "14px" : "8px",
-              fontFamily: "'Inter', system-ui",
+              fontFamily: "'Montserrat', system-ui",
               fontSize: isSelected ? "13px" : "9px",
               opacity: anySelected && !isSelected ? 0.3 : 1,
               boxShadow: isSelected

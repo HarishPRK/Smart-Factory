@@ -45,7 +45,7 @@ const TOUR_STOPS: {
     ],
     lookAt: STAGE_POSITIONS.mixing,
     dwell: 4,
-    label: "Coca-Cola Filling",
+    label: "Pepsi Filling",
   },
   {
     position: [STAGE_POSITIONS.curing[0] + 3, 2, STAGE_POSITIONS.curing[2] + 3],

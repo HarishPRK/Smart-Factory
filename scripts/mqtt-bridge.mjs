@@ -82,6 +82,13 @@ localClient.on("connect", () => {
     if (err) console.error("[bridge] Local subscribe error:", err);
     else console.log("[bridge] Subscribed to plc/# on local broker");
   });
+  // LoRaWAN soil/irrigation telemetry — published on `lorawan/data` (single
+  // shared topic). Wildcard tolerates per-device subtopics if the gateway
+  // ever splits them out.
+  localClient.subscribe("lorawan/#", { qos: 0 }, (err) => {
+    if (err) console.error("[bridge] LoRaWAN subscribe error:", err);
+    else console.log("[bridge] Subscribed to lorawan/# on local broker");
+  });
 });
 
 localClient.on("error", (err) => {

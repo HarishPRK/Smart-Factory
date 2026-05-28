@@ -2,8 +2,10 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import "./globalTheme.css";
+import "./integrations/design-tokens.css";
 import App from "./App.tsx";
 import { ErrorBoundary } from "./ErrorBoundary";
+import { ToastProvider } from "./integrations/ui/Toast";
 
 // Suppress THREE.js deprecation warnings from React Three Fiber internals.
 // R3F v9 still uses THREE.Clock and PCFSoftShadowMap internally;
@@ -26,7 +28,9 @@ window.addEventListener("unhandledrejection", (e) => {
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ErrorBoundary>
-      <App />
+      <ToastProvider>
+        <App />
+      </ToastProvider>
     </ErrorBoundary>
   </StrictMode>,
 );

@@ -1,8 +1,39 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import type { PLCParameter } from "../types";
 import { usePLCContext } from "../context/PLCContext";
 import { usePLCStore } from "../stores/plcStore";
 import { useTweenedNumber } from "../hooks/useTweenedNumber";
+import ThreePhaseMotorWidget from "./ThreePhaseMotorWidget";
+
+/**
+ * Returns a CSS class that flashes a card's outline when its value changes by
+ * more than `threshold` fraction of its range. Filters out sensor micro-jitter
+ * (which would strobe the whole panel) so only deliberate changes — an operator
+ * turning a pot, a relay toggling — light up the box. Reusable for analog
+ * (numeric) and digital (boolean) parameters.
+ */
+function useChangeFlash(value: number, range: number, threshold = 0.03): boolean {
+  const [flash, setFlash] = useState(false);
+  const prevRef = useRef(value);
+  useEffect(() => {
+    const delta = Math.abs(value - prevRef.current);
+    const significant = range > 0 ? delta / range > threshold : delta > 0.5;
+    if (significant) {
+      prevRef.current = value;
+      setFlash(false);
+      // rAF so removing → re-adding the class restarts the CSS animation even
+      // on rapid successive changes.
+      const raf = requestAnimationFrame(() => setFlash(true));
+      const t = setTimeout(() => setFlash(false), 850);
+      return () => {
+        cancelAnimationFrame(raf);
+        clearTimeout(t);
+      };
+    }
+    prevRef.current = value;
+  }, [value, range, threshold]);
+  return flash;
+}
 
 /* ── Status badge ──────────────────────────────────────── */
 
@@ -84,6 +115,7 @@ const AnalogCard: React.FC<{ param: PLCParameter }> = ({ param }) => {
   // up the same eased value so number + bar stay locked together.
   const value = useTweenedNumber(rawValue, 280);
   const pct = Math.max(0, Math.min(1, (value - min) / (max - min)));
+  const flash = useChangeFlash(rawValue, max - min);
   const glowClass =
     param.status === "warning"
       ? "status-warn-glow"
@@ -93,7 +125,7 @@ const AnalogCard: React.FC<{ param: PLCParameter }> = ({ param }) => {
 
   return (
     <div
-      className={`card-inner p-2 flex flex-col justify-between transition-all duration-300 relative overflow-hidden group/card ${glowClass}`}
+      className={`card-inner p-2 flex flex-col justify-between transition-all duration-300 relative overflow-hidden group/card ${glowClass} ${flash ? "plc-value-flash" : ""}`}
     >
       {/* Top row: label + status */}
       <div className="flex justify-between items-center gap-1 relative z-10">
@@ -168,12 +200,14 @@ const DigitalCard: React.FC<{ param: PLCParameter; onToggle?: () => void }> = ({
 }) => {
   const active = param.active ?? false;
   const hex = param.accentHex;
+  // Range of 1 so any boolean flip (0↔1) exceeds the 3% threshold and flashes.
+  const flash = useChangeFlash(active ? 1 : 0, 1);
 
   return (
     <div
       className={`card-inner p-2 flex flex-col justify-between transition-all duration-500 relative overflow-hidden group/card ${
         onToggle ? "cursor-pointer active:scale-[0.97]" : ""
-      }`}
+      } ${flash ? "plc-value-flash" : ""}`}
       onClick={onToggle}
       style={{
         borderColor: active ? `${hex}30` : undefined,
@@ -625,6 +659,9 @@ const PLCParametersWidget: React.FC<{ className?: string }> = ({
             />
           ),
         )}
+        {/* 3-Phase motor — a clickable tile that opens the per-phase detail
+            drawer (same widget that used to sit as a strip below). */}
+        <ThreePhaseMotorWidget />
       </div>
 
       {/* Footer */}

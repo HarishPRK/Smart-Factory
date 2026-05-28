@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { subscribeRawPLCPayload, type RawPLCPayload } from "../services/plcService";
 import { useTweenedNumber } from "../hooks/useTweenedNumber";
+import MotorSpinner3D from "./MotorSpinner3D";
 
 /* ── Live snapshot of the Shelly proEM 3-phase meter ──────
  * The proEM publishes per-phase (a/b/c) voltage / current / active power /
@@ -57,11 +58,11 @@ function pickReal(raw: RawPLCPayload, key: string): number | null {
 
 function readPhase(raw: RawPLCPayload, leg: "a" | "b" | "c"): PhaseReading {
   return {
-    voltage:   pickReal(raw, `boardB_shelly_proEM_data_${leg}_voltage`),
-    current:   pickReal(raw, `boardB_shelly_proEM_data_${leg}_current`),
-    actPower:  pickReal(raw, `boardB_shelly_proEM_data_${leg}_act_power`),
-    aprtPower: pickReal(raw, `boardB_shelly_proEM_data_${leg}_aprt_power`),
-    pf:        pickReal(raw, `boardB_shelly_proEM_data_${leg}_pf`),
+    voltage:   pickReal(raw, `boardB_shellypro3em_data_${leg}_voltage`),
+    current:   pickReal(raw, `boardB_shellypro3em_data_${leg}_current`),
+    actPower:  pickReal(raw, `boardB_shellypro3em_data_${leg}_act_power`),
+    aprtPower: pickReal(raw, `boardB_shellypro3em_data_${leg}_aprt_power`),
+    pf:        pickReal(raw, `boardB_shellypro3em_data_${leg}_pf`),
   };
 }
 
@@ -73,10 +74,10 @@ function readMeter(raw: RawPLCPayload): MeterReading {
     a,
     b,
     c,
-    neutralCurrent:  pickReal(raw, "boardB_shelly_proEM_data_n_current"),
-    totalActPower:   pickReal(raw, "boardB_shelly_proEM_data_total_act_power"),
-    totalAprtPower:  pickReal(raw, "boardB_shelly_proEM_data_total_aprt_power"),
-    totalCurrent:    pickReal(raw, "boardB_shelly_proEM_data_total_current"),
+    neutralCurrent:  pickReal(raw, "boardB_shellypro3em_data_n_current"),
+    totalActPower:   pickReal(raw, "boardB_shellypro3em_data_total_act_power"),
+    totalAprtPower:  pickReal(raw, "boardB_shellypro3em_data_total_aprt_power"),
+    totalCurrent:    pickReal(raw, "boardB_shellypro3em_data_total_current"),
     hasAny: false,
   };
   reading.hasAny =
@@ -107,15 +108,24 @@ const TweenedAmount: React.FC<{
 };
 
 const VOLTAGE_LIVE_THRESHOLD = 50;
-const CURRENT_LIVE_THRESHOLD = 0.05;
+const CURRENT_LIVE_THRESHOLD = 0.02;
+
+type MotorState = "offline" | "energized" | "running";
+
+/** 3-state classification: any phase live above VOLTAGE_LIVE_THRESHOLD makes
+ *  the motor "energized"; total current above CURRENT_LIVE_THRESHOLD on top
+ *  of that promotes it to "running". Matches MotorSpinner3D's internal logic. */
+function classifyMotor(meter: MeterReading): MotorState {
+  const phases = [meter.a, meter.b, meter.c];
+  const anyLive = phases.some((p) => (p.voltage ?? 0) > VOLTAGE_LIVE_THRESHOLD);
+  if (!anyLive) return "offline";
+  const totalA = Math.abs(meter.totalCurrent ?? 0);
+  const phaseA = phases.some((p) => Math.abs(p.current ?? 0) > CURRENT_LIVE_THRESHOLD);
+  return totalA > CURRENT_LIVE_THRESHOLD || phaseA ? "running" : "energized";
+}
 
 function isRunning(meter: MeterReading): boolean {
-  const phases = [meter.a, meter.b, meter.c];
-  return phases.some(
-    (p) =>
-      (p.voltage ?? 0) > VOLTAGE_LIVE_THRESHOLD &&
-      Math.abs(p.current ?? 0) > CURRENT_LIVE_THRESHOLD,
-  );
+  return classifyMotor(meter) === "running";
 }
 
 const PHASE_COLORS: Record<"a" | "b" | "c", string> = {
@@ -129,15 +139,32 @@ const PHASE_COLORS: Record<"a" | "b" | "c", string> = {
 const DetailDrawer: React.FC<{
   meter: MeterReading;
   running: boolean;
+  state: MotorState;
   onClose: () => void;
-}> = ({ meter, running, onClose }) => {
+}> = ({ meter, running, state, onClose }) => {
+  const stateLabel =
+    state === "running" ? "Running"
+    : state === "energized" ? "Energized"
+    : "Offline";
+  const stateClasses =
+    state === "running"
+      ? "text-amber-300/90 bg-amber-500/[0.07] border-amber-500/[0.18]"
+      : state === "energized"
+        ? "text-blue-200/85 bg-blue-500/[0.06] border-blue-400/[0.14]"
+        : "text-blue-200/50 bg-blue-500/[0.03] border-blue-400/[0.06]";
+  const dotClasses =
+    state === "running"
+      ? "bg-amber-400 animate-pulse-glow"
+      : state === "energized"
+        ? "bg-blue-300 animate-pulse-glow"
+        : "bg-blue-400/30";
   return createPortal(
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in"
       onClick={onClose}
     >
       <div
-        className="card p-5 w-[440px] max-w-[90vw] flex flex-col gap-3"
+        className="card p-5 w-[560px] max-w-[94vw] flex flex-col gap-3"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -166,18 +193,10 @@ const DetailDrawer: React.FC<{
           </div>
           <div className="flex items-center gap-2">
             <span
-              className={`text-[11px] font-medium flex items-center gap-1.5 px-2 py-0.5 rounded-md border ${
-                running
-                  ? "text-amber-300/90 bg-amber-500/[0.07] border-amber-500/[0.18]"
-                  : "text-blue-200/60 bg-blue-500/[0.04] border-blue-400/[0.06]"
-              }`}
+              className={`text-[11px] font-medium flex items-center gap-1.5 px-2 py-0.5 rounded-md border ${stateClasses}`}
             >
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  running ? "bg-amber-400 animate-pulse-glow" : "bg-blue-400/30"
-                }`}
-              />
-              {running ? "Running" : "Idle"}
+              <span className={`w-1.5 h-1.5 rounded-full ${dotClasses}`} />
+              {stateLabel}
             </span>
             <button
               onClick={onClose}
@@ -193,6 +212,22 @@ const DetailDrawer: React.FC<{
               </svg>
             </button>
           </div>
+        </div>
+
+        {/* 3D motor visualization — tilted stator with spinning rotor.
+            Coils light up in their phase color when V > 50V; RPM scales
+            with measured current. */}
+        <div className="flex justify-center py-2">
+          <MotorSpinner3D
+            running={running}
+            currentA={meter.totalCurrent}
+            phaseVoltages={{
+              a: meter.a.voltage,
+              b: meter.b.voltage,
+              c: meter.c.voltage,
+            }}
+            size={280}
+          />
         </div>
 
         {/* Per-phase grid */}
@@ -308,7 +343,8 @@ const ThreePhaseMotorWidget: React.FC<ThreePhaseMotorWidgetProps> = ({
     return unsubscribe;
   }, []);
 
-  const running = isRunning(meter);
+  const state = classifyMotor(meter);
+  const running = state === "running";
   const energised: Record<"a" | "b" | "c", boolean> = {
     a: (meter.a.voltage ?? 0) > VOLTAGE_LIVE_THRESHOLD,
     b: (meter.b.voltage ?? 0) > VOLTAGE_LIVE_THRESHOLD,
@@ -317,83 +353,74 @@ const ThreePhaseMotorWidget: React.FC<ThreePhaseMotorWidgetProps> = ({
 
   return (
     <>
+      {/* Rendered as a PLC-parameter tile inside the PLC Parameters grid.
+          Clicking opens the full per-phase detail drawer. */}
       <button
         onClick={() => setOpen(true)}
-        className={`card px-3 py-2 flex items-center gap-3 animate-fade-in delay-4 cursor-pointer hover:border-amber-400/25 active:scale-[0.98] transition-all duration-200 text-left ${className}`}
+        className={`card-inner p-2 flex flex-col justify-between transition-all duration-300 relative overflow-hidden group/card cursor-pointer active:scale-[0.97] text-left ${className}`}
       >
-        {/* Title + RYB phase dots */}
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="text-[10px] font-semibold text-amber-100/85 uppercase tracking-[0.14em] whitespace-nowrap">
+        {/* Top: label + status */}
+        <div className="flex justify-between items-center gap-1 relative z-10">
+          <span
+            className="text-blue-200/80 uppercase tracking-[0.06em] font-medium whitespace-nowrap"
+            style={{ fontSize: "11px" }}
+          >
             3-Phase
-          </div>
-          <div className="flex items-center gap-1">
-            {(["a", "b", "c"] as const).map((leg) => (
-              <span
-                key={leg}
-                className="w-1.5 h-1.5 rounded-full transition-all"
-                style={{
-                  backgroundColor: energised[leg]
-                    ? PHASE_COLORS[leg]
-                    : "rgba(75,85,99,0.5)",
-                  boxShadow: energised[leg]
-                    ? `0 0 5px ${PHASE_COLORS[leg]}`
-                    : undefined,
-                }}
-              />
-            ))}
-          </div>
+          </span>
+          <span
+            className={`font-semibold px-1.5 py-0.5 rounded-md flex items-center gap-1 whitespace-nowrap ${
+              running
+                ? "text-amber-300 bg-amber-500/[0.10] border border-amber-500/25"
+                : "text-blue-200/60 bg-white/[0.03] border border-white/[0.06]"
+            }`}
+            style={{ fontSize: "9.5px" }}
+          >
+            <span
+              className={`w-1 h-1 rounded-full ${
+                running ? "bg-amber-400 animate-pulse-glow" : "bg-blue-400/30"
+              }`}
+            />
+            {running ? "Run" : "Idle"}
+          </span>
         </div>
 
-        {/* Totals — pushed to the right (tweened so live updates feel fluid) */}
-        <div className="ml-auto flex items-center gap-3 font-mono text-[10px] text-cyan-100/80">
+        {/* Center: RYB phase dots */}
+        <div className="flex items-center justify-center gap-2.5 relative z-10 my-auto py-1.5">
+          {(["a", "b", "c"] as const).map((leg) => (
+            <span
+              key={leg}
+              className="w-2.5 h-2.5 rounded-full transition-all"
+              style={{
+                backgroundColor: energised[leg]
+                  ? PHASE_COLORS[leg]
+                  : "rgba(75,85,99,0.5)",
+                boxShadow: energised[leg]
+                  ? `0 0 8px ${PHASE_COLORS[leg]}`
+                  : undefined,
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Bottom: Σ power + current (tweened) */}
+        <div className="flex justify-between items-center relative z-10 font-mono text-cyan-100/80" style={{ fontSize: "9.5px" }}>
           <span className="flex items-baseline gap-0.5">
-            <span className="text-amber-200/55 text-[8px] uppercase mr-0.5">Σ</span>
-            <TweenedAmount value={meter.totalActPower} decimals={2} />
-            <span className="text-blue-300/45 text-[8px] ml-0.5">W</span>
+            <span className="text-amber-200/55 mr-0.5">Σ</span>
+            <TweenedAmount value={meter.totalActPower} decimals={1} />
+            <span className="text-blue-300/45 ml-0.5">W</span>
           </span>
           <span className="flex items-baseline gap-0.5">
             <TweenedAmount value={meter.totalCurrent} decimals={2} />
-            <span className="text-blue-300/45 text-[8px] ml-0.5">A</span>
+            <span className="text-blue-300/45 ml-0.5">A</span>
           </span>
         </div>
-
-        {/* Status pill */}
-        <span
-          className={`text-[9px] font-medium flex items-center gap-1 px-1.5 py-0.5 rounded border whitespace-nowrap ${
-            running
-              ? "text-amber-300/90 bg-amber-500/[0.07] border-amber-500/[0.18]"
-              : "text-blue-200/55 bg-blue-500/[0.04] border-blue-400/[0.06]"
-          }`}
-        >
-          <span
-            className={`w-1 h-1 rounded-full ${
-              running ? "bg-amber-400 animate-pulse-glow" : "bg-blue-400/30"
-            }`}
-          />
-          {running ? "RUN" : "IDLE"}
-        </span>
-
-        {/* Expand chevron */}
-        <svg
-          width="10"
-          height="10"
-          viewBox="0 0 12 12"
-          fill="none"
-          className="text-amber-300/50"
-        >
-          <path
-            d="M3 5l3-3 3 3M3 7l3 3 3-3"
-            stroke="currentColor"
-            strokeWidth="1.3"
-            strokeLinecap="round"
-          />
-        </svg>
       </button>
 
       {open && (
         <DetailDrawer
           meter={meter}
           running={running}
+          state={state}
           onClose={() => setOpen(false)}
         />
       )}

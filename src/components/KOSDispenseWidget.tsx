@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useKOSDispenses } from "../hooks/useKOSDispenses";
 import KOSDetailDrawer from "./KOSDetailDrawer";
+import PepsiLogo from "./PepsiLogo";
 
 /**
  * KOS dispenser widget — sits in the KPI bar next to PREDICT / TWIN.
@@ -29,51 +30,41 @@ const KOSDispenseWidget: React.FC = () => {
     <button
       type="button"
       onClick={() => setDrawerOpen(true)}
-      className="card shimmer-border hover:border-rose-400/30 p-3.5 flex flex-col justify-between h-[96px] min-w-[200px] max-w-[300px] flex-1 basis-[200px] relative overflow-hidden cursor-pointer transition-all duration-300 text-left"
-      aria-label="Open KOS dispenser detail"
+      className="card shimmer-border hover:border-blue-400/30 p-3.5 flex flex-col justify-between h-[96px] min-w-[200px] max-w-[300px] flex-1 basis-[200px] relative overflow-hidden cursor-pointer transition-all duration-300 text-left"
+      aria-label="Open Pepsi dispenser detail"
       title={
         latestRecommendation?.body
           ? `${latestRecommendation.headline ?? ""}\n${latestRecommendation.body}\n\nClick for full feed →`
-          : "Click for full KOS dispenser feed"
+          : "Click for full Pepsi dispenser feed"
       }
     >
-      {/* Subtle Coke-red accent gradient — KOS is the dispenser brand */}
-      <div className="absolute inset-0 bg-gradient-to-br from-red-500/[0.08] to-rose-500/[0.02] pointer-events-none" />
+      {/* Pepsi blue accent gradient */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-600/[0.10] to-blue-400/[0.02] pointer-events-none" />
 
-      {/* Decorative cup glyph */}
+      {/* Decorative Pepsi cup glyph */}
       <div className="absolute bottom-2 right-3 z-0 opacity-55">
         <svg width="42" height="22" viewBox="0 0 42 22" fill="none">
           <path
             d="M6 4 H30 L27 18 H9 Z"
-            stroke="#fb7185"
+            stroke="#60a5fa"
             strokeWidth="1.4"
             strokeLinejoin="round"
             fill="none"
           />
-          <path d="M9 8 H27" stroke="#fb7185" strokeWidth="1" opacity="0.6" />
-          <circle cx="34" cy="6" r="1.6" fill="#fda4af" />
-          <circle cx="36" cy="11" r="1.2" fill="#fda4af" opacity="0.7" />
-          <circle cx="33" cy="13" r="1" fill="#fda4af" opacity="0.5" />
+          <path d="M9 8 H27" stroke="#60a5fa" strokeWidth="1" opacity="0.6" />
+          <circle cx="34" cy="6" r="1.6" fill="#93c5fd" />
+          <circle cx="36" cy="11" r="1.2" fill="#93c5fd" opacity="0.7" />
+          <circle cx="33" cy="13" r="1" fill="#93c5fd" opacity="0.5" />
         </svg>
       </div>
 
       {/* Header */}
       <div className="flex justify-between items-start relative z-10">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-red-500/[0.14] rounded-lg flex items-center justify-center border border-red-400/[0.18] shadow-[0_0_10px_rgba(244,63,94,0.14)]">
-            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" className="text-red-200">
-              <path
-                d="M5 3 H15 L13.5 17 H6.5 Z"
-                stroke="currentColor"
-                strokeWidth="1.4"
-                strokeLinejoin="round"
-                fill="none"
-              />
-              <path d="M7 7 H13" stroke="currentColor" strokeWidth="1" opacity="0.6" />
-            </svg>
-          </div>
-          <span className="text-[11px] text-red-100/90 uppercase tracking-[0.12em] font-semibold">
-            Dispenser
+          {/* Classic Pepsi roundel */}
+          <PepsiLogo size={28} style={{ filter: "drop-shadow(0 0 6px rgba(0,75,147,0.35))" }} />
+          <span className="text-[11px] text-blue-100/90 uppercase tracking-[0.12em] font-semibold">
+            Pepsi Dispenser
           </span>
         </div>
         {hasData && (
@@ -81,7 +72,7 @@ const KOSDispenseWidget: React.FC = () => {
             className={`text-[9px] font-semibold uppercase tracking-[0.08em] px-1.5 py-0.5 rounded-md border ${
               latestPour?.memberTier === "Gold"
                 ? "text-amber-200 bg-amber-500/[0.08] border-amber-400/30"
-                : "text-rose-200 bg-rose-500/[0.08] border-rose-400/25"
+                : "text-blue-200 bg-blue-500/[0.08] border-blue-400/25"
             }`}
           >
             {latestPour?.memberTier ?? "LIVE"}
@@ -92,18 +83,18 @@ const KOSDispenseWidget: React.FC = () => {
       {/* Body */}
       <div className="relative z-10 flex flex-col gap-0.5 mt-auto">
         <div
-          className="text-[13px] font-semibold text-rose-50 leading-none tracking-tight overflow-hidden whitespace-nowrap text-ellipsis"
+          className="text-[13px] font-semibold text-blue-50 leading-none tracking-tight overflow-hidden whitespace-nowrap text-ellipsis"
           style={{ maxWidth: "150px" }}
         >
           {drinkLabel}
         </div>
         <div className="flex items-baseline gap-1.5">
-          <span className="text-[10px] text-rose-200/70 font-medium">
+          <span className="text-[10px] text-blue-200/70 font-medium">
             {hasData ? volumeLabel : totalsLabel}
           </span>
           {hasData && memberLabel && (
             <span
-              className="text-[9px] text-rose-300/50 truncate"
+              className="text-[9px] text-blue-300/50 truncate"
               style={{ maxWidth: "90px" }}
             >
               · {memberLabel}
@@ -125,7 +116,7 @@ const KOSDispenseWidget: React.FC = () => {
                 style={{
                   width: "3px",
                   height: `${h}px`,
-                  background: "#fb7185",
+                  background: "#60a5fa",
                   borderRadius: "1px",
                 }}
               />

@@ -10,7 +10,7 @@ import {
  *
  * Self-contained: mounts a floating button (bottom-left, so it doesn't fight
  * Plant Copilot at bottom-right) plus a small drawer with the conversation.
- * No tabs, no PLC context, no streaming — submit → poll → render.
+ * No tabs, no PLC context, no streaming - submit > poll > render.
  */
 const LanggraphAgentPanel: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -26,7 +26,7 @@ const LanggraphAgentPanel: React.FC = () => {
 
 export default LanggraphAgentPanel;
 
-/* ── Floating button ───────────────────────────────────── */
+/* -- Floating button ------------------------------------- */
 
 const FloatingButton: React.FC<{ open: boolean; onClick: () => void }> = ({
   open,
@@ -76,7 +76,7 @@ const FloatingButton: React.FC<{ open: boolean; onClick: () => void }> = ({
   </button>
 );
 
-/* ── Drawer ────────────────────────────────────────────── */
+/* -- Drawer ---------------------------------------------- */
 
 interface DrawerProps {
   chat: ReturnType<typeof useLangraphChat>;
@@ -233,12 +233,12 @@ const Drawer: React.FC<DrawerProps> = ({ chat, onClose }) => {
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
-          fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
+          fontFamily: "'Montserrat', 'Segoe UI', system-ui, sans-serif",
           color: "#e5e7eb",
           animation: "lg-modal-rise 200ms ease-out",
         }}
       >
-        {/* Ambient backdrop orbs — visible behind every state */}
+        {/* Ambient backdrop orbs - visible behind every state */}
         <div
           aria-hidden
           style={{
@@ -343,7 +343,7 @@ const Drawer: React.FC<DrawerProps> = ({ chat, onClose }) => {
               Clear
             </IconButton>
             <IconButton onClick={onClose} title="Close">
-              ✕
+              X
             </IconButton>
           </div>
         </div>
@@ -396,7 +396,7 @@ const Drawer: React.FC<DrawerProps> = ({ chat, onClose }) => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={
-              pending ? "Thinking…" : "Ask me anything about the plant"
+              pending ? "Thinking..." : "Ask me anything about the plant"
             }
             disabled={pending}
             style={{
@@ -447,7 +447,7 @@ const Drawer: React.FC<DrawerProps> = ({ chat, onClose }) => {
   );
 };
 
-/* ── Sub-components ────────────────────────────────────── */
+/* -- Sub-components -------------------------------------- */
 
 const IconButton: React.FC<{
   onClick: () => void;
@@ -477,11 +477,15 @@ const IconButton: React.FC<{
 );
 
 const SAMPLE_PROMPTS = [
-  "How is my overall factory performance?",
+  "How is my overall system performance?",
   "How many units have been produced so far?",
-  "How many times has my system been in emergency state?",
-  "Only the red lights are ON in both the panels array alerts. I tried pressing the green button but the plant operation did not start. What to do?",
-  "Start the plant operations.",
+  "What is the downtime of my system?",
+  "The system is in emergency state. How to restart the plant?",
+  "List all devices connected through modbus/rs485 with plc.",
+  "How many times has the system entered emergency state?",
+  "Analyze the power consumption, voltage and current of single phase motor.",
+  "Analyze pressure sensor data.",
+  "Predict downtime risk for the plant."
 ];
 
 interface EmptyStateProps {
@@ -606,7 +610,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({ onPromptClick, disabled }) => (
       }}
       className="lg-shimmer-text"
     >
-      Hi there — how can I help?
+      Hi there - how can I help?
     </div>
     <div
       style={{
@@ -622,11 +626,11 @@ const EmptyState: React.FC<EmptyStateProps> = ({ onPromptClick, disabled }) => (
 
     <div
       style={{
-        display: "flex",
-        flexDirection: "column",
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
         gap: "8px",
         width: "100%",
-        maxWidth: "560px",
+        maxWidth: "780px",
         marginTop: "4px",
       }}
     >
@@ -638,14 +642,14 @@ const EmptyState: React.FC<EmptyStateProps> = ({ onPromptClick, disabled }) => (
           disabled={disabled}
           className="lg-prompt-card"
           style={{
-            fontSize: "14px",
-            lineHeight: 1.5,
+            fontSize: "12.5px",
+            lineHeight: 1.4,
             color: "#ede9fe",
             background:
               "linear-gradient(180deg, rgba(139, 92, 246, 0.14), rgba(91, 33, 182, 0.06))",
             border: "1px solid rgba(139, 92, 246, 0.28)",
-            borderRadius: "12px",
-            padding: "12px 16px 12px 38px",
+            borderRadius: "10px",
+            padding: "10px 12px 10px 30px",
             textAlign: "left",
             cursor: disabled ? "default" : "pointer",
             opacity: disabled ? 0.55 : 1,
@@ -655,9 +659,10 @@ const EmptyState: React.FC<EmptyStateProps> = ({ onPromptClick, disabled }) => (
             position: "relative",
             overflow: "hidden",
             animation: `lg-prompt-rise 0.45s ease-out both`,
-            animationDelay: `${0.06 * i + 0.05}s`,
+            animationDelay: `${0.04 * i + 0.05}s`,
             boxShadow:
               "0 4px 12px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)",
+            minHeight: "52px",
           }}
         >
           {/* Leading sparkle bullet */}
@@ -665,18 +670,18 @@ const EmptyState: React.FC<EmptyStateProps> = ({ onPromptClick, disabled }) => (
             aria-hidden
             style={{
               position: "absolute",
-              left: "14px",
+              left: "10px",
               top: "50%",
               transform: "translateY(-50%)",
-              width: "14px",
-              height: "14px",
+              width: "10px",
+              height: "10px",
               borderRadius: "50%",
               background:
                 "radial-gradient(circle, #c4b5fd 0%, #7c3aed 65%, transparent 100%)",
-              boxShadow: "0 0 10px rgba(167, 139, 250, 0.6)",
+              boxShadow: "0 0 8px rgba(167, 139, 250, 0.55)",
             }}
           />
-          <span style={{ position: "relative", zIndex: 1 }}>“{p}”</span>
+          <span style={{ position: "relative", zIndex: 1 }}>{p}</span>
         </button>
       ))}
     </div>
@@ -791,14 +796,14 @@ function renderBubbleContent(m: LangraphMessage, onCancel: () => void) {
   return m.content || <span style={{ color: "#9ca3af" }}>(empty reply)</span>;
 }
 
-/* ── Thinking state ────────────────────────────────────── */
+/* -- Thinking state -------------------------------------- */
 
 const THINKING_PHASES = [
-  { label: "Routing query…", icon: "↪" },
-  { label: "Fetching from Historian…", icon: "⟳" },
-  { label: "Analyzing live PLC signals…", icon: "⟁" },
-  { label: "Cross-checking alerts…", icon: "⚠" },
-  { label: "Synthesizing answer…", icon: "✦" },
+  { label: "Routing query...", icon: ">" },
+  { label: "Fetching from Historian...", icon: "*" },
+  { label: "Analyzing live PLC signals...", icon: "âŸ" },
+  { label: "Cross-checking alerts...", icon: "âš " },
+  { label: "Synthesizing answer...", icon: "*" },
 ];
 
 const ThinkingContent: React.FC<{ elapsedMs: number; onCancel: () => void }> = ({

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, Suspense, lazy } from "react";
 import KPIBar from "./KPIBar";
 import ZoneTabs from "./ZoneTabs";
-import FilterBar from "./FilterBar";
 import workerIcon from "../assets/icons/worker.svg";
 import capgeminiLogo from "../assets/capgemini-logo.jpeg";
 import alertWarning from "../assets/icons/alert_warning.svg";
@@ -9,12 +8,9 @@ import gearIcon from "../assets/icons/Gear.svg";
 import Weather from "../Weather";
 import { ShiftIndicator, SystemStatus } from "./HeaderWidgets";
 import { useFilters } from "../context/FilterContext";
-import { computeOverviewChips } from "../data/mockData";
 import PLCParametersWidget from "./PLCParametersWidget";
 import MotorFanWidget from "./MotorFanWidget";
 import EmergencyLightWidget from "./EmergencyLightWidget";
-import ThreePhaseMotorWidget from "./ThreePhaseMotorWidget";
-import { AIFloatingButton } from "./AIAssistantModal";
 import { usePredictionStore } from "../stores/predictionStore";
 
 const FactoryScene = lazy(() => import("./factory3d/FactoryScene"));
@@ -26,6 +22,13 @@ const KPIAnalyticsPanel = lazy(() => import("./KPIAnalyticsPanel"));
 const OEEPanel = lazy(() => import("./OEEPanel"));
 const PredictivePanel = lazy(() => import("./PredictivePanel"));
 const DigitalTwinPanel = lazy(() => import("./DigitalTwinPanel"));
+const IntegrationModal = lazy(() => import("./IntegrationModal"));
+const DynamicPathSelectionPage = lazy(() =>
+  import("../integrations/pages/DynamicPathSelection").then((m) => ({ default: m.DynamicPathSelectionPage })),
+);
+const VideoAnalyticsPage = lazy(() =>
+  import("../integrations/pages/VideoAnalytics").then((m) => ({ default: m.VideoAnalyticsPage })),
+);
 
 const Dashboard: React.FC = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -35,11 +38,11 @@ const Dashboard: React.FC = () => {
   const [oeeOpen, setOeeOpen] = useState(false);
   const [predictiveOpen, setPredictiveOpen] = useState(false);
   const [digitalTwinOpen, setDigitalTwinOpen] = useState(false);
+  const [dpsOpen, setDpsOpen] = useState(false);
+  const [videoOpen, setVideoOpen] = useState(false);
   const predAlertCount = usePredictionStore((s) => s.anomalyAlerts.length);
   const [sceneView, setSceneView] = useState<"factory" | "plc">("factory");
-  const { filteredMachines, filteredAlerts } = useFilters();
-
-  const overviewChips = computeOverviewChips(filteredMachines);
+  const { filteredAlerts } = useFilters();
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -47,43 +50,40 @@ const Dashboard: React.FC = () => {
   }, []);
 
   return (
-    <div className="h-dvh max-h-dvh text-white px-4 py-4 xl:px-5 xl:py-4 font-sans flex flex-col overflow-hidden gap-4">
+    <div className="min-h-dvh xl:h-dvh xl:max-h-dvh text-white px-3 py-3 xl:px-5 xl:py-4 font-sans flex flex-col overflow-y-auto xl:overflow-hidden gap-3 xl:gap-4">
       {/* Header */}
       <header className="glass flex items-center justify-between gap-4 flex-none animate-fade-in header-glow rounded-[28px] px-5 py-4">
-        <div className="flex items-center gap-4 min-w-0">
-          <div className="w-11 h-11 rounded-[16px] flex items-center justify-center relative group/logo cursor-pointer transition-all duration-300 overflow-hidden bg-white">
+        <div className="flex items-center gap-3.5 min-w-0">
+          {/* Capgemini (integrator) — small mark, kept */}
+          <div className="w-10 h-10 rounded-[14px] flex items-center justify-center relative group/logo cursor-pointer transition-all duration-300 overflow-hidden bg-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]">
             <img
               src={capgeminiLogo}
               alt="Capgemini"
-              className="w-9 h-9 object-contain group-hover/logo:scale-110 transition-transform duration-300"
+              className="w-8 h-8 object-contain group-hover/logo:scale-110 transition-transform duration-300"
             />
-            <div
-              className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-300 rounded-full border-2 border-[#07192f] shadow-[0_0_10px_rgba(52,211,153,0.8)] animate-pulse-glow"
-              style={{ color: "#6ee7b7" }}
-            ></div>
           </div>
-          <div className="min-w-0">
-            <div className="text-[16px] font-semibold tracking-[0.24em] text-cyan-50 uppercase truncate">
-              Digital Factory
+          <div className="min-w-0 pl-1">
+            <div className="text-[15px] font-bold tracking-[0.24em] text-white/95 uppercase truncate leading-none">
+              PepsiCo Manufacturing
             </div>
-            <div className="text-[11px] text-sky-200/70 font-medium tracking-[0.22em] mt-1 flex items-center gap-2 uppercase">
-              <span className="text-cyan-200/85">Live Operations</span>
+            <div className="text-[10px] text-white/45 font-medium tracking-[0.3em] mt-1.5 uppercase">
+              Live Operations
             </div>
           </div>
-          <div className="hidden xl:flex items-center gap-3 min-w-0 pl-2">
-            <div className="h-10 w-px bg-gradient-to-b from-transparent via-cyan-300/25 to-transparent"></div>
+          <div className="hidden xl:flex items-center gap-3 min-w-0 pl-1.5">
+            <div className="h-9 w-px bg-gradient-to-b from-transparent via-white/15 to-transparent"></div>
             <SystemStatus operational={true} />
           </div>
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap justify-end">
-          <div className="hidden 2xl:flex items-center gap-2 rounded-full border border-cyan-300/14 bg-sky-400/[0.05] px-4 py-2 text-[10px] text-sky-100/75 font-medium">
+          <div className="hidden 2xl:flex items-center gap-2 rounded-full border border-white/[0.07] bg-white/[0.03] px-4 py-2 text-[10px] text-white/70 font-medium">
             <svg
               width="12"
               height="12"
               viewBox="0 0 16 16"
               fill="none"
-              className="text-cyan-200/75"
+              className="text-white/55"
             >
               <circle
                 cx="8"
@@ -105,7 +105,7 @@ const Dashboard: React.FC = () => {
                 day: "numeric",
               })}
             </span>
-            <span className="text-sky-300/20">•</span>
+            <span className="text-white/20">•</span>
             <span className="tabular-nums">
               {currentTime.toLocaleTimeString("en-US", {
                 hour: "2-digit",
@@ -114,8 +114,8 @@ const Dashboard: React.FC = () => {
               })}
             </span>
           </div>
-          <div className="hidden lg:flex items-center gap-2 rounded-full border border-cyan-300/14 bg-sky-400/[0.05] px-4 py-2 text-[10px] text-sky-100/80 font-medium">
-            <span className="w-2 h-2 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,0.9)]"></span>
+          <div className="hidden lg:flex items-center gap-2 rounded-full border border-white/[0.07] bg-white/[0.03] px-4 py-2 text-[10px] text-white/75 font-medium">
+            <span className="w-2 h-2 rounded-full bg-[#91c904] shadow-[0_0_10px_rgba(145,201,4,0.8)]"></span>
             Factory 028
           </div>
           <ShiftIndicator />
@@ -207,54 +207,21 @@ const Dashboard: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Grid */}
-      <div className="grid grid-cols-12 gap-4 flex-grow min-h-0 overflow-hidden">
+      {/* Main Grid — stacks to a single column below xl (square / narrow
+          screens), side-by-side 9:3 at xl and up. */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 flex-grow min-h-0 xl:overflow-hidden">
         {/* Center Content — expanded for larger factory floor */}
-        <div className="col-span-9 flex flex-col gap-4 h-full min-h-0">
-          <div className="relative flex items-center gap-4 px-1 animate-fade-in delay-1">
-            {/* Hero — left-aligned with accent bar so it stops floating */}
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-              <span className="hero-accent flex-none" />
-              <div className="min-w-0">
-                <div className="section-title inline-flex items-center gap-2">
-                  <span className="ind-live-dot" />
-                  Operations Snapshot
-                </div>
-                <div className="text-[15px] font-semibold text-slate-100 mt-1.5 tracking-tight leading-tight truncate">
-                  Monitor alerts, machine health, and plant KPIs in one view.
-                </div>
-              </div>
-            </div>
-            {/* Bloomberg-style command strip */}
-            <div className="flex items-stretch gap-2 flex-none">
-              {overviewChips.map((chip) => {
-                const tone =
-                  chip.label.toLowerCase() === "critical"
-                    ? "tone-alarm"
-                    : chip.label.toLowerCase() === "warnings"
-                      ? "tone-warn"
-                      : "tone-ok";
-                return (
-                  <div key={chip.label} className={`cmd-chip ${tone}`}>
-                    <div className="cmd-chip-label">{chip.label}</div>
-                    <div className="cmd-chip-value">
-                      <span className="dot" />
-                      {chip.value}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          <FilterBar />
+        <div className="xl:col-span-9 flex flex-col gap-4 xl:h-full min-h-0">
           <KPIBar
             onOeeClick={() => setOeeOpen(true)}
             onAnalyticsClick={() => setAnalyticsOpen(true)}
             onPredictClick={() => setPredictiveOpen(true)}
             onDigitalTwinClick={() => setDigitalTwinOpen(true)}
+            onDpsClick={() => setDpsOpen(true)}
+            onVideoClick={() => setVideoOpen(true)}
             predAlertCount={predAlertCount}
           />
-          <div className="flex-grow min-h-0 card data-trace corner-marks relative overflow-hidden group">
+          <div className="flex-grow min-h-[460px] xl:min-h-0 card data-trace corner-marks relative overflow-hidden group">
             {/* 3D Scene — Factory or PLC Control Room */}
             <Suspense
               fallback={
@@ -427,28 +394,25 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Right Sidebar — PLC + motor/emergency + thin 3-phase strip
-            (click strip to open per-phase detail drawer) */}
-        <div className="col-span-3 flex flex-col gap-3 h-full min-h-0">
-          <PLCParametersWidget className="flex-[3] min-h-0" />
-          <div className="flex-[1] min-h-0 flex gap-3">
+            (click strip to open per-phase detail drawer).
+            On stacked (sub-xl) layouts the children need explicit heights
+            since flex ratios collapse without a fixed-height parent. */}
+        <div className="xl:col-span-3 flex flex-col gap-3 xl:h-full min-h-0">
+          {/* 3-Phase now lives inside PLC Parameters as a clickable tile, so the
+              sidebar is just PLC params + the motor/emergency row, which gets
+              more vertical room. */}
+          <PLCParametersWidget className="flex-1 min-h-[360px] xl:min-h-0" />
+          <div className="flex-none h-[150px] flex gap-3">
             <MotorFanWidget className="flex-1 min-h-0" />
             <EmergencyLightWidget className="flex-1 min-h-0" />
           </div>
-          <ThreePhaseMotorWidget className="flex-none" />
         </div>
       </div>
 
-      <AIFloatingButton onClick={() => setAiChatOpen(true)} />
       <Suspense fallback={null}>
         {/* Langgraph agent — always mounted so its own floating button is
             available in the corner. Talks to VITE_LANGGRAPH_API_BASE. */}
         <LanggraphAgentPanel />
-        {aiChatOpen && (
-          <AIAssistantModal
-            open={aiChatOpen}
-            onClose={() => setAiChatOpen(false)}
-          />
-        )}
         {notifOpen && (
           <NotificationDrawer
             open={notifOpen}
@@ -476,6 +440,24 @@ const Dashboard: React.FC = () => {
             open={digitalTwinOpen}
             onClose={() => setDigitalTwinOpen(false)}
           />
+        )}
+        {dpsOpen && (
+          <IntegrationModal
+            open={dpsOpen}
+            onClose={() => setDpsOpen(false)}
+            title="Dynamic Path Selection"
+          >
+            <DynamicPathSelectionPage />
+          </IntegrationModal>
+        )}
+        {videoOpen && (
+          <IntegrationModal
+            open={videoOpen}
+            onClose={() => setVideoOpen(false)}
+            title="Video Analytics"
+          >
+            <VideoAnalyticsPage />
+          </IntegrationModal>
         )}
       </Suspense>
     </div>

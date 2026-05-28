@@ -10,7 +10,7 @@ import FactoryWorker3D from "./FactoryWorker3D";
 import LidarScanner3D from "./LidarScanner3D";
 import StackLight3D from "./StackLight3D";
 import { BlowMolderTunnel, CoolingTunnelInline } from "./InlineMachine3D";
-import ColaFillingStation3D from "./ColaFillingStation3D";
+import PepsiFillingStation3D from "./PepsiFillingStation3D";
 import { CONVEYOR_PATH } from "./factoryLayout";
 import { STAGE_POSITIONS, STAGE_CONVEYOR_T } from "./digitalTwinLayout";
 import type { ManufacturingStage, StageId } from "../../types/digitalTwin";
@@ -162,7 +162,7 @@ const ProcessPipeline3D: React.FC = () => {
 
       {/* ── In-line tunnel machines ──
           Belt threads through the middle of these. Preforms enter the blow
-          molder and red Coke bottles emerge on the downstream side. Cooled
+          molder and blue Pepsi bottles emerge on the downstream side. Cooled
           bottles travel through the cooling tunnel under cyan glow. */}
       <BlowMolderTunnel
         position={formingTunnel.position}
@@ -173,10 +173,10 @@ const ProcessPipeline3D: React.FC = () => {
         rotationY={curingTunnel.rotationY}
       />
 
-      {/* Coca-Cola filling station — inline filling machine.
+      {/* Pepsi filling station — inline filling machine.
           Positioned directly on the belt at the filling/mixing stage.
-          Bottles pass through and get filled with Coca-Cola. */}
-      <ColaFillingStation3D
+          Bottles pass through and get filled with Pepsi. */}
+      <PepsiFillingStation3D
         position={fillingPlacement.position}
         rotationY={fillingPlacement.rotationY}
       />
@@ -266,7 +266,7 @@ const ProcessPipeline3D: React.FC = () => {
         syncToConveyor
       />
 
-      {/* Coca-Cola carton at the packaging cobot's drop zone */}
+      {/* Pepsi carton at the packaging cobot's drop zone */}
       <group position={[packaging[0] - 1.26, 0, packaging[2] + 1.26]}>
         {/* Carton body — opaque cardboard brown */}
         <mesh position={[0, 0.22, 0]} castShadow>
@@ -282,27 +282,27 @@ const ProcessPipeline3D: React.FC = () => {
           <boxGeometry args={[0.48, 0.01, 0.38]} />
           <meshStandardMaterial color="#1c1917" roughness={0.9} />
         </mesh>
-        {/* Coca-Cola red label panel — front */}
+        {/* Pepsi blue label panel — front */}
         <mesh position={[0, 0.22, 0.226]}>
           <planeGeometry args={[0.5, 0.3]} />
           <meshStandardMaterial
-            color="#dc2626"
-            emissive="#7f1d1d"
+            color="#004B93"
+            emissive="#001f4d"
             emissiveIntensity={0.2}
             roughness={0.5}
           />
         </mesh>
-        {/* White Coke wave stripe */}
+        {/* White Pepsi wave stripe */}
         <mesh position={[0, 0.22, 0.227]}>
           <planeGeometry args={[0.45, 0.05]} />
           <meshStandardMaterial color="#f8fafc" roughness={0.4} />
         </mesh>
-        {/* Coca-Cola red label panel — side */}
+        {/* Pepsi blue label panel — side */}
         <mesh position={[0.276, 0.22, 0]} rotation={[0, Math.PI / 2, 0]}>
           <planeGeometry args={[0.4, 0.3]} />
           <meshStandardMaterial
-            color="#dc2626"
-            emissive="#7f1d1d"
+            color="#004B93"
+            emissive="#001f4d"
             emissiveIntensity={0.2}
             roughness={0.5}
           />

@@ -5,21 +5,21 @@
 
 :root {
   /* Neutral/Panel backgrounds — industrial graphite */
-  --color-panel-bg: #141b27;
-  --color-panel-edge: #2a3444;
-  --color-panel-highlight: rgba(58, 169, 192, 0.06);
+  --color-panel-bg: #221f3a;
+  --color-panel-edge: #322e4f;
+  --color-panel-highlight: rgba(117, 176, 234, 0.06);
 
   /* Text colors — neutral slate */
-  --color-text-primary: #e4ebf3;
-  --color-text-muted: #8a97a8;
+  --color-text-primary: #f3f1ff;
+  --color-text-muted: #9a93b8;
 
   /* Component backgrounds */
-  --color-track-bg: rgba(58, 169, 192, 0.10);
+  --color-track-bg: rgba(117, 176, 234, 0.10);
 
-  /* Primary accent — industrial cyan (desaturated) */
-  --color-primary: #3aa9c0;
-  --color-primary-light: #5cc0d4;
-  --color-primary-glow: rgba(58, 169, 192, 0.18);
+  /* Primary accent — Pepsi blue (desaturated) */
+  --color-primary: #75b0ea;
+  --color-primary-light: #9bc7f2;
+  --color-primary-glow: rgba(117, 176, 234, 0.18);
 
   /* ISA-101 status colors — Success */
   --color-status-success: #3fa66a;
@@ -30,7 +30,7 @@
   --color-status-warning-light: #e0a546;
 
   /* ISA-101 status colors — Alarm (signal red) */
-  --color-status-danger: #c0392b;
+  --color-status-danger: #EE1C25;
   --color-status-danger-light: #d65544;
 
   /* Typography */

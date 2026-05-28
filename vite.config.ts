@@ -9,6 +9,15 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',  // Listen on all interfaces — allows access from Meta Quest / other LAN devices
     port: 5173,
+    proxy: {
+      // Dynamic Path Selection + Video Analytics Express server (run via `npm run dev:server`).
+      // Forwards /api/* (incl. SSE for /api/ipsec/stream and MJPEG for /api/video/:id) so the
+      // browser hits the integration endpoints same-origin.
+      // Use 127.0.0.1 (not localhost): on Windows + Node 18+, `localhost`
+      // resolves to IPv6 ::1 first, but the Express server binds IPv4 — that
+      // mismatch causes ECONNREFUSED even when the server is running.
+      '/api': { target: 'http://127.0.0.1:3001', changeOrigin: true, ws: false },
+    },
   },
   plugins: [
     react({
