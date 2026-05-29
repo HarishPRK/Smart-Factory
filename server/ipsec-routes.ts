@@ -10,16 +10,16 @@
  *   registerIpsecRoutes(app);
  *
  * Env vars consumed:
- *   GATEWAY_PATH_HOST   — base URL of the gateway's path-control API (default
- *                          http://192.168.1.201:8090). Forwarded to from
- *                          /api/gateway/path so the browser can flip the
- *                          active underlay (Force Fiber / 5G / Auto).
+ *   IOT_PATH_CONTROL_TOPIC — IoT Core topic the com.rdk.pathcontrol Greengrass
+ *                          component listens on (via the device's mqtt bridge)
+ *                          to flip the active underlay. Default rdk/path/control.
+ *                          /api/gateway/path publishes the Auto / Force-Fiber /
+ *                          Force-5G command here and waits for the component ack.
  */
 
 import type { Express } from 'express';
 import { ipsecSource } from './ipsecSource.js';
-
-const GATEWAY_PATH_HOST = process.env.GATEWAY_PATH_HOST ?? 'http://192.168.1.201:8090';
+import { pathControlSource } from './pathControlSource.js';
 
 export function registerIpsecRoutes(app: Express): void {
   /** Current cached snapshot (hydrate-on-mount). */
@@ -59,10 +59,13 @@ export function registerIpsecRoutes(app: Express): void {
     });
   });
 
-  /** POST /api/gateway/path — proxies the DPS Auto / Force-Fiber / Force-5G
-   *  button to the gateway's path-control HTTP API at `:8090/api/path`.
-   *  Browser can't reach the gateway directly (different network, CORS),
-   *  so this same-origin proxy posts the JSON body verbatim. */
+  /** POST /api/gateway/path — drives the DPS Auto / Force-Fiber / Force-5G
+   *  button through the `com.rdk.pathcontrol` Greengrass component on the edge
+   *  gateway. We publish the command to AWS IoT Core (rdk/path/control); the
+   *  device's mqtt bridge relays it to the local broker the component listens
+   *  on, the component applies it via its local :8090/api/path API, and acks on
+   *  rdk/path/control/result. We forward that ack back to the browser. No
+   *  direct LAN reachability to the gateway is needed. */
   app.post('/api/gateway/path', async (req, res) => {
     const mode = req.body?.mode;
     if (mode !== 'auto' && mode !== 'fiber' && mode !== '5g') {
@@ -70,21 +73,24 @@ export function registerIpsecRoutes(app: Express): void {
       return;
     }
     try {
-      const upstream = await fetch(`${GATEWAY_PATH_HOST}/api/path`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode }),
-      });
-      const text = await upstream.text();
-      const ct = upstream.headers.get('content-type');
-      if (ct) res.setHeader('Content-Type', ct);
-      res.status(upstream.status).send(text);
+      const result = await pathControlSource.setMode(mode);
+      if (result.ok === false) {
+        // The component reached the gateway but the gateway rejected the change.
+        res.status(502).json({
+          error: result.error ?? 'gateway rejected the mode change',
+          mode,
+          result,
+        });
+        return;
+      }
+      res.json({ ok: true, mode, result });
     } catch (err) {
+      // Publish/connect failure, or no ack within the timeout window.
       // eslint-disable-next-line no-console
-      console.error('[gateway-path] upstream error:', err);
+      console.error('[gateway-path] path-control error:', err);
       res.status(502).json({
         error: err instanceof Error ? err.message : String(err),
-        upstream: GATEWAY_PATH_HOST,
+        topic: pathControlSource.status().controlTopic,
       });
     }
   });

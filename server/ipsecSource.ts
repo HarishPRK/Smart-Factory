@@ -19,11 +19,13 @@ import { EventEmitter } from 'node:events';
 import type { IpsecGatewayState, IpsecMetrics, IpsecTunnelMetric } from '../src/integrations/types.js';
 import { decodeIpsecMetrics } from './ipsecProto.js';
 
-const ENDPOINT       = process.env.IOT_ENDPOINT       ?? 'alht1i2bx8tzt-ats.iot.us-east-1.amazonaws.com';
-const REGION         = process.env.IOT_REGION         ?? process.env.AWS_REGION ?? 'us-east-1';
+// Read lazily (at call time, not module-load) so values always reflect the
+// loaded .env regardless of ESM import ordering.
+const endpoint = () => process.env.IOT_ENDPOINT ?? 'alht1i2bx8tzt-ats.iot.us-east-1.amazonaws.com';
+const region   = () => process.env.IOT_REGION ?? process.env.AWS_REGION ?? 'us-east-1';
 // Default falls back to a generic `ipsec/metrics` topic. Override via the
 // IOT_IPSEC_TOPIC env var to match whatever your edge gateway publishes on.
-const SUBSCRIBE_TOPIC = process.env.IOT_IPSEC_TOPIC   ?? 'ipsec/metrics';
+const subscribeTopic = () => process.env.IOT_IPSEC_TOPIC ?? 'ipsec/metrics';
 const CLIENT_ID      = process.env.IOT_CLIENT_ID      ?? `ce-server-${Math.random().toString(36).slice(2, 10)}`;
 
 interface IpsecSourceEvents {
@@ -58,11 +60,11 @@ class IpsecSource extends EventEmitter {
       const credentialsProvider = auth.AwsCredentialsProvider.newDefault();
       const builder = iot.AwsIotMqttConnectionConfigBuilder
         .new_with_websockets({
-          region: REGION,
+          region: region(),
           credentials_provider: credentialsProvider,
         });
 
-      builder.with_endpoint(ENDPOINT);
+      builder.with_endpoint(endpoint());
       builder.with_client_id(CLIENT_ID);
       builder.with_clean_session(true);
       builder.with_keep_alive_seconds(60);
@@ -74,7 +76,7 @@ class IpsecSource extends EventEmitter {
         this.connected = true;
         this.lastError = undefined;
         // eslint-disable-next-line no-console
-        console.log(`[ipsec] connected to ${ENDPOINT} as ${CLIENT_ID}, subscribing to "${SUBSCRIBE_TOPIC}"`);
+        console.log(`[ipsec] connected to ${endpoint()} as ${CLIENT_ID}, subscribing to "${subscribeTopic()}"`);
         this.emit('status', { connected: true });
       });
       this.connection.on('interrupt', (err) => {
@@ -105,7 +107,7 @@ class IpsecSource extends EventEmitter {
       await this.connection.connect();
 
       await this.connection.subscribe(
-        SUBSCRIBE_TOPIC,
+        subscribeTopic(),
         mqtt.QoS.AtMostOnce,
         (topic, payload) => this.handleMessage(topic, payload),
       );
@@ -121,6 +123,11 @@ class IpsecSource extends EventEmitter {
   private handleMessage(topic: string, payload: ArrayBuffer): void {
     try {
       const bytes = new Uint8Array(payload);
+
+      // DIAGNOSTIC: confirm messages are actually reaching the handler + their
+      // size/first bytes. Remove once the feed is confirmed working.
+      // eslint-disable-next-line no-console
+      console.log(`[ipsec] rx ${bytes.length}B on "${topic}" — first bytes: ${Array.from(bytes.slice(0, 8)).map((b) => b.toString(16).padStart(2, "0")).join(" ")}`);
 
       // The gateway publishes raw protobuf bytes on the configured topic.
       // If an upstream IoT Rule ever starts producing JSON instead (e.g. by
@@ -173,6 +180,13 @@ class IpsecSource extends EventEmitter {
       const state: IpsecGatewayState = { metrics: normalised, receivedAt: Date.now() };
       this.gateways.set(gatewayKey, state);
       this.emit('update', { gatewayKey, state });
+
+      // DIAGNOSTIC: dump the fully-decoded payload so we can confirm the
+      // protobuf is being interpreted correctly. Remove once confirmed.
+      // eslint-disable-next-line no-console
+      console.log(`[ipsec] decoded key="${gatewayKey}" ts=${normalised.timestamp_ms} active="${normalised.active_tunnel}" tunnel_count=${normalised.tunnel_count} tunnels=${normalised.tunnels.length} gw="${normalised.gateway.name}" mac="${normalised.gateway.mac}" wan=${normalised.wan.ifname}/${normalised.wan.link_up ? 'up' : 'down'} rx=${normalised.wan.rx_bytes} tx=${normalised.wan.tx_bytes}`);
+      // eslint-disable-next-line no-console
+      console.log('[ipsec] tunnels:', JSON.stringify(normalised.tunnels));
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error(`[ipsec] failed to parse payload on "${topic}":`, err);
@@ -185,8 +199,8 @@ class IpsecSource extends EventEmitter {
       receivedAt: Date.now(),
       connected: this.connected,
       lastError: this.lastError,
-      subscribedTopic: SUBSCRIBE_TOPIC,
-      endpoint: ENDPOINT,
+      subscribedTopic: subscribeTopic(),
+      endpoint: endpoint(),
     };
   }
 

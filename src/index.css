@@ -815,30 +815,48 @@ input:focus-visible,
 
 /* ─────────────────────────────────────────────────────────
  * PLC parameter "value changed" flash
- * A one-shot bright outline ring on a single sensor/output card when its
- * value changes meaningfully (e.g. operator turning a pot, toggling a relay).
- * Uses `outline` rather than box-shadow so it (a) isn't clipped by the
- * card's overflow-hidden and (b) doesn't fight the status-*-glow box-shadow
- * animations. Pepsi-blue → white sweep so it reads as "this just updated".
+ * A one-shot coloured outline ring + tint on a single sensor/output card when
+ * its value changes meaningfully (operator turning a pot, a relay toggling,
+ * a digital output flipping). The colour encodes direction — GREEN when the
+ * value rises / a state improves, AMBER when it falls / degrades — so a glance
+ * tells you not just *that* something changed but *which way*.
+ *
+ * Uses `outline` rather than box-shadow so it (a) isn't clipped by the card's
+ * overflow-hidden and (b) doesn't fight the status-*-glow box-shadow
+ * animations. Colours come from the --flash-line / --flash-fill custom
+ * properties set by the direction modifier classes below.
  * ────────────────────────────────────────────────────────── */
 @keyframes plc-value-flash {
   0% {
-    outline-color: rgba(120, 200, 255, 0);
-    background-color: rgba(117, 176, 234, 0);
+    outline-color: transparent;
+    background-color: transparent;
   }
-  18% {
-    outline-color: rgba(150, 215, 255, 0.95);
-    background-color: rgba(117, 176, 234, 0.16);
+  16% {
+    outline-color: var(--flash-line);
+    background-color: var(--flash-fill);
   }
   100% {
-    outline-color: rgba(120, 200, 255, 0);
-    background-color: rgba(117, 176, 234, 0);
+    outline-color: transparent;
+    background-color: transparent;
   }
 }
 .plc-value-flash {
-  outline: 2px solid rgba(120, 200, 255, 0);
+  /* Fallback colours (neutral blue) in case a modifier class is ever missing. */
+  --flash-line: rgba(150, 215, 255, 0.95);
+  --flash-fill: rgba(117, 176, 234, 0.16);
+  outline: 2.5px solid transparent;
   outline-offset: -1px;
-  animation: plc-value-flash 0.85s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: plc-value-flash 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* Value rose / state improved — emerald. */
+.plc-value-flash-up {
+  --flash-line: rgba(52, 232, 162, 0.98);
+  --flash-fill: rgba(16, 185, 129, 0.20);
+}
+/* Value fell / state degraded — amber. */
+.plc-value-flash-down {
+  --flash-line: rgba(255, 176, 70, 0.98);
+  --flash-fill: rgba(245, 158, 11, 0.18);
 }
 
 /* ─────────────────────────────────────────────────────────

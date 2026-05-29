@@ -64,7 +64,7 @@ const Dashboard: React.FC = () => {
           </div>
           <div className="min-w-0 pl-1">
             <div className="text-[15px] font-bold tracking-[0.24em] text-white/95 uppercase truncate leading-none">
-              PepsiCo Manufacturing
+              Manufacturing Industry
             </div>
             <div className="text-[10px] text-white/45 font-medium tracking-[0.3em] mt-1.5 uppercase">
               Live Operations

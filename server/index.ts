@@ -11,18 +11,21 @@
  *   GET  /api/video/:id            (MJPEG passthrough)
  *
  * dotenv MUST load before any other import that consumes env vars (the AWS
- * IoT SDK inside ipsecSource reads them at module load time), so the
- * loadDotenv() call sits at the very top.
+ * IoT SDK inside ipsecSource reads IOT_IPSEC_TOPIC / creds / endpoint at
+ * module-load time). Because ESM hoists imports above top-level statements,
+ * env loading lives in its own module that is imported FIRST below — that
+ * guarantees it runs before ipsecSource et al. are evaluated.
  */
 
-import { config as loadDotenv } from 'dotenv';
-loadDotenv({ override: true });
+import './load-env.js';
 
 import express from 'express';
 import cors from 'cors';
 import { registerIpsecRoutes } from './ipsec-routes.js';
 import { registerIpsecInsightRoute } from './ipsec-insight-route.js';
 import { registerVideoRoutes } from './video-routes.js';
+import { ipsecSource } from './ipsecSource.js';
+import { pathControlSource } from './pathControlSource.js';
 
 const app = express();
 app.use(cors());
@@ -40,4 +43,12 @@ const PORT = Number(process.env.PORT ?? 3001);
 app.listen(PORT, "127.0.0.1", () => {
   // eslint-disable-next-line no-console
   console.log(`[server] listening on http://127.0.0.1:${PORT}`);
+  // Kick off the AWS IoT subscription — without this the dashboard never
+  // receives any IPsec telemetry (this was the missing piece).
+  void ipsecSource.start();
+  // Pre-connect the path-control publisher so the rdk/path/control/result
+  // subscription is live before the first DPS button press (it would otherwise
+  // connect lazily on the first /api/gateway/path call). Swallow startup
+  // errors — the route surfaces them per-request if creds are missing.
+  void pathControlSource.start().catch(() => { /* logged inside start() */ });
 });
