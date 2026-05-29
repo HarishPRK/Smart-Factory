@@ -6,25 +6,35 @@ import { useTweenedNumber } from "../hooks/useTweenedNumber";
 import ThreePhaseMotorWidget from "./ThreePhaseMotorWidget";
 
 /**
- * Returns a CSS class that flashes a card's outline when its value changes by
- * more than `threshold` fraction of its range. Filters out sensor micro-jitter
- * (which would strobe the whole panel) so only deliberate changes — an operator
+ * Direction of a meaningful value change — drives the flash colour.
+ *   "up"   → value rose      (green flash)
+ *   "down" → value fell       (amber flash)
+ *   null   → no active flash
+ */
+type FlashDir = "up" | "down" | null;
+
+/**
+ * Returns the direction of the most recent meaningful change so the card can
+ * flash a colour. A change counts only if it exceeds `threshold` fraction of
+ * the parameter's range — this filters out sensor micro-jitter (which would
+ * otherwise strobe the whole panel) so only deliberate changes — an operator
  * turning a pot, a relay toggling — light up the box. Reusable for analog
  * (numeric) and digital (boolean) parameters.
  */
-function useChangeFlash(value: number, range: number, threshold = 0.03): boolean {
-  const [flash, setFlash] = useState(false);
+function useChangeFlash(value: number, range: number, threshold = 0.03): FlashDir {
+  const [flash, setFlash] = useState<FlashDir>(null);
   const prevRef = useRef(value);
   useEffect(() => {
-    const delta = Math.abs(value - prevRef.current);
-    const significant = range > 0 ? delta / range > threshold : delta > 0.5;
+    const delta = value - prevRef.current;
+    const significant = range > 0 ? Math.abs(delta) / range > threshold : Math.abs(delta) > 0.5;
     if (significant) {
+      const dir: FlashDir = delta > 0 ? "up" : "down";
       prevRef.current = value;
-      setFlash(false);
+      setFlash(null);
       // rAF so removing → re-adding the class restarts the CSS animation even
       // on rapid successive changes.
-      const raf = requestAnimationFrame(() => setFlash(true));
-      const t = setTimeout(() => setFlash(false), 850);
+      const raf = requestAnimationFrame(() => setFlash(dir));
+      const t = setTimeout(() => setFlash(null), 850);
       return () => {
         cancelAnimationFrame(raf);
         clearTimeout(t);
@@ -33,6 +43,13 @@ function useChangeFlash(value: number, range: number, threshold = 0.03): boolean
     prevRef.current = value;
   }, [value, range, threshold]);
   return flash;
+}
+
+/** Maps a flash direction to the paired CSS classes (base + colour modifier). */
+function flashClass(dir: FlashDir): string {
+  if (dir === "up") return "plc-value-flash plc-value-flash-up";
+  if (dir === "down") return "plc-value-flash plc-value-flash-down";
+  return "";
 }
 
 /* ── Status badge ──────────────────────────────────────── */
@@ -125,7 +142,7 @@ const AnalogCard: React.FC<{ param: PLCParameter }> = ({ param }) => {
 
   return (
     <div
-      className={`card-inner p-2 flex flex-col justify-between transition-all duration-300 relative overflow-hidden group/card ${glowClass} ${flash ? "plc-value-flash" : ""}`}
+      className={`card-inner p-2 flex flex-col justify-between transition-all duration-300 relative overflow-hidden group/card ${glowClass} ${flashClass(flash)}`}
     >
       {/* Top row: label + status */}
       <div className="flex justify-between items-center gap-1 relative z-10">
@@ -207,7 +224,7 @@ const DigitalCard: React.FC<{ param: PLCParameter; onToggle?: () => void }> = ({
     <div
       className={`card-inner p-2 flex flex-col justify-between transition-all duration-500 relative overflow-hidden group/card ${
         onToggle ? "cursor-pointer active:scale-[0.97]" : ""
-      } ${flash ? "plc-value-flash" : ""}`}
+      } ${flashClass(flash)}`}
       onClick={onToggle}
       style={{
         borderColor: active ? `${hex}30` : undefined,
@@ -312,10 +329,14 @@ const RelayCard: React.FC<{ param: PLCParameter }> = ({ param }) => {
       : hex === "#ef4444" || label === "Offline"
         ? "status-alarm-glow"
         : "";
+  // Health rank (healthy=2 / partial=1 / offline=0) so a state transition
+  // flashes green when it improves and amber when it degrades.
+  const healthRank = hex === "#10b981" ? 2 : hex === "#f59e0b" ? 1 : 0;
+  const flash = useChangeFlash(healthRank, 1);
 
   return (
     <div
-      className={`card-inner p-2 flex flex-col justify-between transition-all duration-500 relative overflow-hidden group/card ${glowClass}`}
+      className={`card-inner p-2 flex flex-col justify-between transition-all duration-500 relative overflow-hidden group/card ${glowClass} ${flashClass(flash)}`}
       style={{ borderColor: `${hex}30`, backgroundColor: `${hex}06` }}
     >
       {/* Top: label + status */}
