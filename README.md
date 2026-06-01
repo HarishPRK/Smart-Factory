@@ -82,15 +82,9 @@ npm install
 
 ### Configure environment
 
-Copy the example file and fill in your own values locally:
-
-```bash
-cp .env.example .env
-```
-
-The `.env` file is gitignored and must never be committed — it holds secrets such
-as AWS credentials and API keys. See [Configuration](#configuration) for the
-variables consumed by the backend.
+Create a `.env` file in the project root and add the values your environment
+needs. See [Configuration](#configuration) for the variables the backend reads.
+The `.env` file is gitignored and must not be committed.
 
 ### Run the frontend
 
@@ -138,8 +132,7 @@ Analytics features. Registered routes include:
 
 ## Configuration
 
-Backend configuration is read from `.env` (see `.env.example` for the full,
-documented template). Key variables include:
+Backend configuration is read from `.env`. Key variables include:
 
 - `PORT` — backend port (default `3001`)
 - `AWS_IOT_ENDPOINT`, `AWS_IOT_TOPIC` — AWS IoT Core endpoint and IPsec topic
@@ -182,11 +175,3 @@ Live site: `https://harishprk.github.io/smart-factory/`
 
 For deploying the backend on a VM, see `deploy/EC2_SETUP.md` and the reverse-proxy
 configuration in `deploy/nginx.conf`.
-
-## Security
-
-- `.env` is gitignored and must never be committed.
-- Rotate any credential that has ever been exposed; removing a file from history
-  does not invalidate a leaked secret.
-- Use temporary credentials or an instance profile instead of long-term access
-  keys wherever possible.
