@@ -8,7 +8,7 @@ import { STAGE_POSITIONS } from "./digitalTwinLayout";
 import type { StageId } from "../../types/digitalTwin";
 
 /**
- * EmergencyResponse3D â€” Animated emergency workers + vehicles
+ * EmergencyResponse3D — Animated emergency workers + vehicles
  *
  * When a stage status is "faulted" or "warning":
  *  - A response worker runs from the standby area to the affected stage
@@ -19,7 +19,7 @@ import type { StageId } from "../../types/digitalTwin";
  * Uses a single useFrame for all responders.
  */
 
-const STANDBY_POS: [number, number, number] = [11, 0, 3]; // Safety office â€” clear of tanks and trucks
+const STANDBY_POS: [number, number, number] = [11, 0, 3]; // Safety office — clear of tanks and trucks
 
 interface Responder {
   id: string;
@@ -32,9 +32,9 @@ interface Responder {
 }
 
 const RESPONDERS: { id: string; label: string; color: string; standbyOffset: [number, number, number] }[] = [
-  { id: "resp1", label: "EHS Officer â€” Tom Bradley", color: "#ef4444", standbyOffset: [0, 0, 0] },
-  { id: "resp2", label: "Maintenance â€” Jake Wilson", color: "#f59e0b", standbyOffset: [1.2, 0, 0] },
-  { id: "resp3", label: "Shift Lead â€” Maria Santos", color: "#3b82f6", standbyOffset: [0, 0, 1.2] },
+  { id: "resp1", label: "EHS Officer — Tom Bradley", color: "#ef4444", standbyOffset: [0, 0, 0] },
+  { id: "resp2", label: "Maintenance — Jake Wilson", color: "#f59e0b", standbyOffset: [1.2, 0, 0] },
+  { id: "resp3", label: "Shift Lead — Maria Santos", color: "#3b82f6", standbyOffset: [0, 0, 1.2] },
 ];
 
 const STAGE_IDS: StageId[] = ["intake", "mixing", "forming", "curing", "quality", "packaging", "dispatch"];
@@ -89,7 +89,7 @@ const EmergencyResponse3D: React.FC = () => {
 
       // Check if assigned fault is still active
       if (resp.targetStageId && !faultedStages.includes(resp.targetStageId)) {
-        // Fault cleared â€” return to standby
+        // Fault cleared — return to standby
         if (resp.state !== "returning" && resp.state !== "standby") {
           resp.state = "returning";
           resp.stateTimer = 0;
@@ -198,15 +198,15 @@ const EmergencyResponse3D: React.FC = () => {
       const label = labelRefs.current[i];
       if (label) {
         if (resp.state === "running_to") {
-          label.textContent = `${resp.label} â†’ responding`;
+          label.textContent = `${resp.label} → responding`;
           label.style.display = "block";
           label.style.color = "#ef4444";
         } else if (resp.state === "inspecting") {
-          label.textContent = `${resp.label} â€” inspecting`;
+          label.textContent = `${resp.label} — inspecting`;
           label.style.display = "block";
           label.style.color = "#f59e0b";
         } else if (resp.state === "returning") {
-          label.textContent = `${resp.label} â† returning`;
+          label.textContent = `${resp.label} ← returning`;
           label.style.display = "block";
           label.style.color = "#10b981";
         } else {

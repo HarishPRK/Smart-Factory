@@ -9,16 +9,16 @@ import { setCameraTarget } from "./CameraController";
 import type { StageId } from "../../types/digitalTwin";
 
 /**
- * InteractiveOverlay3D â€” Makes the entire factory interactive
+ * InteractiveOverlay3D — Makes the entire factory interactive
  *
  * Clickable zones around each element type:
  *  - Equipment stations (already handled by ManufacturingStage3D click)
- *  - Workers â€” shows role + status
- *  - Robots â€” shows arm type + task
- *  - Silos â€” shows fill level + material
- *  - Trucks â€” shows vehicle info + cargo status
- *  - Forklift â€” shows operator + load info
- *  - Conveyor sections â€” shows speed + throughput
+ *  - Workers — shows role + status
+ *  - Robots — shows arm type + task
+ *  - Silos — shows fill level + material
+ *  - Trucks — shows vehicle info + cargo status
+ *  - Forklift — shows operator + load info
+ *  - Conveyor sections — shows speed + throughput
  *
  * Hover effect: glowing outline ring appears under hovered object.
  */
@@ -38,7 +38,7 @@ const INTERACTIVE_ITEMS: InfoItem[] = [
   {
     id: "worker-intake",
     title: "Operator: Mike Johnson",
-    subtitle: "Material Inspector â€” OSHA Certified",
+    subtitle: "Material Inspector — OSHA Certified",
     position: [STAGE_POSITIONS.intake[0] - 0.8, 1.5, STAGE_POSITIONS.intake[2] + 1.2],
     details: [
       { label: "Shift", value: "Day Shift (6AM-2PM)" },
@@ -52,7 +52,7 @@ const INTERACTIVE_ITEMS: InfoItem[] = [
   {
     id: "worker-mixing",
     title: "Operator: Harish Radhakrishnan",
-    subtitle: "Chemical Technician â€” HazMat Certified",
+    subtitle: "Chemical Technician — HazMat Certified",
     position: [STAGE_POSITIONS.mixing[0] + 0.8, 1.5, STAGE_POSITIONS.mixing[2] + 1.2],
     details: [
       { label: "Shift", value: "Day Shift (6AM-2PM)" },
@@ -66,11 +66,11 @@ const INTERACTIVE_ITEMS: InfoItem[] = [
   {
     id: "worker-quality",
     title: "Inspector: Sarah Mitchell",
-    subtitle: "QC Inspector â€” ISO 9001 Lead Auditor",
+    subtitle: "QC Inspector — ISO 9001 Lead Auditor",
     position: [STAGE_POSITIONS.quality[0] - 0.7, 1.5, STAGE_POSITIONS.quality[2] + 1.2],
     details: [
       { label: "Shift", value: "Day Shift (6AM-2PM)" },
-      { label: "Task", value: "Dimensional verification â€” FDA 21 CFR" },
+      { label: "Task", value: "Dimensional verification — FDA 21 CFR" },
       { label: "Inspected today", value: "847 bottles" },
       { label: "Reject rate", value: "1.2%", color: "#10b981" },
       { label: "Employee ID", value: "EMP-2956" },
@@ -87,7 +87,7 @@ const INTERACTIVE_ITEMS: InfoItem[] = [
       { label: "Status", value: "Operating", color: "#10b981" },
       { label: "Cycle time", value: "4.2 sec" },
       { label: "Cycles today", value: "3,847" },
-      { label: "Accuracy", value: "Â±0.02mm" },
+      { label: "Accuracy", value: "±0.02mm" },
       { label: "Next maintenance", value: "In 72 hrs" },
     ],
     accentColor: "#f59e0b",
@@ -122,13 +122,13 @@ const INTERACTIVE_ITEMS: InfoItem[] = [
   {
     id: "silo-pet",
     title: "Silo A: PET Resin",
-    subtitle: "Virgin PET Grade A-1 â€” Eastman Chemical",
+    subtitle: "Virgin PET Grade A-1 — Eastman Chemical",
     position: [STAGE_POSITIONS.intake[0] - 2.0, 3.5, STAGE_POSITIONS.intake[2] - 2.0],
     details: [
       { label: "Capacity", value: "26,000 lbs" },
       { label: "Current level", value: "73%", color: "#10b981" },
       { label: "Material", value: "PET Chip (IV 0.80)" },
-      { label: "Temperature", value: "329Â°F" },
+      { label: "Temperature", value: "329°F" },
       { label: "Supplier", value: "Eastman, Kingsport TN" },
       { label: "Last refill", value: "4 hrs ago" },
     ],
@@ -137,7 +137,7 @@ const INTERACTIVE_ITEMS: InfoItem[] = [
   {
     id: "silo-additive",
     title: "Silo B: Additives",
-    subtitle: "UV Stabilizer + Slip Agent â€” Clariant",
+    subtitle: "UV Stabilizer + Slip Agent — Clariant",
     position: [STAGE_POSITIONS.intake[0] - 0.5, 3.0, STAGE_POSITIONS.intake[2] - 2.0],
     details: [
       { label: "Capacity", value: "6,600 lbs" },
@@ -149,7 +149,7 @@ const INTERACTIVE_ITEMS: InfoItem[] = [
   },
 ];
 
-/* â”€â”€ Hover Ring â€” glowing circle under hovered items â”€â”€ */
+/* â”€â”€ Hover Ring — glowing circle under hovered items â”€â”€ */
 const HoverRing: React.FC<{ position: [number, number, number]; color: string; visible: boolean }> = ({
   position, color, visible,
 }) => {
@@ -169,7 +169,7 @@ const HoverRing: React.FC<{ position: [number, number, number]; color: string; v
   );
 };
 
-/* â”€â”€ Clickable Zone â€” invisible box that captures hover/click â”€â”€ */
+/* â”€â”€ Clickable Zone — invisible box that captures hover/click â”€â”€ */
 const ClickZone: React.FC<{
   item: InfoItem;
   onSelect: (item: InfoItem) => void;
@@ -211,7 +211,7 @@ const ClickZone: React.FC<{
   </group>
 );
 
-/* â”€â”€ Detail Panel â€” shown on click â”€â”€ */
+/* â”€â”€ Detail Panel — shown on click â”€â”€ */
 const DetailPanel: React.FC<{
   item: InfoItem;
   onClose: () => void;
@@ -250,7 +250,7 @@ const DetailPanel: React.FC<{
             lineHeight: 1,
           }}
         >
-          Ã—
+          ×
         </button>
       </div>
 
@@ -277,7 +277,7 @@ const DetailPanel: React.FC<{
   </Html>
 );
 
-/* â”€â”€ Production Stats Bar â€” live throughput â”€â”€ */
+/* â”€â”€ Production Stats Bar — live throughput â”€â”€ */
 const ProductionStats: React.FC = () => {
   const tick = useDigitalTwinStore((s) => s.tick);
   const stats = React.useMemo(() => {

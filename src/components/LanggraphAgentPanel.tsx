@@ -798,12 +798,66 @@ function renderBubbleContent(m: LangraphMessage, onCancel: () => void) {
 
 /* -- Thinking state -------------------------------------- */
 
-const THINKING_PHASES = [
-  { label: "Routing query...", icon: ">" },
-  { label: "Fetching from Historian...", icon: "*" },
-  { label: "Analyzing live PLC signals...", icon: "âŸ" },
-  { label: "Cross-checking alerts...", icon: "âš " },
-  { label: "Synthesizing answer...", icon: "*" },
+/* Crisp inline icons per thinking phase — replaces the old text/emoji glyphs
+ * (which were rendering as mojibake) so nothing can corrupt. */
+const PhaseGlyph: React.FC<{ name: string }> = ({ name }) => {
+  const common = {
+    width: 14,
+    height: 14,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.8,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+  switch (name) {
+    case "route":
+      return (
+        <svg {...common}>
+          <circle cx="6" cy="6" r="2.4" />
+          <circle cx="18" cy="18" r="2.4" />
+          <path d="M8.4 6H14a4 4 0 0 1 4 4v5.6" />
+        </svg>
+      );
+    case "database":
+      return (
+        <svg {...common}>
+          <ellipse cx="12" cy="6" rx="7" ry="3" />
+          <path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6" />
+          <path d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3" />
+        </svg>
+      );
+    case "activity":
+      return (
+        <svg {...common}>
+          <path d="M3 12h3l3 7 4-14 3 7h5" />
+        </svg>
+      );
+    case "alert":
+      return (
+        <svg {...common}>
+          <path d="M12 3.5 21 19H3z" />
+          <path d="M12 9.5v4" />
+          <circle cx="12" cy="16.4" r="0.6" fill="currentColor" stroke="none" />
+        </svg>
+      );
+    case "sparkle":
+    default:
+      return (
+        <svg {...common}>
+          <path d="M12 3l1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7z" />
+        </svg>
+      );
+  }
+};
+
+const THINKING_PHASES: { label: string; name: string }[] = [
+  { label: "Routing query…", name: "route" },
+  { label: "Fetching from Historian…", name: "database" },
+  { label: "Analyzing live PLC signals…", name: "activity" },
+  { label: "Cross-checking alerts…", name: "alert" },
+  { label: "Synthesizing answer…", name: "sparkle" },
 ];
 
 const ThinkingContent: React.FC<{ elapsedMs: number; onCancel: () => void }> = ({
@@ -977,33 +1031,62 @@ const ThinkingContent: React.FC<{ elapsedMs: number; onCancel: () => void }> = (
         }}
       >
         <span
+          key={`icon-${phase}`}
           aria-hidden
           style={{
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
-            width: "20px",
-            height: "20px",
-            borderRadius: "6px",
-            background: "rgba(167, 139, 250, 0.14)",
-            border: "1px solid rgba(167, 139, 250, 0.28)",
-            color: "#ddd6fe",
-            fontSize: "11px",
+            width: "24px",
+            height: "24px",
+            borderRadius: "8px",
+            background:
+              "linear-gradient(135deg, rgba(167,139,250,0.28), rgba(124,58,237,0.12))",
+            border: "1px solid rgba(167, 139, 250, 0.4)",
+            boxShadow: "0 0 12px rgba(139,92,246,0.25)",
+            color: "#ede9fe",
+            flex: "none",
+            animation: "lg-phase-fade 1.8s ease both",
           }}
         >
-          {current.icon}
+          <PhaseGlyph name={current.name} />
         </span>
         <span
           key={phase}
           style={{
             fontSize: "13px",
-            color: "#cbd5e1",
+            fontWeight: 500,
+            color: "#ddd6fe",
             letterSpacing: "0.01em",
             animation: "lg-phase-fade 1.8s ease both",
           }}
         >
           {current.label}
         </span>
+
+        <span style={{ flex: 1 }} />
+
+        {/* Step-progress dots */}
+        <div style={{ display: "flex", gap: "5px", alignItems: "center" }}>
+          {THINKING_PHASES.map((_, i) => (
+            <span
+              key={i}
+              aria-hidden
+              style={{
+                width: i === phase ? "16px" : "5px",
+                height: "5px",
+                borderRadius: "999px",
+                background:
+                  i === phase
+                    ? "linear-gradient(90deg, #c4b5fd, #7c3aed)"
+                    : "rgba(167, 139, 250, 0.25)",
+                boxShadow:
+                  i === phase ? "0 0 8px rgba(167,139,250,0.6)" : "none",
+                transition: "width 0.35s ease, background 0.35s ease",
+              }}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );

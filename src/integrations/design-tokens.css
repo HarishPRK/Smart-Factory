@@ -666,6 +666,12 @@
   border: 1px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
+  /* Skip rendering the heavy per-tile SVG illustration until the tile is
+     near the viewport. With 12 detail-rich scenes this cuts the modal's
+     first-paint cost dramatically; intrinsic-size keeps scroll/layout stable
+     so off-screen tiles still reserve their space. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 280px;
   transition:
     border-color 0.2s ease,
     transform 0.2s ease,

@@ -245,6 +245,23 @@ body::before {
 .delay-5 { animation-delay: 0.30s; }
 .delay-6 { animation-delay: 0.36s; }
 
+/* ── OEE dashboard motion ───────────────────────────────────
+ * Used by OEEPanel / OEEGauge: the trend lines draw themselves in via a
+ * normalized pathLength (1 → 0), the area under the OEE line rises in, and a
+ * highlight sweeps across the pillar bars and the panel's top accent. */
+@keyframes oee-draw {
+  from { stroke-dashoffset: 1; }
+  to   { stroke-dashoffset: 0; }
+}
+@keyframes oee-area-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes oee-bar-shimmer {
+  0%   { transform: translateX(-120%); }
+  60%, 100% { transform: translateX(360%); }
+}
+
 /* Shimmer — retuned as a subtle instrument highlight, not a cyber sweep */
 .shimmer-border {
   position: relative;
@@ -1410,32 +1427,25 @@ input:focus-visible,
   line-height: 1;
 }
 
-/* ─────────────────────────────────────────────────────────
- * Universal font-size bump — improves readability on large
- * factory-floor displays at 100% zoom. Bumps the small
- * arbitrary tailwind sizes that are sprinkled across the app
- * (text-[10px], text-[11px], …) by ~1–2px, plus tightens the
- * built-in xs/sm helpers and the named industrial labels.
- * Designed to be non-breaking — fixed-height cards still fit.
- * ────────────────────────────────────────────────────────── */
-[class*="text-[8px]"]  { font-size: 10px !important; }
-[class*="text-[9px]"]  { font-size: 11px !important; }
-[class*="text-[10px]"] { font-size: 12px !important; }
-[class*="text-[11px]"] { font-size: 13px !important; }
-[class*="text-[12px]"] { font-size: 14px !important; }
-[class*="text-[13px]"] { font-size: 14px !important; }
-[class*="text-[14px]"] { font-size: 15px !important; }
-[class*="text-[15px]"] { font-size: 16px !important; }
-[class*="text-[16px]"] { font-size: 17px !important; }
-[class*="text-[17px]"] { font-size: 18px !important; }
-[class*="text-[18px]"] { font-size: 19px !important; }
-[class*="text-[20px]"] { font-size: 21px !important; }
-[class*="text-[22px]"] { font-size: 23px !important; }
-[class*="text-[24px]"] { font-size: 25px !important; }
+/* Fit-to-width scaling support (see src/hooks/useFitToWidth.ts).
+ * When the app is zoomed down to fit narrow viewports, a raw 100dvh element
+ * would only cover `zoom × screen height`, leaving an empty band at the bottom.
+ * The hook publishes `--fit-vh` (= innerHeight / zoom); these overrides make the
+ * viewport-height utilities use it so the full-height layout still fills the
+ * screen. When not scaling, `--fit-vh` is unset and they fall back to 100dvh.
+ * Unlayered rules intentionally win over Tailwind's @layer utilities. */
+.min-h-dvh { min-height: var(--fit-vh, 100dvh); }
+.h-dvh     { height:     var(--fit-vh, 100dvh); }
+.max-h-dvh { max-height: var(--fit-vh, 100dvh); }
 
-/* Built-in tailwind helpers */
-.text-xs  { font-size: 13px !important; line-height: 1.35 !important; }
-.text-sm  { font-size: 15px !important; line-height: 1.45 !important; }
+/* NOTE: A global "font-size bump" used to live here — it overrode every
+ * arbitrary tailwind size (text-[10px] → 12px, etc.) plus .text-xs/.text-sm
+ * with !important. It inflated all text ~1–3px beyond what the fixed-size
+ * cards/badges were built for, causing widespread truncation ("Normal" →
+ * "Norm"), a clipped header, and an oversized/misaligned UI. Removed so text
+ * renders at the sizes the layout was designed for. If larger text is needed
+ * on big factory-floor displays, scale the root font-size responsively
+ * instead of force-overriding individual utilities. */
 
 /* Named industrial helpers */
 .ind-label    { font-size: 11px; }

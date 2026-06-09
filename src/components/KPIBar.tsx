@@ -1,8 +1,42 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useFilters } from "../context/FilterContext";
 import { kpis, getKpiForZone } from "../data/mockData";
+import { useTweenedNumber } from "../hooks/useTweenedNumber";
 import KOSDispenseWidget from "./KOSDispenseWidget";
 import LorawanWidget from "./LorawanWidget";
+
+/* ── Count-up KPI value ─────────────────────────────────
+ * KPI values arrive as preformatted strings ("2,041", "128.1", "75.2"). This
+ * parses the number, sweeps to it (from 0 on first mount, from the current
+ * value on zone switches), and re-formats preserving the original grouping
+ * and decimal places. Non-numeric values fall through unchanged. */
+function parseKpiValue(s: string) {
+  const cleaned = s.replace(/,/g, "");
+  const num = parseFloat(cleaned);
+  const dot = cleaned.indexOf(".");
+  const decimals = dot >= 0 ? cleaned.length - dot - 1 : 0;
+  return { num, decimals, group: s.includes(",") || num >= 1000, ok: Number.isFinite(num) };
+}
+
+const KpiCountUp: React.FC<{ value: string }> = ({ value }) => {
+  const { num, decimals, group, ok } = parseKpiValue(value);
+  const [revealed, setRevealed] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setRevealed(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  const tweened = useTweenedNumber(ok && revealed ? num : 0, 900);
+  if (!ok) return <>{value}</>;
+  return (
+    <>
+      {tweened.toLocaleString("en-US", {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+        useGrouping: group,
+      })}
+    </>
+  );
+};
 
 const MiniSparkline: React.FC<{ data: number[]; color: string }> = ({
   data,
@@ -165,7 +199,7 @@ const KPIBar: React.FC<KPIBarProps> = ({ onOeeClick, onAnalyticsClick, onPredict
                   dispatch({ type: "SET_KPI", kpi: kpi.id });
                 }
               }}
-              className={`card shimmer-border ${kpi.hoverBorder} p-3.5 flex flex-col justify-between h-[96px] min-w-[145px] max-w-[260px] flex-1 basis-[145px] relative overflow-hidden animate-fade-in delay-${i + 1} group cursor-pointer transition-all duration-300 ${
+              className={`card shimmer-border ${kpi.hoverBorder} p-3.5 flex flex-col justify-between h-[96px] min-w-[190px] max-w-[320px] flex-1 basis-[190px] relative overflow-hidden animate-fade-in delay-${i + 1} group cursor-pointer transition-all duration-300 ${
                 isSelected
                   ? "ring-1 ring-white/20 shadow-[0_0_20px_rgba(0,92,185,0.20)] scale-[1.02]"
                   : ""
@@ -212,8 +246,8 @@ const KPIBar: React.FC<KPIBarProps> = ({ onOeeClick, onAnalyticsClick, onPredict
                 </div>
               </div>
               <div className="flex items-baseline gap-1.5 mt-auto relative z-10">
-                <span className="text-[26px] font-semibold gradient-number leading-none tracking-tight">
-                  {zoneData.value}
+                <span className="text-[26px] font-semibold gradient-number leading-none tracking-tight tabular-nums">
+                  <KpiCountUp value={zoneData.value} />
                 </span>
                 <span className="text-[11px] text-blue-200/70 font-medium">
                   {kpi.unit}
@@ -231,7 +265,7 @@ const KPIBar: React.FC<KPIBarProps> = ({ onOeeClick, onAnalyticsClick, onPredict
         {onAnalyticsClick && (
           <button
             onClick={onAnalyticsClick}
-            className="card shimmer-border hover:border-cyan-400/30 p-3.5 flex flex-col justify-between h-[96px] min-w-[145px] max-w-[260px] flex-1 basis-[145px] relative overflow-hidden group/analytics cursor-pointer transition-all duration-300 text-left"
+            className="card shimmer-border hover:border-cyan-400/30 p-3.5 flex flex-col justify-between h-[96px] min-w-[190px] max-w-[320px] flex-1 basis-[190px] relative overflow-hidden group/analytics cursor-pointer transition-all duration-300 text-left"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/[0.12] to-blue-500/[0.04] opacity-0 group-hover/analytics:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
             <div className="absolute bottom-2 right-3 z-0 opacity-50 group-hover/analytics:opacity-75 transition-opacity duration-500">
@@ -267,7 +301,7 @@ const KPIBar: React.FC<KPIBarProps> = ({ onOeeClick, onAnalyticsClick, onPredict
         {onPredictClick && (
           <button
             onClick={onPredictClick}
-            className="card shimmer-border hover:border-purple-400/30 p-3.5 flex flex-col justify-between h-[96px] min-w-[145px] max-w-[260px] flex-1 basis-[145px] relative overflow-hidden group/predict cursor-pointer transition-all duration-300 text-left"
+            className="card shimmer-border hover:border-purple-400/30 p-3.5 flex flex-col justify-between h-[96px] min-w-[190px] max-w-[320px] flex-1 basis-[190px] relative overflow-hidden group/predict cursor-pointer transition-all duration-300 text-left"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-purple-500/[0.14] to-fuchsia-500/[0.04] opacity-0 group-hover/predict:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
             <div className="absolute bottom-2 right-3 z-0 opacity-55 group-hover/predict:opacity-80 transition-opacity duration-500">
@@ -307,7 +341,7 @@ const KPIBar: React.FC<KPIBarProps> = ({ onOeeClick, onAnalyticsClick, onPredict
         {onDigitalTwinClick && (
           <button
             onClick={onDigitalTwinClick}
-            className="card shimmer-border hover:border-emerald-400/30 p-3.5 flex flex-col justify-between h-[96px] min-w-[145px] max-w-[260px] flex-1 basis-[145px] relative overflow-hidden group/twin cursor-pointer transition-all duration-300 text-left"
+            className="card shimmer-border hover:border-emerald-400/30 p-3.5 flex flex-col justify-between h-[96px] min-w-[190px] max-w-[320px] flex-1 basis-[190px] relative overflow-hidden group/twin cursor-pointer transition-all duration-300 text-left"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/[0.12] to-teal-500/[0.04] opacity-0 group-hover/twin:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
             <div className="absolute bottom-2 right-3 z-0 opacity-55 group-hover/twin:opacity-80 transition-opacity duration-500">
@@ -342,7 +376,7 @@ const KPIBar: React.FC<KPIBarProps> = ({ onOeeClick, onAnalyticsClick, onPredict
         {onDpsClick && (
           <button
             onClick={onDpsClick}
-            className="card shimmer-border hover:border-blue-400/30 p-3.5 flex flex-col justify-between h-[96px] min-w-[145px] max-w-[260px] flex-1 basis-[145px] relative overflow-hidden group/dps cursor-pointer transition-all duration-300 text-left"
+            className="card shimmer-border hover:border-blue-400/30 p-3.5 flex flex-col justify-between h-[96px] min-w-[190px] max-w-[320px] flex-1 basis-[190px] relative overflow-hidden group/dps cursor-pointer transition-all duration-300 text-left"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-blue-500/[0.14] to-sky-500/[0.04] opacity-0 group-hover/dps:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
             <div className="absolute bottom-2 right-3 z-0 opacity-55 group-hover/dps:opacity-80 transition-opacity duration-500">
@@ -378,7 +412,7 @@ const KPIBar: React.FC<KPIBarProps> = ({ onOeeClick, onAnalyticsClick, onPredict
         {onVideoClick && (
           <button
             onClick={onVideoClick}
-            className="card shimmer-border hover:border-rose-400/30 p-3.5 flex flex-col justify-between h-[96px] min-w-[145px] max-w-[260px] flex-1 basis-[145px] relative overflow-hidden group/video cursor-pointer transition-all duration-300 text-left"
+            className="card shimmer-border hover:border-rose-400/30 p-3.5 flex flex-col justify-between h-[96px] min-w-[190px] max-w-[320px] flex-1 basis-[190px] relative overflow-hidden group/video cursor-pointer transition-all duration-300 text-left"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-rose-500/[0.12] to-red-500/[0.04] opacity-0 group-hover/video:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
             <div className="absolute bottom-2 right-3 z-0 opacity-55 group-hover/video:opacity-80 transition-opacity duration-500">

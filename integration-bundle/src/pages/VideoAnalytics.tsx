@@ -1190,7 +1190,7 @@ function SceneParking() {
         <rect x="-11" y="8" width="22" height="12" rx="2" fill="rgba(0,0,0,0.45)" />
       </g>
 
-      {/* Bay E: DUCK waddling across the lot 🦆 */}
+      {/* Bay E */}
       <g transform="translate(210 132)">
         {/* body */}
         <ellipse cx="0" cy="0" rx="10" ry="6" fill="#fbbf24" stroke="#92400e" strokeWidth="0.7" />

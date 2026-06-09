@@ -19,7 +19,6 @@ import AnimatedMachinery3D from "./AnimatedMachinery3D";
 import InteractiveOverlay3D from "./InteractiveOverlay3D";
 import FunControls from "./FunControls";
 import SelectedStagePanel from "./SelectedStagePanel";
-import EmergencyResponse3D from "./EmergencyResponse3D";
 import BottleProcessing3D from "./BottleProcessing3D";
 import FactoryExtras3D from "./FactoryExtras3D";
 import FactoryPremium3D from "./FactoryPremium3D";
@@ -518,7 +517,7 @@ const SceneContent: React.FC<{
         maxDistance={55}
         enableDamping
         dampingFactor={0.08}
-        target={[0, 0, 0]}
+        target={[-3.08, -2.43, -1.14]}
         mouseButtons={{
           LEFT: THREE.MOUSE.ROTATE,
           MIDDLE: THREE.MOUSE.PAN,
@@ -552,8 +551,9 @@ const SceneContent: React.FC<{
       {/* Interactive overlays â€” click workers, robots, silos, trucks */}
       <InteractiveOverlay3D />
 
-      {/* Emergency response â€” workers run to faulted stages */}
-      <EmergencyResponse3D />
+      {/* Emergency-response red-alert responders removed per request — they
+          spawned a red floating label whenever a stage went faulted/warning.
+          Re-add <EmergencyResponse3D /> (and its import) to restore. */}
 
       {/* Water filling, capping, labeling & rejection stations */}
       <BottleProcessing3D />
@@ -679,7 +679,7 @@ const FactoryScene: React.FC = () => {
           stencil: false,
           depth: true,
         }}
-        camera={{ position: [18, 14, 18], fov: 40, near: 0.1, far: 120 }}
+        camera={{ position: [-17.64, 11.72, 19.63], fov: 40, near: 0.1, far: 120 }}
         onCreated={({ scene }) => {
           scene.background = new THREE.Color("#0a0e16");
         }}
@@ -730,9 +730,17 @@ const FactoryScene: React.FC = () => {
           (e.currentTarget as HTMLButtonElement).style.color = "#93c5fd";
         }}
       >
-        <span style={{ fontSize: "16px", lineHeight: 1 }}>
-          {isFullscreen ? "â›¶" : "â›¶"}
-        </span>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+          <path
+            d={isFullscreen
+              ? "M6 2v2.5a1.5 1.5 0 0 1-1.5 1.5H2M10 2v2.5A1.5 1.5 0 0 0 11.5 6H14M6 14v-2.5A1.5 1.5 0 0 0 4.5 10H2m8 4v-2.5a1.5 1.5 0 0 1 1.5-1.5H14"
+              : "M2 6V3.5A1.5 1.5 0 0 1 3.5 2H6m4 0h2.5A1.5 1.5 0 0 1 14 3.5V6m0 4v2.5a1.5 1.5 0 0 1-1.5 1.5H10m-4 0H3.5A1.5 1.5 0 0 1 2 12.5V10"}
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
         {isFullscreen ? "EXIT FULLSCREEN" : "FULLSCREEN"}
       </button>
     </div>

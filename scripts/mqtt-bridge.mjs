@@ -214,7 +214,9 @@ function forward(topic, payloadBuf) {
   } catch {
     payload = payloadBuf.toString(); // tolerate non-JSON publishes
   }
-  const msg = JSON.stringify({ topic, payload });
+  // `publishedAt` (epoch ms) lets the browser measure bridge → WS → browser
+  // transport latency (the local baseline) via latencyMonitor.
+  const msg = JSON.stringify({ topic, payload, publishedAt: Date.now() });
   for (const ws of clients) {
     if (ws.readyState === 1) ws.send(msg);
   }

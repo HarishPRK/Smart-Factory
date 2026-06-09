@@ -106,7 +106,7 @@ const SelectedStagePanel: React.FC = () => {
           }}
           title="Deselect (ESC)"
         >
-          Ã—
+          ×
         </button>
       </div>
 

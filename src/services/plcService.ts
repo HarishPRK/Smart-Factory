@@ -1,5 +1,6 @@
 import type { PLCParameter } from "../types";
 import { plcParameters } from "../data/mockData";
+import { latencyMonitor } from "./latencyMonitor";
 
 /* ── Raw MQTT payload from plc/data topic ────────────── */
 
@@ -1519,6 +1520,21 @@ export class IoTCorePLCService implements PLCService {
       this.client.on("message", (_topic: string, payload: Buffer) => {
         try {
           this.pendingRaw = JSON.parse(payload.toString()) as RawPLCPayload;
+
+          // Latency measurement: the bridge stamps `_bridgeTs` (epoch ms) when
+          // it republishes plc/data to IoT Core. Compare against now to get the
+          // bridge → IoT Core → browser transport latency for the direct path.
+          latencyMonitor.record(
+            (this.pendingRaw as { _bridgeTs?: number })._bridgeTs,
+            "iotcore",
+          );
+
+          // Broadcast the raw payload to non-sensor subscribers (OEE dashboard,
+          // KPI tiles) before the sensor parser reduces it. plc/data carries the
+          // shift-rollup OEE fields alongside the sensor channels, so this must
+          // fire on the IoTCore path too — not just the Mosquitto bridge path.
+          emitRawPLCPayload(this.pendingRaw);
+
           if (!this.flushTimer) {
             this.flushTimer = setTimeout(() => {
               this.flushTimer = null;
@@ -1821,7 +1837,11 @@ export class MosquittoPLCService implements PLCService {
 
     this.ws.onmessage = (event) => {
       try {
-        const msg = JSON.parse(event.data as string) as { topic: string; payload: unknown };
+        const msg = JSON.parse(event.data as string) as {
+          topic: string;
+          payload: unknown;
+          publishedAt?: number;
+        };
 
         // KOS topics (forwarded from AWS IoT by the bridge) take a separate
         // route — they're consumed by the dispenser widget, not the PLC
@@ -1839,6 +1859,11 @@ export class MosquittoPLCService implements PLCService {
         }
 
         if (msg.topic !== "plc/data") return;
+
+        // Latency measurement: the bridge stamps `publishedAt` (epoch ms) on
+        // the WS envelope when it forwards plc/data. Gives the local
+        // bridge → WS → browser baseline to compare against the iotcore path.
+        latencyMonitor.record(msg.publishedAt, "mosquitto");
 
         // Always keep the latest raw payload — never drop a message
         this.pendingRaw = msg.payload as RawPLCPayload;

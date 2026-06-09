@@ -139,7 +139,12 @@ const PACKAGING_SENSORS: SensorConfig[] = [
   // Normal operating range is 60–80 bar. Warning triggers below 50 bar, critical below 30 bar.
   // Only "below" thresholds are active — high pressure does NOT stop production.
   { sensorId: "pkg_pressure",  type: "pressure",         label: "Pressure",   unit: "bar", min: 0, max: 100, nominal: 65, warningThreshold: 50,  criticalThreshold: 30,  volatility: 2.0 },
-  { sensorId: "pkg_water",     type: "water",            label: "Water",      unit: "",    min: 0, max: 1,   nominal: 0,  warningThreshold: 0.3, criticalThreshold: 0.6, volatility: 0.08 },
+  // Water-leakage probe. In the current rig this analog channel sits at its
+  // full-scale 1.0 (stuck/floating high) with no real leak present, which used
+  // to fault Packaging and fire the emergency light. Thresholds raised above
+  // the sensor's 0–1 range so a normal/maxed reading reads "normal" instead of
+  // false-alarming. Lower these back toward 0.3 / 0.6 to re-arm leak detection.
+  { sensorId: "pkg_water",     type: "water",            label: "Water",      unit: "",    min: 0, max: 1,   nominal: 0,  warningThreshold: 1.1, criticalThreshold: 1.2, volatility: 0.08 },
   // V2 additions — case presence, fire detection, operator E-stop
   { sensorId: "pkg_proximity", type: "proximity",        label: "Case Prox.", unit: "",    min: 0, max: 1,   nominal: 1,  warningThreshold: 0.5, criticalThreshold: 0.2, volatility: 0.1 },
   // Fire: high = safe, low = fire detected. See curing_fire for rationale.

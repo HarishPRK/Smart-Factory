@@ -1,6 +1,10 @@
 #root {
-  min-height: 100vh;
-  height: 100vh;
+  /* `--fit-vh` is the logical viewport height published by useFitToWidth when
+     the app is zoom-scaled to fit; falls back to 100vh when not scaling. Using
+     it here keeps #root as tall as the (zoom-compensated) viewport so the
+     full-height dashboard fills the screen with no clipping or empty band. */
+  min-height: var(--fit-vh, 100vh);
+  height: var(--fit-vh, 100vh);
   width: 100%;
   position: relative;
   z-index: 1;

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useId } from "react";
 import { useTweenedNumber } from "../hooks/useTweenedNumber";
 
 interface OEEGaugeProps {
@@ -6,6 +6,13 @@ interface OEEGaugeProps {
   size?: number;
   label?: string;
   showPercentage?: boolean;
+}
+
+/* Band colour + a lighter companion used for the arc gradient and tip glow. */
+function band(pct: number): { color: string; light: string; glow: string } {
+  if (pct >= 85) return { color: "#10b981", light: "#6ee7b7", glow: "rgba(16,185,129,0.45)" };
+  if (pct >= 65) return { color: "#f59e0b", light: "#fcd34d", glow: "rgba(245,158,11,0.45)" };
+  return { color: "#ef4444", light: "#fca5a5", glow: "rgba(239,68,68,0.45)" };
 }
 
 /* ── Semicircle gauge ─────────────────────────────────────
@@ -22,6 +29,7 @@ const OEEGauge: React.FC<OEEGaugeProps> = ({
   label,
   showPercentage = true,
 }) => {
+  const uid = useId().replace(/:/g, "");
   // Tween the incoming 0–1 value — the percentage text, arc fill (via
   // stroke-dashoffset), and colour band threshold (red/amber/green) all
   // derive from this so they stay perfectly locked while animating.
@@ -53,23 +61,51 @@ const OEEGauge: React.FC<OEEGaugeProps> = ({
   const arcLength = Math.PI * radius;
   const filledLength = arcLength * clamped;
 
-  // Colour bands matching the rest of the dashboard
-  let color = "#ef4444";
-  let glow = "rgba(239,68,68,0.35)";
-  if (pct >= 85) {
-    color = "#10b981";
-    glow = "rgba(16,185,129,0.35)";
-  } else if (pct >= 65) {
-    color = "#f59e0b";
-    glow = "rgba(245,158,11,0.35)";
-  }
+  const { color, light, glow } = band(pct);
+
+  // Tip of the filled arc — angle sweeps from π (left) to 0 (right).
+  const tipAngle = Math.PI * (1 - clamped);
+  const tipX = cx + radius * Math.cos(tipAngle);
+  const tipY = cy - radius * Math.sin(tipAngle);
 
   const fontSize = size >= 100 ? Math.round(size * 0.2) : size >= 60 ? 16 : 12;
   const labelSize = size >= 100 ? 10 : 8;
+  const showTicks = size >= 110;
 
   return (
     <div className="flex flex-col items-center">
       <svg width={size} height={viewH} viewBox={`0 0 ${viewW} ${viewH}`}>
+        <defs>
+          <linearGradient id={`oee-grad-${uid}`} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor={color} stopOpacity="0.7" />
+            <stop offset="55%" stopColor={color} />
+            <stop offset="100%" stopColor={light} />
+          </linearGradient>
+        </defs>
+
+        {/* Tick marks around the dial — subtle, big gauges only */}
+        {showTicks &&
+          Array.from({ length: 9 }, (_, i) => {
+            const a = Math.PI * (1 - i / 8);
+            const rOuter = radius + strokeWidth / 2 + 3;
+            const rInner = rOuter - 4;
+            const frac = i / 8;
+            const lit = frac <= clamped + 0.001;
+            return (
+              <line
+                key={i}
+                x1={cx + rInner * Math.cos(a)}
+                y1={cy - rInner * Math.sin(a)}
+                x2={cx + rOuter * Math.cos(a)}
+                y2={cy - rOuter * Math.sin(a)}
+                stroke={lit ? color : "rgba(120,170,220,0.18)"}
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                style={{ transition: "stroke 0.4s ease-out" }}
+              />
+            );
+          })}
+
         {/* Background track */}
         <path
           d={arcPath}
@@ -86,18 +122,28 @@ const OEEGauge: React.FC<OEEGaugeProps> = ({
           <path
             d={arcPath}
             fill="none"
-            stroke={color}
+            stroke={`url(#oee-grad-${uid})`}
             strokeWidth={strokeWidth}
             strokeLinecap="round"
             strokeDasharray={`${arcLength} ${arcLength}`}
             strokeDashoffset={arcLength - filledLength}
-            style={{
-              filter: `drop-shadow(0 0 5px ${glow})`,
-              // dashoffset is now driven by the tweened value, so no CSS
-              // transition is needed (or wanted — would compound the easing).
-              transition: "stroke 0.4s ease-out",
-            }}
+            style={{ filter: `drop-shadow(0 0 6px ${glow})` }}
           />
+        )}
+
+        {/* Pulsing tip — a bright core dot with an expanding halo ring that
+            rides the leading edge of the fill, so the gauge always reads as
+            "live". */}
+        {filledLength > 4 && (
+          <g>
+            <circle cx={tipX} cy={tipY} r={Math.max(2.5, strokeWidth * 0.32)} fill="#ffffff">
+              <animate attributeName="opacity" values="1;0.55;1" dur="1.6s" repeatCount="indefinite" />
+            </circle>
+            <circle cx={tipX} cy={tipY} r={strokeWidth * 0.5} fill="none" stroke={light} strokeWidth="1.5">
+              <animate attributeName="r" values={`${strokeWidth * 0.45};${strokeWidth * 1.1};${strokeWidth * 0.45}`} dur="1.6s" repeatCount="indefinite" />
+              <animate attributeName="opacity" values="0.7;0;0.7" dur="1.6s" repeatCount="indefinite" />
+            </circle>
+          </g>
         )}
 
         {/* Value text — sits inside the semicircle, vertically centered on
@@ -112,6 +158,7 @@ const OEEGauge: React.FC<OEEGaugeProps> = ({
             fontSize={fontSize}
             fontWeight="600"
             fontFamily="Inter, sans-serif"
+            style={{ filter: `drop-shadow(0 0 10px ${glow})` }}
           >
             {pct.toFixed(1)}%
           </text>

@@ -124,11 +124,6 @@ class IpsecSource extends EventEmitter {
     try {
       const bytes = new Uint8Array(payload);
 
-      // DIAGNOSTIC: confirm messages are actually reaching the handler + their
-      // size/first bytes. Remove once the feed is confirmed working.
-      // eslint-disable-next-line no-console
-      console.log(`[ipsec] rx ${bytes.length}B on "${topic}" — first bytes: ${Array.from(bytes.slice(0, 8)).map((b) => b.toString(16).padStart(2, "0")).join(" ")}`);
-
       // The gateway publishes raw protobuf bytes on the configured topic.
       // If an upstream IoT Rule ever starts producing JSON instead (e.g. by
       // running `decode(*, 'proto', …)` first), accept that shape too.
@@ -181,12 +176,6 @@ class IpsecSource extends EventEmitter {
       this.gateways.set(gatewayKey, state);
       this.emit('update', { gatewayKey, state });
 
-      // DIAGNOSTIC: dump the fully-decoded payload so we can confirm the
-      // protobuf is being interpreted correctly. Remove once confirmed.
-      // eslint-disable-next-line no-console
-      console.log(`[ipsec] decoded key="${gatewayKey}" ts=${normalised.timestamp_ms} active="${normalised.active_tunnel}" tunnel_count=${normalised.tunnel_count} tunnels=${normalised.tunnels.length} gw="${normalised.gateway.name}" mac="${normalised.gateway.mac}" wan=${normalised.wan.ifname}/${normalised.wan.link_up ? 'up' : 'down'} rx=${normalised.wan.rx_bytes} tx=${normalised.wan.tx_bytes}`);
-      // eslint-disable-next-line no-console
-      console.log('[ipsec] tunnels:', JSON.stringify(normalised.tunnels));
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error(`[ipsec] failed to parse payload on "${topic}":`, err);

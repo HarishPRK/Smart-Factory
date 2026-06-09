@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from "react";
 import { usePredictionStore } from "../stores/predictionStore";
+import CountUp from "./CountUp";
 import { requestAIAnalysis } from "../services/aiPredictionService";
 import type { ParameterPrediction, RULEstimate, AnomalyAlert } from "../types/predictions";
 
@@ -218,19 +219,19 @@ const ProductionTab: React.FC = () => {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-white/[0.02] border border-cyan-300/[0.06] rounded-xl p-4 text-center">
+        <div className="bg-white/[0.02] border border-cyan-300/[0.06] rounded-xl p-4 text-center animate-fade-in transition-all duration-300 hover:-translate-y-0.5" style={{ animationDelay: "60ms" }}>
           <div className="text-[9px] text-sky-200/40 uppercase tracking-wider">Predicted OEE</div>
-          <div className="text-[28px] font-bold text-cyan-50 mt-1">{predictedOEE.toFixed(1)}%</div>
+          <div className="text-[28px] font-bold text-cyan-50 mt-1 tabular-nums"><CountUp value={predictedOEE} decimals={1} suffix="%" /></div>
         </div>
-        <div className="bg-white/[0.02] border border-cyan-300/[0.06] rounded-xl p-4 text-center">
+        <div className="bg-white/[0.02] border border-cyan-300/[0.06] rounded-xl p-4 text-center animate-fade-in transition-all duration-300 hover:-translate-y-0.5" style={{ animationDelay: "120ms" }}>
           <div className="text-[9px] text-sky-200/40 uppercase tracking-wider">Performance</div>
           <div className={`text-[18px] font-bold mt-1 ${healthScore.overall > 70 ? "text-green-400" : healthScore.overall > 40 ? "text-amber-400" : "text-red-400"}`}>
             {currentPerformance}
           </div>
         </div>
-        <div className="bg-white/[0.02] border border-cyan-300/[0.06] rounded-xl p-4 text-center">
+        <div className="bg-white/[0.02] border border-cyan-300/[0.06] rounded-xl p-4 text-center animate-fade-in transition-all duration-300 hover:-translate-y-0.5" style={{ animationDelay: "180ms" }}>
           <div className="text-[9px] text-sky-200/40 uppercase tracking-wider">Health</div>
-          <div className="text-[28px] font-bold text-cyan-50 mt-1">{healthScore.overall}</div>
+          <div className="text-[28px] font-bold text-cyan-50 mt-1 tabular-nums"><CountUp value={healthScore.overall} /></div>
         </div>
       </div>
 
@@ -344,9 +345,17 @@ const PredictivePanel: React.FC<PredictivePanelProps> = ({ open, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} style={{ animation: "fadeIn 0.25s ease" }} />
 
-      <div className="relative w-[90vw] max-w-[1000px] max-h-[85vh] bg-[#0a1628]/95 backdrop-blur-2xl border border-cyan-300/12 rounded-2xl shadow-[0_20px_80px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden">
+      <div
+        className="relative w-[90vw] max-w-[1000px] max-h-[85vh] bg-[#0a1628]/95 backdrop-blur-2xl border border-cyan-300/12 rounded-2xl shadow-[0_20px_80px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden"
+        style={{ animation: "modalIn 0.32s cubic-bezier(0.16, 1, 0.3, 1)" }}
+      >
+        {/* Animated accent sweep along the top edge */}
+        <div className="absolute top-0 left-0 right-0 h-px overflow-hidden">
+          <div className="h-full w-1/3 bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent" style={{ animation: "oee-bar-shimmer 3.5s ease-in-out infinite" }} />
+        </div>
+
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-cyan-300/[0.08]">
           <div>

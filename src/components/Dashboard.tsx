@@ -11,6 +11,7 @@ import { useFilters } from "../context/FilterContext";
 import PLCParametersWidget from "./PLCParametersWidget";
 import MotorFanWidget from "./MotorFanWidget";
 import EmergencyLightWidget from "./EmergencyLightWidget";
+import IntegrationModal from "./IntegrationModal";
 import { usePredictionStore } from "../stores/predictionStore";
 
 const FactoryScene = lazy(() => import("./factory3d/FactoryScene"));
@@ -22,12 +23,19 @@ const KPIAnalyticsPanel = lazy(() => import("./KPIAnalyticsPanel"));
 const OEEPanel = lazy(() => import("./OEEPanel"));
 const PredictivePanel = lazy(() => import("./PredictivePanel"));
 const DigitalTwinPanel = lazy(() => import("./DigitalTwinPanel"));
-const IntegrationModal = lazy(() => import("./IntegrationModal"));
 const DynamicPathSelectionPage = lazy(() =>
   import("../integrations/pages/DynamicPathSelection").then((m) => ({ default: m.DynamicPathSelectionPage })),
 );
 const VideoAnalyticsPage = lazy(() =>
   import("../integrations/pages/VideoAnalytics").then((m) => ({ default: m.VideoAnalyticsPage })),
+);
+
+/** Spinner shown inside an integration modal while its lazy page chunk loads. */
+const IntegrationLoading: React.FC = () => (
+  <div className="flex flex-col items-center justify-center gap-3 py-24 text-cyan-200/70">
+    <div className="w-7 h-7 rounded-full border-2 border-cyan-300/20 border-t-cyan-300/80 animate-spin"></div>
+    <div className="text-[11px] uppercase tracking-[0.18em] font-semibold">Loading…</div>
+  </div>
 );
 
 const Dashboard: React.FC = () => {
@@ -441,25 +449,34 @@ const Dashboard: React.FC = () => {
             onClose={() => setDigitalTwinOpen(false)}
           />
         )}
-        {dpsOpen && (
-          <IntegrationModal
-            open={dpsOpen}
-            onClose={() => setDpsOpen(false)}
-            title="Dynamic Path Selection"
-          >
-            <DynamicPathSelectionPage />
-          </IntegrationModal>
-        )}
-        {videoOpen && (
-          <IntegrationModal
-            open={videoOpen}
-            onClose={() => setVideoOpen(false)}
-            title="Video Analytics"
-          >
-            <VideoAnalyticsPage />
-          </IntegrationModal>
-        )}
       </Suspense>
+
+      {/* Integration modals — the modal shell is a static import so it opens
+          instantly on click; only the heavy page chunk lazy-loads, with its
+          own spinner so the user gets immediate feedback instead of a frozen
+          blank screen while the ~100KB chunk downloads and parses. */}
+      {dpsOpen && (
+        <IntegrationModal
+          open={dpsOpen}
+          onClose={() => setDpsOpen(false)}
+          title="Dynamic Path Selection"
+        >
+          <Suspense fallback={<IntegrationLoading />}>
+            <DynamicPathSelectionPage />
+          </Suspense>
+        </IntegrationModal>
+      )}
+      {videoOpen && (
+        <IntegrationModal
+          open={videoOpen}
+          onClose={() => setVideoOpen(false)}
+          title="Video Analytics"
+        >
+          <Suspense fallback={<IntegrationLoading />}>
+            <VideoAnalyticsPage />
+          </Suspense>
+        </IntegrationModal>
+      )}
     </div>
   );
 };

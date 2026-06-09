@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { usePLCContext, useMqttBufferContext } from "../context/PLCContext";
+import CountUp from "./CountUp";
 import type { TimeRange } from "../types";
 import {
   isSiteWiseConfigured,
@@ -97,10 +98,12 @@ interface ChartProps {
   height?: number;
   unit?: string;
   nominal?: number;
+  /** When set, the line draws itself in and re-draws whenever this key changes. */
+  drawKey?: string;
 }
 
 const AreaChart: React.FC<ChartProps> = ({
-  data, color, anomalies = [], timeRange, height = 160, unit, nominal,
+  data, color, anomalies = [], timeRange, height = 160, unit, nominal, drawKey,
 }) => {
   const W = 500;
   const H = height;
@@ -179,13 +182,21 @@ const AreaChart: React.FC<ChartProps> = ({
         style={{ transition: "d 0.8s cubic-bezier(0.4, 0, 0.2, 1)" }}
       />
       <path
+        key={drawKey}
         d={path} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round"
-        style={{ transition: "d 0.8s cubic-bezier(0.4, 0, 0.2, 1)" }}
+        pathLength={drawKey ? 1 : undefined}
+        style={{
+          transition: "d 0.8s cubic-bezier(0.4, 0, 0.2, 1)",
+          filter: `drop-shadow(0 0 4px ${color}66)`,
+          ...(drawKey ? { strokeDasharray: 1, animation: "oee-draw 1s ease-out both" } : {}),
+        }}
       />
       <circle
         cx={pts[pts.length - 1].x} cy={pts[pts.length - 1].y} r="3" fill={color}
-        style={{ transition: "cx 0.8s cubic-bezier(0.4, 0, 0.2, 1), cy 0.8s cubic-bezier(0.4, 0, 0.2, 1)" }}
-      />
+        style={{ transition: "cx 0.8s cubic-bezier(0.4, 0, 0.2, 1), cy 0.8s cubic-bezier(0.4, 0, 0.2, 1)", filter: `drop-shadow(0 0 4px ${color})` }}
+      >
+        <animate attributeName="r" values="3;4.5;3" dur="1.8s" repeatCount="indefinite" />
+      </circle>
 
       {/* Anomaly markers */}
       {anomalies.map((idx) => {
@@ -368,14 +379,16 @@ const SensorCard: React.FC<{
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: param.color }} />
           <h4 className="text-[13px] font-semibold text-cyan-50">{param.label}</h4>
-          <span className={`px-1 py-0.5 rounded text-[7px] font-bold uppercase ${
-            history.source === "mqtt" ? "bg-cyan-500/15 text-cyan-400" :
-            history.source === "sitewise" ? "bg-emerald-500/15 text-emerald-400" :
-            "bg-amber-500/15 text-amber-400"
-          }`}>{history.source === "mqtt" ? "LIVE" : history.source === "sitewise" ? "SW" : "MOCK"}</span>
+          {history.source !== "mock" && (
+            <span className={`px-1 py-0.5 rounded text-[7px] font-bold uppercase ${
+              history.source === "mqtt" ? "bg-cyan-500/15 text-cyan-400" : "bg-emerald-500/15 text-emerald-400"
+            }`}>{history.source === "mqtt" ? "LIVE" : "SW"}</span>
+          )}
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[18px] font-semibold" style={{ color: param.color }}>{latest.toFixed(1)}</span>
+          <span className="text-[18px] font-semibold tabular-nums" style={{ color: param.color }}>
+            <CountUp value={latest} decimals={1} />
+          </span>
           <span className="text-[10px] text-sky-200/50">{param.unit}</span>
         </div>
       </div>
@@ -403,11 +416,11 @@ const DigitalChannel: React.FC<{ param: PLCParam; timeRange: AnalyticsTimeRange 
         <div className="flex items-center gap-2.5">
           <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: param.color }} />
           <h4 className="text-[13px] font-semibold text-cyan-50">{param.label}</h4>
-          <span className={`px-1 py-0.5 rounded text-[7px] font-bold uppercase ${
-            history.source === "mqtt" ? "bg-cyan-500/15 text-cyan-400" :
-            history.source === "sitewise" ? "bg-emerald-500/15 text-emerald-400" :
-            "bg-amber-500/15 text-amber-400"
-          }`}>{history.source === "mqtt" ? "LIVE" : history.source === "sitewise" ? "SW" : "MOCK"}</span>
+          {history.source !== "mock" && (
+            <span className={`px-1 py-0.5 rounded text-[7px] font-bold uppercase ${
+              history.source === "mqtt" ? "bg-cyan-500/15 text-cyan-400" : "bg-emerald-500/15 text-emerald-400"
+            }`}>{history.source === "mqtt" ? "LIVE" : "SW"}</span>
+          )}
         </div>
         <div className="flex items-center gap-4">
           <div className="text-center">
@@ -856,9 +869,17 @@ const KPIAnalyticsPanel: React.FC<KPIAnalyticsPanelProps> = ({ open, onClose }) 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} style={{ animation: "fadeIn 0.25s ease" }} />
 
-      <div className="relative w-[90vw] max-w-[1100px] max-h-[85vh] bg-[#0a1628]/95 backdrop-blur-2xl border border-cyan-300/12 rounded-2xl shadow-[0_20px_80px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden">
+      <div
+        className="relative w-[90vw] max-w-[1100px] max-h-[85vh] bg-[#0a1628]/95 backdrop-blur-2xl border border-cyan-300/12 rounded-2xl shadow-[0_20px_80px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden"
+        style={{ animation: "modalIn 0.32s cubic-bezier(0.16, 1, 0.3, 1)" }}
+      >
+        {/* Animated accent sweep along the top edge */}
+        <div className="absolute top-0 left-0 right-0 h-px overflow-hidden">
+          <div className="h-full w-1/3 bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent" style={{ animation: "oee-bar-shimmer 3.5s ease-in-out infinite" }} />
+        </div>
+
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-cyan-300/[0.08]">
           <div>
@@ -939,15 +960,17 @@ const KPIAnalyticsPanel: React.FC<KPIAnalyticsPanelProps> = ({ open, onClose }) 
                     </h3>
                     <p className="text-[11px] text-sky-200/55 mt-0.5 flex items-center gap-2">
                       Range: {param.min}–{param.max} {param.unit} · Nominal: {param.nominal} {param.unit}
-                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
-                        historyData.source === "mqtt"
-                          ? "bg-cyan-500/15 text-cyan-400 border border-cyan-500/20"
-                          : historyData.source === "sitewise"
-                            ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
-                            : "bg-amber-500/15 text-amber-400 border border-amber-500/20"
-                      }`}>
-                        {historyData.loading ? "Loading..." : historyData.source === "mqtt" ? "MQTT Live" : historyData.source === "sitewise" ? "SiteWise" : "Mock"}
-                      </span>
+                      {(historyData.loading || historyData.source !== "mock") && (
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+                          historyData.loading
+                            ? "bg-blue-500/15 text-blue-400 border border-blue-500/20"
+                            : historyData.source === "mqtt"
+                              ? "bg-cyan-500/15 text-cyan-400 border border-cyan-500/20"
+                              : "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
+                        }`}>
+                          {historyData.loading ? "Loading..." : historyData.source === "mqtt" ? "MQTT Live" : "SiteWise"}
+                        </span>
+                      )}
                       {anomalies.length > 0 && (
                         <span className="text-red-400/80">
                           {anomalies.length} anomal{anomalies.length === 1 ? "y" : "ies"}
@@ -980,8 +1003,8 @@ const KPIAnalyticsPanel: React.FC<KPIAnalyticsPanelProps> = ({ open, onClose }) 
                       CSV
                     </button>
                     <div className="text-right">
-                      <div className="text-[28px] font-semibold leading-none" style={{ color: param.color }}>
-                        {stats.latest}
+                      <div className="text-[28px] font-semibold leading-none tabular-nums" style={{ color: param.color }}>
+                        <CountUp value={Number(stats.latest)} decimals={param.kind === "analog" ? 1 : 0} fallback={stats.latest} />
                       </div>
                       <div className="text-[11px] text-sky-200/55 mt-0.5">{param.unit} latest</div>
                     </div>
@@ -995,21 +1018,26 @@ const KPIAnalyticsPanel: React.FC<KPIAnalyticsPanelProps> = ({ open, onClose }) 
                   height={220}
                   unit={param.unit}
                   nominal={param.nominal}
+                  drawKey={`${param.id}-${localTimeRange}`}
                 />
               </div>
 
               {/* Stats Row */}
               <div className="grid grid-cols-4 gap-3">
                 {[
-                  { label: "Average", value: stats.avg, color: param.color },
-                  { label: "Peak", value: stats.peak, color: "#ef4444" },
-                  { label: "Minimum", value: stats.min, color: "#10b981" },
-                  { label: "Anomalies", value: String(anomalies.length), color: anomalies.length > 0 ? "#ef4444" : "#10b981" },
-                ].map((stat) => (
-                  <div key={stat.label} className="card-inner p-3.5">
+                  { label: "Average", value: Number(stats.avg), color: param.color },
+                  { label: "Peak", value: Number(stats.peak), color: "#ef4444" },
+                  { label: "Minimum", value: Number(stats.min), color: "#10b981" },
+                  { label: "Anomalies", value: anomalies.length, color: anomalies.length > 0 ? "#ef4444" : "#10b981" },
+                ].map((stat, i) => (
+                  <div
+                    key={stat.label}
+                    className="card-inner p-3.5 animate-fade-in transition-all duration-300 hover:-translate-y-0.5"
+                    style={{ animationDelay: `${80 + i * 60}ms` }}
+                  >
                     <div className="text-[10px] text-sky-200/55 uppercase tracking-[0.12em] font-semibold">{stat.label}</div>
-                    <div className="text-[22px] font-semibold mt-1 leading-none" style={{ color: stat.color }}>
-                      {stat.value}
+                    <div className="text-[22px] font-semibold mt-1 leading-none tabular-nums" style={{ color: stat.color }}>
+                      <CountUp value={stat.value} decimals={stat.label === "Anomalies" ? 0 : param.kind === "analog" ? 1 : 0} />
                     </div>
                     <div className="text-[10px] text-sky-200/45 mt-0.5">{stat.label === "Anomalies" ? "detected" : param.unit}</div>
                   </div>

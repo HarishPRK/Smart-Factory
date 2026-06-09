@@ -738,7 +738,7 @@ const FunControls: React.FC<{
           }}
         >
           <span style={{ fontSize: "14px", lineHeight: 1 }}>
-            {expanded ? "âœ•" : "â–²"}
+            {expanded ? "✕" : "▲"}
           </span>
           {expanded ? "CLOSE CONTROLS" : "CONTROLS"}
         </button>

@@ -1,4 +1,5 @@
 "use no memo";
+import { useEffect } from "react";
 import { useThree, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three/examples/jsm/controls/OrbitControls.js";
@@ -20,7 +21,7 @@ const TOUR_STOPS: {
   dwell: number;
   label: string;
 }[] = [
-  { position: [18, 14, 18], lookAt: [0, 0, 0], dwell: 3, label: "Overview" },
+  { position: [-17.64, 11.72, 19.63], lookAt: [-3.08, -2.43, -1.14], dwell: 3, label: "Overview" },
   {
     position: [STAGE_POSITIONS.intake[0] - 6, 3, STAGE_POSITIONS.intake[2] + 5],
     lookAt: STAGE_POSITIONS.intake,
@@ -101,7 +102,7 @@ export function setCameraTarget(
 
 export function resetCameraView() {
   _autoTourActive = false;
-  setCameraTarget([18, 14, 18], [0, 0, 0]);
+  setCameraTarget([-17.64, 11.72, 19.63], [-3.08, -2.43, -1.14]);
 }
 
 export function startAutoTour() {
@@ -128,6 +129,33 @@ const CameraController: React.FC = () => {
   const { camera, controls } = useThree();
   const lerpSpeed = 0.035;
   const dwellTimerRef = { current: 0 };
+
+  // DEV camera-capture helper: orbit/pan/zoom to the framing you want, then
+  // press "C" to log + copy the current camera position and orbit target.
+  // Paste those numbers in to bake the view in as the default (Canvas camera,
+  // OrbitControls target, resetCameraView, and the "Overview" tour stop).
+  // Dev-only — stripped from production builds.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      )
+        return;
+      if (e.key !== "c" && e.key !== "C") return;
+      const oc = controls as unknown as OrbitControlsImpl | null;
+      const t = oc?.target ?? new THREE.Vector3();
+      const fmt = (v: THREE.Vector3) =>
+        `[${v.x.toFixed(2)}, ${v.y.toFixed(2)}, ${v.z.toFixed(2)}]`;
+      const out = `position: ${fmt(camera.position)}  target: ${fmt(t)}`;
+      // eslint-disable-next-line no-console
+      console.log("[camera]", out);
+      navigator.clipboard?.writeText(out).catch(() => {});
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [camera, controls]);
 
   useFrame((_, delta) => {
     if (!_flyTarget) {
