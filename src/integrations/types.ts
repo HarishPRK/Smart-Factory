@@ -8,7 +8,6 @@ export interface Branch {
   firmware: string;
   uptimeHours: number;
 }
-
 export interface LanPort {
   id: number;
   linkUp: boolean;
@@ -50,13 +49,41 @@ export interface Device {
   name: string;
   kind:
     | 'laptop' | 'desktop' | 'printer' | 'payment' | 'server' | 'confphone'
-    | 'fire_sensor' | 'smoke_sensor' | 'door_lock';
+    | 'fire_sensor' | 'smoke_sensor' | 'door_lock'
+    // Live-discovery kinds (Phase 1) — devices the gateway reports off the LAN.
+    | 'phone' | 'tablet' | 'matter' | 'shelly' | 'generic';
   domain: 'IT' | 'OT';
   ip: string;
   mac: string;
   status: Status;
   connectedForHours: number;
-  conn: 'wired' | 'wifi' | 'poe';
+  conn: 'wired' | 'wifi' | 'poe' | 'thread';
+  /** Current relay/switch state for controllable kinds (matter, shelly).
+   *  Undefined = unknown or not switchable. */
+  power?: boolean;
+  /** Live electrical readings reported by the device itself (e.g. a Shelly's
+   *  switch:0 metering). Present only for devices that publish them. */
+  telemetry?: DeviceTelemetry;
+}
+
+export interface DeviceTelemetry {
+  apowerW?: number;        // active power draw
+  voltageV?: number;
+  currentA?: number;
+  energyWhTotal?: number;  // lifetime energy through the relay
+  tempC?: number;          // device internal temperature
+  // Wi-Fi link readings (from the gateway's per-client ipsec/metrics block).
+  rssiDbm?: number;
+  snrDb?: number;
+  linkDownMbps?: number;
+  linkUpMbps?: number;
+  wifiStandard?: string;   // e.g. "802.11ax"
+  wifiHealth?: string;     // gateway verdict, e.g. "high_retrans" | "tx_errors"
+  rxBytes?: number;
+  txBytes?: number;
+  // Live measured throughput, derived server-side from byte-counter deltas.
+  rxMbps?: number;
+  txMbps?: number;
 }
 
 export interface Alert {
@@ -103,6 +130,137 @@ export interface IpsecWanMetric {
   tx_packets: number;
 }
 
+export interface IpsecWifiClient {
+  mac: string;
+  ip: string;
+  hostname: string;
+  ap_index: number;
+  ssid: string;
+  active: boolean;
+  authenticated: boolean;
+  rssi: number;
+  snr: number;
+  standard: string;
+  downlink_rate: number;
+  uplink_rate: number;
+  rx_bytes: number;
+  tx_bytes: number;
+  rx_packets: number;
+  tx_packets: number;
+  errors_sent: number;
+  retrans_count: number;
+  failed_retrans_count: number;
+  health: string;
+}
+
+export interface IpsecWifiMetrics {
+  total_clients: number;
+  active_clients: number;
+  weak_signal_clients: number;
+  clients_with_errors: number;
+  high_retrans_clients: number;
+  clients: IpsecWifiClient[];
+}
+
+/* ─── Cellular metrics (field 8 in the proto) ─── */
+
+export interface CellularInterfaceMetric {
+  ifname: string;
+  present: boolean;
+  link_up: boolean;
+  mac: string;
+  ipv4_address: string;
+  ipv6_address: string;
+  mtu: number;
+  rx_bytes: number;
+  tx_bytes: number;
+  rx_packets: number;
+  tx_packets: number;
+  rx_errors: number;
+  tx_errors: number;
+  rx_dropped: number;
+  tx_dropped: number;
+}
+
+export interface CellularModemMetric {
+  modem_path: string;
+  modem_index: number;
+  manufacturer: string;
+  model: string;
+  firmware_revision: string;
+  hardware_revision: string;
+  device_id: string;
+  imei: string;
+  driver: string;
+  plugin: string;
+  primary_port: string;
+  ports: string[];
+  state: string;
+  power_state: string;
+  lock: string;
+  signal_quality_percent: number;
+  access_technology: string;
+  allowed_modes: string;
+  preferred_mode: string;
+  current_bands: string;
+  supported_bands: string;
+  operator_name: string;
+  operator_code: string;
+  registration_state: string;
+}
+
+export interface CellularSimMetric {
+  sim_path: string;
+  sim_slot: string;
+  active: boolean;
+  iccid: string;
+  imsi: string;
+  eid: string;
+}
+
+export interface CellularBearerMetric {
+  bearer_path: string;
+  connected: boolean;
+  apn: string;
+  ip_type: string;
+  interface: string;
+  ipv4_address: string;
+  ipv4_gateway: string;
+  ipv4_dns1: string;
+  ipv4_dns2: string;
+  ipv6_address: string;
+  ipv6_gateway: string;
+  ipv6_dns1: string;
+  ipv6_dns2: string;
+  mtu: number;
+}
+
+export interface CellularRadioMetric {
+  rssi_dbm: number;
+  rsrp_dbm: number;
+  rsrq_db: number;
+  snr_db: number;
+  serving_cell_info: string;
+  lte_band: string;
+  nr5g_band: string;
+  cell_id: number;
+  tac: number;
+  pci: number;
+  earfcn: number;
+  nrarfcn: number;
+}
+
+export interface CellularMetrics {
+  available: boolean;
+  modem_count: number;
+  interface?: CellularInterfaceMetric;
+  modem?: CellularModemMetric;
+  sim?: CellularSimMetric;
+  bearer?: CellularBearerMetric;
+  radio?: CellularRadioMetric;
+  health: string;
+}
+
 export interface IpsecMetrics {
   timestamp_ms: number;
   active_tunnel: string;
@@ -110,6 +268,8 @@ export interface IpsecMetrics {
   tunnels: IpsecTunnelMetric[];
   wan: IpsecWanMetric;
   gateway: IpsecGatewayMetric;
+  wifi?: IpsecWifiMetrics;
+  cellular?: CellularMetrics;
 }
 
 /** Server snapshot wrapper — adds when the message was received locally so the
@@ -124,6 +284,9 @@ export interface IpsecGatewayState {
   metrics: IpsecMetrics;
   /** Server epoch ms — the moment WE received the decoded payload. */
   receivedAt: number;
+  /** Which MQTT topic family this gateway is publishing under. Drives the
+   *  per-branch live-data routing — Plano uses `rdk`, McKinney uses `prpl`. */
+  source?: 'rdk' | 'prpl' | 'other';
 }
 
 export type WanPath = '5G' | 'Fiber';
@@ -159,8 +322,10 @@ export interface PathFlipEvent {
 
 export interface PathThreshold {
   metric: 'latency' | 'jitter' | 'loss' | 'mos';
-  warn: number;
-  fail: number;
+  /** Per-underlay warn/fail bounds — Fiber and 5G are tuned independently
+   *  since cellular tolerates higher latency/jitter than fixed-line fiber. */
+  fiber: { warn: number; fail: number };
+  fiveg: { warn: number; fail: number };
   unit: string;
 }
 
@@ -293,13 +458,10 @@ export interface FleetStat {
 /* ───── Business value (Insights tab) ───── */
 
 export type ValueCategoryId =
-  | 'energy'      // HVAC, lights, idle PoE
   | 'efficiency'  // IT/OT Opex — auto-triage, agent resolutions
-  | 'safety'      // OT alerts answered within SLA
+  | 'storage'     // telemetry DB cost reduction (compression / retention)
   | 'uptime'      // dynamic path selection avoided outages
-  | 'routing'     // policy-based traffic routing — wasted bandwidth recovered
-  | 'bandwidth'   // overall network traffic reduction (caching, dedup)
-  | 'storage';    // telemetry DB cost reduction (compression / retention)
+  | 'energy';     // HVAC, lights, idle PoE + predictive maintenance
 
 export interface ValueCategory {
   id: ValueCategoryId;
@@ -330,13 +492,10 @@ export interface CostWarning {
 
 export interface SavingsTrendPoint {
   month: string;
-  energy: number;
   efficiency: number;
-  safety: number;
-  uptime: number;
-  routing: number;
-  bandwidth: number;
   storage: number;
+  uptime: number;
+  energy: number;
 }
 
 export interface ROISummary {

@@ -150,44 +150,32 @@ const MotorFanWidget: React.FC<MotorFanWidgetProps> = ({ className = "" }) => {
 
   return (
     <div
-      className={`card p-3 flex flex-col gap-2 animate-fade-in delay-4 cursor-pointer active:scale-[0.97] transition-all duration-300 ${className}`}
+      className={`card p-3 flex flex-col gap-2 animate-fade-in delay-4 cursor-pointer active:scale-[0.97] transition-all duration-300 rounded-xl ${className}`}
       onClick={handleToggle}
     >
       {/* Header */}
       <div className="flex justify-between items-center flex-none">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 bg-gradient-to-br from-cyan-500/[0.12] to-blue-500/[0.06] rounded-lg flex items-center justify-center border border-cyan-400/[0.12] shadow-[0_0_8px_rgba(103,232,249,0.08)]">
-            <svg
-              width="10"
-              height="10"
-              viewBox="0 0 16 16"
-              fill="none"
-              className="opacity-75"
-            >
-              <path
-                d="M8 2C5.8 3.2 5 6 6.5 7.5C5 5.8 2 6 2 8C2 10.2 5.2 11 6.5 9.5C5.3 11 6 14 8 14C10.2 12.8 11 10 9.5 8.5C11 10.2 14 10 14 8C14 5.8 10.8 5 9.5 6.5C10.7 5 10 2 8 2Z"
-                stroke="white"
-                strokeWidth="1.1"
-                fill="none"
-                strokeLinejoin="round"
-              />
+        <div className="flex items-center gap-1.5">
+          <div className="w-5 h-5 bg-gradient-to-br from-indigo-500/[0.12] to-blue-500/[0.06] rounded-md flex items-center justify-center border border-indigo-400/[0.12]">
+            <svg width="9" height="9" viewBox="0 0 16 16" fill="none" className="opacity-65">
+              <path d="M8 2C5.8 3.2 5 6 6.5 7.5C5 5.8 2 6 2 8C2 10.2 5.2 11 6.5 9.5C5.3 11 6 14 8 14C10.2 12.8 11 10 9.5 8.5C11 10.2 14 10 14 8C14 5.8 10.8 5 9.5 6.5C10.7 5 10 2 8 2Z" stroke="white" strokeWidth="1.1" fill="none" strokeLinejoin="round" />
               <circle cx="8" cy="8" r="1.5" fill="white" opacity="0.55" />
             </svg>
           </div>
-          <h3 className="text-[13px] font-semibold text-blue-100/90 uppercase tracking-[0.15em]">
+          <h3 className="text-[11px] font-semibold text-white/75 uppercase tracking-[0.14em]">
             Motor
           </h3>
         </div>
         <span
-          className={`text-[12px] font-medium flex items-center gap-1.5 px-2 py-0.5 rounded-md border transition-all duration-700 ${
+          className={`text-[9px] font-semibold flex items-center gap-1 px-1.5 py-0.5 rounded-md border transition-all duration-700 ${
             isOn
-              ? "text-cyan-400/80 bg-cyan-500/[0.07] border-cyan-500/[0.12]"
-              : "text-blue-200/60 bg-blue-500/[0.04] border-blue-400/[0.06]"
+              ? "text-indigo-300/80 bg-indigo-500/[0.06] border-indigo-500/[0.15]"
+              : "text-white/40 bg-white/[0.02] border-white/[0.05]"
           }`}
         >
           <span
-            className={`w-1.5 h-1.5 rounded-full transition-all duration-700 ${isOn ? "bg-cyan-400 animate-pulse-glow" : "bg-blue-400/30"}`}
-            style={isOn ? { color: "#67e8f9" } : undefined}
+            className={`w-1.5 h-1.5 rounded-full transition-all duration-700 ${isOn ? "bg-indigo-400 animate-pulse-glow" : "bg-white/20"}`}
+            style={isOn ? { color: "#7ab4ee" } : undefined}
           />
           {isOn ? "Running" : "Standby"}
         </span>

@@ -21,8 +21,15 @@ function readInitialTheme(): Theme {
   return 'light';
 }
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(readInitialTheme);
+interface ThemeProviderProps {
+  children: ReactNode;
+  initialTheme?: Theme;
+}
+
+export function ThemeProvider({ children, initialTheme }: ThemeProviderProps) {
+  const [theme, setThemeState] = useState<Theme>(
+    () => initialTheme ?? readInitialTheme(),
+  );
 
   const setTheme = useCallback((t: Theme) => {
     setThemeState(t);

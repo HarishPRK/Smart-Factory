@@ -19,7 +19,7 @@
  * Env (from .env on the EC2 box):
  *   WS_PORT               local WebSocket port nginx proxies to, default 9001
  *   CLOUD_TOPICS          comma-separated IoT topic filters to subscribe,
- *                         default "plc/#,lorawan/#"
+ *                         default "prplHome/McKinney/lineA/plc1/#,plc/#,lorawan/#"
  *   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY [/ AWS_SESSION_TOKEN]  required
  *                         (PREFER an EC2 instance role — then leave these unset)
  *   AWS_IOT_ENDPOINT (or IOT_ENDPOINT)   default alht1i2bx8tzt-ats.iot.us-east-1.amazonaws.com
@@ -27,8 +27,8 @@
  *
  * Authorization (IAM policy on the instance role or access key):
  *   iot:Connect    on  client/cloud-bridge-*
- *   iot:Subscribe  on  topicfilter/plc/#   (and other subscribed filters)
- *   iot:Receive    on  topic/plc/data      (and other subscribed topics)
+ *   iot:Subscribe  on  topicfilter/prplHome/McKinney/lineA/plc1/#   (and other subscribed filters)
+ *   iot:Receive    on  topic/prplHome/McKinney/lineA/plc1/data      (and other subscribed topics)
  */
 
 import fs from "node:fs";
@@ -64,7 +64,7 @@ function loadDotenv() {
 }
 
 const WS_PORT = Number(process.env.WS_PORT ?? 9001);
-const CLOUD_TOPICS = (process.env.CLOUD_TOPICS ?? "plc/#,lorawan/#")
+const CLOUD_TOPICS = (process.env.CLOUD_TOPICS ?? "prplHome/McKinney/lineA/plc1/#,plc/#,lorawan/#")
   .split(",")
   .map((t) => t.trim())
   .filter(Boolean);

@@ -20,7 +20,7 @@ const MAX_LIVE_POINTS = 240;
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 
 /** Build an OEEResponse from a raw MQTT payload shaped like the shift-rollup
- *  message the physical broker publishes on `plc/data`:
+ *  message the physical broker publishes on the PLC data topic:
  *    { OEE, availability, performance, quality,
  *      total_units_produced, uptime_in_minutes, downtime_in_minutes }
  *  Returns null when none of the OEE-shaped fields are present. */

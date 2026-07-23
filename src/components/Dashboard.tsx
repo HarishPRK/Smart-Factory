@@ -5,8 +5,9 @@ import workerIcon from "../assets/icons/worker.svg";
 import capgeminiLogo from "../assets/capgemini-logo.jpeg";
 import alertWarning from "../assets/icons/alert_warning.svg";
 import gearIcon from "../assets/icons/Gear.svg";
-import Weather from "../Weather";
-import { ShiftIndicator, SystemStatus } from "./HeaderWidgets";
+// Weather component available for future use but not shown in header
+// import Weather from "../Weather";
+// import { ShiftIndicator, SystemStatus } from "./HeaderWidgets";
 import { useFilters } from "../context/FilterContext";
 import PLCParametersWidget from "./PLCParametersWidget";
 import MotorFanWidget from "./MotorFanWidget";
@@ -23,8 +24,12 @@ const KPIAnalyticsPanel = lazy(() => import("./KPIAnalyticsPanel"));
 const OEEPanel = lazy(() => import("./OEEPanel"));
 const PredictivePanel = lazy(() => import("./PredictivePanel"));
 const DigitalTwinPanel = lazy(() => import("./DigitalTwinPanel"));
+const UNSExplorerPanel = lazy(() => import("./UNSExplorerPanel"));
 const DynamicPathSelectionPage = lazy(() =>
   import("../integrations/pages/DynamicPathSelection").then((m) => ({ default: m.DynamicPathSelectionPage })),
+);
+const ApplicationAwareRoutingPage = lazy(() =>
+  import("../integrations/pages/ApplicationAwareRouting").then((m) => ({ default: m.ApplicationAwareRoutingPage })),
 );
 const VideoAnalyticsPage = lazy(() =>
   import("../integrations/pages/VideoAnalytics").then((m) => ({ default: m.VideoAnalyticsPage })),
@@ -38,6 +43,40 @@ const IntegrationLoading: React.FC = () => (
   </div>
 );
 
+type NetworkBranchId = "b-mck-03" | "b-pln-01";
+
+/** Smart Factory has no global branch picker, so the network integrations
+ * expose the Connected Enterprise source mapping locally. McKinney/prpl is
+ * the default because that is the Smart Factory gateway feed. */
+const GatewaySourceSelector: React.FC<{
+  value: NetworkBranchId;
+  onChange: (value: NetworkBranchId) => void;
+}> = ({ value, onChange }) => (
+  <div
+    className="toolbar"
+    style={{ justifyContent: "flex-end", marginBottom: 14 }}
+    aria-label="Gateway telemetry source"
+  >
+    <span style={{ color: "var(--text-muted)", fontSize: 11, marginRight: 4 }}>
+      Gateway feed
+    </span>
+    <button
+      type="button"
+      className={value === "b-mck-03" ? "primary" : undefined}
+      onClick={() => onChange("b-mck-03")}
+    >
+      prpl · McKinney
+    </button>
+    <button
+      type="button"
+      className={value === "b-pln-01" ? "primary" : undefined}
+      onClick={() => onChange("b-pln-01")}
+    >
+      rdk · Plano
+    </button>
+  </div>
+);
+
 const Dashboard: React.FC = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [aiChatOpen, setAiChatOpen] = useState(false);
@@ -47,10 +86,18 @@ const Dashboard: React.FC = () => {
   const [predictiveOpen, setPredictiveOpen] = useState(false);
   const [digitalTwinOpen, setDigitalTwinOpen] = useState(false);
   const [dpsOpen, setDpsOpen] = useState(false);
+  const [appRoutingOpen, setAppRoutingOpen] = useState(false);
+  const [networkBranchId, setNetworkBranchId] = useState<NetworkBranchId>("b-mck-03");
   const [videoOpen, setVideoOpen] = useState(false);
+  const [unsOpen, setUnsOpen] = useState(false);
   const predAlertCount = usePredictionStore((s) => s.anomalyAlerts.length);
   const [sceneView, setSceneView] = useState<"factory" | "plc">("factory");
   const { filteredAlerts } = useFilters();
+
+  // The integration modals cover the whole screen, so freeze the 3D render
+  // loop while one is open — on integrated GPUs the scene otherwise competes
+  // with the modal for the GPU and makes it take seconds to appear.
+  const scenePaused = dpsOpen || appRoutingOpen || videoOpen;
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -58,195 +105,126 @@ const Dashboard: React.FC = () => {
   }, []);
 
   return (
-    <div className="min-h-dvh xl:h-dvh xl:max-h-dvh text-white px-3 py-3 xl:px-5 xl:py-4 font-sans flex flex-col overflow-y-auto xl:overflow-hidden gap-3 xl:gap-4">
-      {/* Header */}
-      <header className="glass flex items-center justify-between gap-4 flex-none animate-fade-in header-glow rounded-[28px] px-5 py-4">
+    <div className="min-h-dvh xl:h-dvh xl:max-h-dvh text-white px-3 py-3 xl:px-5 xl:py-3.5 font-sans flex flex-col overflow-y-auto xl:overflow-hidden gap-3">
+      {/* Header — minimal, modern */}
+      <header className="flex items-center justify-between gap-4 flex-none animate-fade-in px-3 py-2">
         <div className="flex items-center gap-3.5 min-w-0">
-          {/* Capgemini (integrator) — small mark, kept */}
-          <div className="w-10 h-10 rounded-[14px] flex items-center justify-center relative group/logo cursor-pointer transition-all duration-300 overflow-hidden bg-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center relative group/logo cursor-pointer transition-all duration-300 overflow-hidden bg-white/95 shadow-[0_2px_10px_rgba(0,0,0,0.3)]">
             <img
               src={capgeminiLogo}
               alt="Capgemini"
               className="w-8 h-8 object-contain group-hover/logo:scale-110 transition-transform duration-300"
             />
           </div>
-          <div className="min-w-0 pl-1">
-            <div className="text-[15px] font-bold tracking-[0.24em] text-white/95 uppercase truncate leading-none">
+          <div className="min-w-0">
+            <div className="text-[15px] font-semibold tracking-[0.06em] text-white/92 uppercase truncate leading-none">
               Manufacturing Industry
             </div>
-            <div className="text-[10px] text-white/45 font-medium tracking-[0.3em] mt-1.5 uppercase">
+            <div className="text-[10px] text-white/30 font-medium tracking-[0.12em] mt-1 uppercase">
               Live Operations
             </div>
           </div>
-          <div className="hidden xl:flex items-center gap-3 min-w-0 pl-1.5">
-            <div className="h-9 w-px bg-gradient-to-b from-transparent via-white/15 to-transparent"></div>
-            <SystemStatus operational={true} />
-          </div>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap justify-end">
-          <div className="hidden 2xl:flex items-center gap-2 rounded-full border border-white/[0.07] bg-white/[0.03] px-4 py-2 text-[10px] text-white/70 font-medium">
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 16 16"
-              fill="none"
-              className="text-white/55"
-            >
-              <circle
-                cx="8"
-                cy="8"
-                r="6.5"
-                stroke="currentColor"
-                strokeWidth="1.4"
-              />
-              <path
-                d="M8 4.5V8.3L10.5 10"
-                stroke="currentColor"
-                strokeWidth="1.4"
-                strokeLinecap="round"
-              />
-            </svg>
-            <span className="tabular-nums">
-              {currentTime.toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-              })}
-            </span>
-            <span className="text-white/20">•</span>
-            <span className="tabular-nums">
-              {currentTime.toLocaleTimeString("en-US", {
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: true,
-              })}
+        <div className="flex items-center gap-4">
+          {/* Compact inline time + weather */}
+          <div className="hidden lg:flex items-center gap-4 text-[13px] text-white/45 font-medium tabular-nums">
+            <span>{currentTime.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })}</span>
+            <span className="text-white/8">|</span>
+            <span className="flex items-center gap-2">
+              <span className="text-[15px] text-white/75 font-semibold">25°</span>
+              <span className="text-white/35">Colorado</span>
             </span>
           </div>
-          <div className="hidden lg:flex items-center gap-2 rounded-full border border-white/[0.07] bg-white/[0.03] px-4 py-2 text-[10px] text-white/75 font-medium">
-            <span className="w-2 h-2 rounded-full bg-[#91c904] shadow-[0_0_10px_rgba(145,201,4,0.8)]"></span>
-            Factory 028
-          </div>
-          <ShiftIndicator />
-          <Weather
-            temperature={25}
-            condition="partly_cloudy"
-            unit="C"
-            location="Colorado"
-            humidity={62}
-            windSpeed={12}
-            aqi={42}
-            aqiLabel="Good"
-          />
 
-          <div className="hidden xl:block h-6 w-px bg-gradient-to-b from-transparent via-cyan-300/20 to-transparent"></div>
-
+          {/* Notification */}
           <button
             onClick={() => setNotifOpen(true)}
-            className="icon-btn notification-bell w-10 h-10 flex items-center justify-center rounded-full glass text-cyan-100/50 hover:text-white relative transition-all duration-300 hover:shadow-[0_0_24px_rgba(34,211,238,0.15)]"
+            className="icon-btn notification-bell w-10 h-10 flex items-center justify-center rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-white/50 hover:text-white relative transition-all duration-200"
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 20 20"
-              fill="none"
-              className="opacity-65 transition-opacity duration-300 group-hover:opacity-80"
-            >
-              <path
-                d="M10 2a6 6 0 00-6 6v3l-1.5 2.5h15L16 11V8a6 6 0 00-6-6z"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinejoin="round"
-                className="text-blue-200"
-              />
-              <path
-                d="M8 17a2 2 0 004 0"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                className="text-blue-200"
-              />
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+              <path d="M10 2a6 6 0 00-6 6v3l-1.5 2.5h15L16 11V8a6 6 0 00-6-6z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+              <path d="M8 17a2 2 0 004 0" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
             </svg>
-            <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-gradient-to-r from-red-500 to-rose-500 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.6)] text-[8px] font-bold flex items-center justify-center px-1 text-white border border-[#030b1a]/80">
-              {filteredAlerts.length}
-            </span>
+            {filteredAlerts.length > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] bg-red-500 rounded-full text-[8px] font-bold flex items-center justify-center px-0.5 text-white">
+                {filteredAlerts.length}
+              </span>
+            )}
           </button>
 
-          <button className="icon-btn w-10 h-10 flex items-center justify-center rounded-full glass text-cyan-100/50 hover:text-white relative transition-all duration-300 hover:shadow-[0_0_24px_rgba(34,211,238,0.12)] group/settings">
+          {/* UNS Explorer — live unified-namespace tree */}
+          <button
+            onClick={() => setUnsOpen(true)}
+            title="UNS Explorer"
+            className="icon-btn w-10 h-10 flex items-center justify-center rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-white/50 hover:text-white relative transition-all duration-200"
+          >
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+              <rect x="3" y="3" width="5" height="4" rx="1" stroke="currentColor" strokeWidth="1.4" />
+              <rect x="12" y="8" width="5" height="4" rx="1" stroke="currentColor" strokeWidth="1.4" />
+              <rect x="3" y="13" width="5" height="4" rx="1" stroke="currentColor" strokeWidth="1.4" />
+              <path d="M8 5h2.5v10H8M10.5 10H12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            </svg>
+          </button>
+
+          {/* Settings */}
+          <button className="icon-btn w-10 h-10 flex items-center justify-center rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-white/50 hover:text-white relative transition-all duration-200 group/settings">
             <img
               src={gearIcon}
               alt="Settings"
-              className="w-4 h-4 opacity-70 invert group-hover/settings:opacity-65 group-hover/settings:rotate-90 transition-all duration-500"
+              className="w-4.5 h-4.5 opacity-50 invert group-hover/settings:rotate-90 transition-all duration-500"
             />
           </button>
 
-          <button className="w-10 h-10 rounded-full overflow-hidden relative group/avatar transition-all duration-300 hover:shadow-[0_0_24px_rgba(59,130,246,0.15)]">
-            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-cyan-300/28 via-sky-300/16 to-blue-500/24 p-[1.5px] group-hover/avatar:from-cyan-300/45 group-hover/avatar:via-sky-300/30 group-hover/avatar:to-blue-500/40 transition-all duration-500">
-              <div className="w-full h-full rounded-full bg-[#0a1d38] flex items-center justify-center overflow-hidden">
-                <div className="w-full h-full bg-gradient-to-br from-cyan-400/20 via-sky-400/14 to-blue-500/20 flex items-center justify-center">
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 20 20"
-                    fill="none"
-                    className="opacity-50 group-hover/avatar:opacity-75 transition-opacity duration-300"
-                  >
-                    <circle
-                      cx="10"
-                      cy="7"
-                      r="3.5"
-                      stroke="white"
-                      strokeWidth="1.5"
-                    />
-                    <path
-                      d="M3 17.5c0-3 3-5.5 7-5.5s7 2.5 7 5.5"
-                      stroke="white"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </div>
-              </div>
-            </div>
-            <div
-              className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-300 rounded-full border-2 border-[#06192f] shadow-[0_0_10px_rgba(52,211,153,0.7)] z-10 animate-pulse-glow"
-              style={{ color: "#6ee7b7" }}
-            ></div>
-          </button>
+          {/* Avatar */}
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/30 to-violet-500/20 flex items-center justify-center cursor-pointer hover:from-indigo-500/40 hover:to-violet-500/30 transition-all duration-300">
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" className="opacity-60">
+              <circle cx="10" cy="7" r="3.5" stroke="white" strokeWidth="1.5" />
+              <path d="M3 17.5c0-3 3-5.5 7-5.5s7 2.5 7 5.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </div>
         </div>
       </header>
 
-      {/* Main Grid — stacks to a single column below xl (square / narrow
-          screens), side-by-side 9:3 at xl and up. */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 flex-grow min-h-0 xl:overflow-hidden">
-        {/* Center Content — expanded for larger factory floor */}
-        <div className="xl:col-span-9 flex flex-col gap-4 xl:h-full min-h-0">
+      {/* Main Grid */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-3 flex-grow min-h-0 xl:overflow-hidden">
+        {/* Center Content */}
+        <div className="xl:col-span-9 flex flex-col gap-3 xl:h-full min-h-0">
           <KPIBar
             onOeeClick={() => setOeeOpen(true)}
             onAnalyticsClick={() => setAnalyticsOpen(true)}
             onPredictClick={() => setPredictiveOpen(true)}
             onDigitalTwinClick={() => setDigitalTwinOpen(true)}
             onDpsClick={() => setDpsOpen(true)}
+            onRoutingClick={() => setAppRoutingOpen(true)}
+            onGatewayTwinClick={() =>
+              window.open("http://52.7.12.103/", "_blank", "noopener,noreferrer")
+            }
             onVideoClick={() => setVideoOpen(true)}
             predAlertCount={predAlertCount}
           />
-          <div className="flex-grow min-h-[460px] xl:min-h-0 card data-trace corner-marks relative overflow-hidden group">
-            {/* 3D Scene — Factory or PLC Control Room */}
+          <div className="flex-grow min-h-[460px] xl:min-h-0 card data-trace corner-marks relative overflow-hidden group rounded-2xl">
+            {/* 3D Scene */}
             <Suspense
               fallback={
-                <div className="absolute inset-0 flex items-center justify-center text-cyan-200/60 text-[11px]">
+                <div className="absolute inset-0 flex items-center justify-center text-white/50 text-[11px] tracking-wider uppercase">
                   Initializing 3D scene…
                 </div>
               }
             >
-              {sceneView === "factory" ? <FactoryScene /> : <PLCControlRoom />}
+              {sceneView === "factory" ? (
+                <FactoryScene paused={scenePaused} />
+              ) : (
+                <PLCControlRoom paused={scenePaused} />
+              )}
             </Suspense>
 
             {/* Gradient overlays */}
-            <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-[#030b1a]/60 to-transparent pointer-events-none z-10"></div>
-            <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#030b1a]/90 to-transparent pointer-events-none z-10"></div>
+            <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-[#0b0c1a]/70 to-transparent pointer-events-none z-10"></div>
+            <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#0b0c1a]/80 to-transparent pointer-events-none z-10"></div>
 
-            {/* View switcher tab */}
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex gap-1 p-1 rounded-xl bg-black/40 backdrop-blur-md border border-cyan-300/10">
+            {/* View switcher */}
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex gap-0.5 p-1 rounded-xl bg-black/50 backdrop-blur-xl border border-white/[0.06]">
               {(
                 [
                   ["factory", "Factory Floor"],
@@ -256,10 +234,10 @@ const Dashboard: React.FC = () => {
                 <button
                   key={id}
                   onClick={() => setSceneView(id)}
-                  className={`px-3 py-1.5 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all duration-200 pointer-events-auto ${
+                  className={`px-3.5 py-1.5 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all duration-200 pointer-events-auto ${
                     sceneView === id
-                      ? "bg-cyan-400/15 text-cyan-200 border border-cyan-400/25 shadow-[0_0_10px_rgba(34,211,238,0.1)]"
-                      : "text-sky-200/50 hover:text-sky-200/80 border border-transparent"
+                      ? "bg-white/[0.08] text-white/90 border border-white/[0.12] shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
+                      : "text-white/40 hover:text-white/70 border border-transparent"
                   }`}
                 >
                   {label}
@@ -401,16 +379,10 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Sidebar — PLC + motor/emergency + thin 3-phase strip
-            (click strip to open per-phase detail drawer).
-            On stacked (sub-xl) layouts the children need explicit heights
-            since flex ratios collapse without a fixed-height parent. */}
+        {/* Right Sidebar */}
         <div className="xl:col-span-3 flex flex-col gap-3 xl:h-full min-h-0">
-          {/* 3-Phase now lives inside PLC Parameters as a clickable tile, so the
-              sidebar is just PLC params + the motor/emergency row, which gets
-              more vertical room. */}
           <PLCParametersWidget className="flex-1 min-h-[360px] xl:min-h-0" />
-          <div className="flex-none h-[150px] flex gap-3">
+          <div className="flex-none h-[140px] flex gap-3">
             <MotorFanWidget className="flex-1 min-h-0" />
             <EmergencyLightWidget className="flex-1 min-h-0" />
           </div>
@@ -449,6 +421,9 @@ const Dashboard: React.FC = () => {
             onClose={() => setDigitalTwinOpen(false)}
           />
         )}
+        {unsOpen && (
+          <UNSExplorerPanel open={unsOpen} onClose={() => setUnsOpen(false)} />
+        )}
       </Suspense>
 
       {/* Integration modals — the modal shell is a static import so it opens
@@ -459,10 +434,23 @@ const Dashboard: React.FC = () => {
         <IntegrationModal
           open={dpsOpen}
           onClose={() => setDpsOpen(false)}
-          title="Dynamic Path Selection"
+          title="Dynamic Failover"
         >
           <Suspense fallback={<IntegrationLoading />}>
-            <DynamicPathSelectionPage />
+            <GatewaySourceSelector value={networkBranchId} onChange={setNetworkBranchId} />
+            <DynamicPathSelectionPage branchId={networkBranchId} />
+          </Suspense>
+        </IntegrationModal>
+      )}
+      {appRoutingOpen && (
+        <IntegrationModal
+          open={appRoutingOpen}
+          onClose={() => setAppRoutingOpen(false)}
+          title="Application Traffic Routing"
+        >
+          <Suspense fallback={<IntegrationLoading />}>
+            <GatewaySourceSelector value={networkBranchId} onChange={setNetworkBranchId} />
+            <ApplicationAwareRoutingPage branchId={networkBranchId} />
           </Suspense>
         </IntegrationModal>
       )}

@@ -9,7 +9,9 @@
       "Bash(npx tsc:*)",
       "Bash(grep -l \"color\\\\|Color\\\\|material\\\\|Material\" \"c:/Users/haris/Projects/Smart Factory/src/components/factory3d\"/*.tsx)",
       "Bash(grep -n \"planeGeometry\\\\|Html\\\\|Text\\\\|useTexture\" \"c:/Users/haris/Projects/Smart Factory/src/components/factory3d\"/*.tsx)",
-      "Bash(find \"c:/Users/haris/Projects/Smart Factory/src/components/factory3d\" -name \"*.tsx\" -type f -exec grep -l \"BulkSilo\\\\|container\\\\|tank\\\\|carton\\\\|pallet\" {} \\\\;)"
+      "Bash(find \"c:/Users/haris/Projects/Smart Factory/src/components/factory3d\" -name \"*.tsx\" -type f -exec grep -l \"BulkSilo\\\\|container\\\\|tank\\\\|carton\\\\|pallet\" {} \\\\;)",
+      "Bash(npm install *)",
+      "Bash(npx eslint *)"
     ]
   }
 }

@@ -38,7 +38,10 @@ const IntegrationModal: React.FC<IntegrationModalProps> = ({
       role="presentation"
       onClick={onClose}
       className="fixed inset-0 z-[9985] animate-[fadeIn_0.2s_ease]"
-      style={{ background: "rgba(2, 6, 14, 0.62)", backdropFilter: "blur(4px)" }}
+      /* No backdrop-filter here: a full-screen blur composited over the WebGL
+         scene is extremely slow on integrated GPUs — a darker flat overlay
+         reads the same and opens instantly. */
+      style={{ background: "rgba(2, 6, 14, 0.8)" }}
     >
       <div
         role="dialog"
@@ -86,7 +89,7 @@ const IntegrationModal: React.FC<IntegrationModalProps> = ({
 
         {/* Body — scrollable, scoped to integration tokens */}
         <div className="flex-1 overflow-y-auto">
-          <ThemeProvider>
+          <ThemeProvider initialTheme="dark">
             <div className="integration-scope" data-theme="dark" style={{ padding: "20px 24px" }}>
               <div className="page-transition">{children}</div>
             </div>

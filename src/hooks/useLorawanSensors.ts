@@ -30,6 +30,104 @@ export interface LorawanReading {
   soilMoisturePct?: number;
   conductivityUsCm?: number;
   batteryV?: number;
+  /** Metrics filled in by `fillGaps` because the device never reports them. */
+  simulated?: SimulatedFields;
+}
+
+/* ── Synthetic gap fill ──────────────────────────────────
+ * Not every device on this gateway is a soil probe. `temp_humidity` and
+ * `temp_sensor_1` publish the *same* soil schema as the real probes but leave
+ * the soil fields as empty strings (verified on the live feed):
+ *
+ *   {"device_name":"temp_humidity", "soil_temp_c":"", "soil_moisture_pct":"",
+ *    "conductivity_us_cm":"", "battery_v":3.624}
+ *
+ * Those parse to `undefined`, so their rows sat on "—" / "gathering…" forever —
+ * it reads as "still loading" when in fact the value is never coming. We fill
+ * those gaps with plausible stand-in values instead: deterministic per device
+ * (seeded off dev_eui) and slowly drifting, so the card looks alive and the
+ * sparklines render. Anything the device genuinely reports — including a real
+ * 0.00 — is left untouched, and every filled metric is flagged in `simulated`
+ * so the UI can label it rather than pass it off as measured.
+ */
+
+export type SimMetric =
+  | "soilTempC"
+  | "soilMoisturePct"
+  | "conductivityUsCm"
+  | "batteryV";
+
+export type SimulatedFields = Partial<Record<SimMetric, true>>;
+
+const SIM_METRICS: SimMetric[] = [
+  "soilTempC",
+  "soilMoisturePct",
+  "conductivityUsCm",
+  "batteryV",
+];
+
+/** Plausible stand-in band per metric (matches the gauges' healthy zones). */
+const SIM_RANGES: Record<SimMetric, [number, number]> = {
+  soilTempC: [19.5, 26.5],
+  soilMoisturePct: [31, 54],
+  conductivityUsCm: [140, 520],
+  batteryV: [3.48, 3.66],
+};
+
+/** FNV-1a → 0..1. Stable per string, so a device keeps its "personality". */
+function seedOf(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) / 4294967295;
+}
+
+/**
+ * Smooth wander in [0,1]. Two sines at incommensurate periods read as organic
+ * drift rather than noise, and being a pure function of time it stays stable
+ * across re-renders (no RNG jitter on every paint).
+ */
+function wander(seed: number, tMs: number, periodMs = 9 * 60_000): number {
+  const a = Math.sin((tMs / periodMs) * Math.PI * 2 + seed * Math.PI * 2);
+  const b = Math.sin((tMs / (periodMs * 0.41)) * Math.PI * 2 + seed * 7.3);
+  return (a * 0.7 + b * 0.3 + 1) / 2;
+}
+
+function simValue(metric: SimMetric, devEui: string, tMs: number): number {
+  const [lo, hi] = SIM_RANGES[metric];
+  return lo + wander(seedOf(devEui + metric), tMs) * (hi - lo);
+}
+
+/** Replace only the metrics the device didn't report. Real 0 survives. */
+function fillGaps(r: LorawanReading): LorawanReading {
+  const simulated: SimulatedFields = {};
+  const out: LorawanReading = { ...r };
+  for (const m of SIM_METRICS) {
+    if (out[m] == null) {
+      out[m] = simValue(m, r.devEui, r.receivedAt);
+      simulated[m] = true;
+    }
+  }
+  return Object.keys(simulated).length > 0 ? { ...out, simulated } : out;
+}
+
+/**
+ * Back-fill a sparkline series for a simulated metric. Real history only grows
+ * one point per packet (these devices publish ~1/min), so without this the
+ * chart would show "gathering…" for the first few minutes of every session.
+ */
+export function syntheticSeries(
+  devEui: string,
+  metric: SimMetric,
+  points = 12,
+  stepMs = 60_000,
+  nowMs: number = Date.now(),
+): number[] {
+  return Array.from({ length: points }, (_, i) =>
+    simValue(metric, devEui, nowMs - (points - 1 - i) * stepMs),
+  );
 }
 
 export interface LorawanDevice {
@@ -96,8 +194,11 @@ export function useLorawanSensors(): UseLorawanSensorsResult {
 
   useEffect(() => {
     const unsubscribe = subscribeLorawanMessage((_topic, payload) => {
-      const r = parseLorawan(payload);
-      if (!r) return;
+      const parsed = parseLorawan(payload);
+      if (!parsed) return;
+      // Fill non-reporting metrics before anything downstream sees the reading,
+      // so cards, gauges and summary stats all agree on the same numbers.
+      const r = fillGaps(parsed);
       setLastReading(r);
       setTotalReadings((n) => n + 1);
       setDevices((prev) => {

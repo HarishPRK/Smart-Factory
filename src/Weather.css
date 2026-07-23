@@ -1,19 +1,18 @@
-/* Weather Widget — Consolidated glass card */
+/* Weather Widget — refined spatial card */
 .weather-widget {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 14px 6px 8px;
-  border-radius: 9999px;
+  padding: 5px 14px 5px 8px;
+  border-radius: 14px;
   position: relative;
   overflow: hidden;
 }
 
-/* Main icon area */
 .weather-main {
   position: relative;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -23,7 +22,7 @@
 .weather-icon-glow {
   position: absolute;
   inset: -4px;
-  background: radial-gradient(circle at center, rgba(255, 200, 0, 0.18), transparent 70%);
+  background: radial-gradient(circle at center, rgba(255, 200, 0, 0.12), transparent 70%);
   border-radius: 50%;
   filter: blur(8px);
   pointer-events: none;
@@ -31,10 +30,9 @@
 }
 
 .weather-widget:hover .weather-icon-glow {
-  background: radial-gradient(circle at center, rgba(255, 200, 0, 0.3), transparent 70%);
+  background: radial-gradient(circle at center, rgba(255, 200, 0, 0.22), transparent 70%);
 }
 
-/* Temperature block */
 .weather-temp-block {
   display: flex;
   flex-direction: column;
@@ -49,43 +47,41 @@
 }
 
 .weather-temp {
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   font-weight: 600;
   line-height: 1.1;
   letter-spacing: -0.02em;
 }
 
 .weather-degree {
-  font-size: 0.65em;
+  font-size: 0.6em;
   vertical-align: super;
   line-height: 1;
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
 .weather-unit {
-  font-size: 0.5em;
+  font-size: 0.45em;
   font-weight: 500;
-  opacity: 0.45;
+  opacity: 0.4;
   margin-left: 1px;
 }
 
 .weather-location {
-  font-size: 0.6rem;
-  color: rgba(191, 239, 255, 0.55);
+  font-size: 0.55rem;
+  color: rgba(200, 195, 230, 0.5);
   font-weight: 500;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
-/* Divider */
 .weather-divider {
   width: 1px;
-  height: 24px;
-  background: linear-gradient(to bottom, transparent, rgba(0, 255, 240, 0.25), transparent);
+  height: 20px;
+  background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.1), transparent);
   flex-shrink: 0;
 }
 
-/* Stats row */
 .weather-stats {
   display: flex;
   align-items: center;
@@ -100,7 +96,7 @@
 
 .weather-stat-value {
   font-size: 0.6rem;
-  color: rgba(186, 230, 253, 0.7);
+  color: rgba(200, 195, 230, 0.6);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   display: flex;
@@ -109,10 +105,9 @@
 }
 
 .weather-stat-sep {
-  color: rgba(125, 211, 252, 0.2);
+  color: rgba(255, 255, 255, 0.12);
 }
 
-/* Hover lift effect */
 .weather-widget:hover {
-  border-color: rgba(0, 255, 240, 0.22);
+  border-color: rgba(122, 180, 238, 0.15);
 }

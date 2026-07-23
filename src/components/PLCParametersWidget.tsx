@@ -127,9 +127,6 @@ const AnalogCard: React.FC<{ param: PLCParameter }> = ({ param }) => {
   const rawValue = param.value ?? 0;
   const min = param.min ?? 0;
   const max = param.max ?? 100;
-  // Smoothly animate both the readout text and the progress fill so live
-  // sensor jitter reads as motion rather than rapid snaps. Bar tween picks
-  // up the same eased value so number + bar stay locked together.
   const value = useTweenedNumber(rawValue, 280);
   const pct = Math.max(0, Math.min(1, (value - min) / (max - min)));
   const flash = useChangeFlash(rawValue, max - min);
@@ -142,7 +139,7 @@ const AnalogCard: React.FC<{ param: PLCParameter }> = ({ param }) => {
 
   return (
     <div
-      className={`card-inner p-2 flex flex-col justify-between transition-all duration-300 relative overflow-hidden group/card ${glowClass} ${flashClass(flash)}`}
+      className={`card-inner p-2.5 flex flex-col justify-between transition-all duration-300 relative overflow-hidden group/card rounded-xl ${glowClass} ${flashClass(flash)}`}
     >
       {/* Top row: label + status */}
       <div className="flex justify-between items-center gap-1 relative z-10">
@@ -152,49 +149,37 @@ const AnalogCard: React.FC<{ param: PLCParameter }> = ({ param }) => {
 
       {/* Center: large value */}
       <div className="flex items-baseline gap-1 relative z-10 my-auto py-1">
-        <span className="text-[26px] font-semibold gradient-number leading-none">
+        <span className="text-[24px] font-semibold gradient-number leading-none">
           {value.toFixed(param.decimals ?? 1)}
         </span>
-        <span
-          className="text-[13px] text-blue-200/70 font-medium"
-          style={{ WebkitTextFillColor: "rgb(120 160 210 / 0.6)" }}
-        >
+        <span className="text-[11px] text-white/40 font-medium">
           {param.unit}
         </span>
       </div>
 
       {/* Bottom: progress bar + range */}
       <div className="relative z-10">
-        <div className="w-full h-1.5 rounded-full bg-white/[0.04] overflow-hidden">
-          {/* No CSS transition here — the tweened `value` already drives a
-              smooth width update on every rAF, and stacking another
-              transition-all on top makes the bar lag behind the number. */}
+        <div className="w-full h-[5px] rounded-full bg-white/[0.04] overflow-hidden">
           <div
             className="h-full rounded-full"
             style={{
               width: `${pct * 100}%`,
               backgroundColor: param.accentHex,
-              boxShadow: `0 0 8px ${param.accentHex}60`,
+              boxShadow: `0 0 6px ${param.accentHex}50`,
             }}
           />
         </div>
         <div className="flex justify-between items-center mt-1 gap-1">
-          <span
-            className="text-blue-200/65 font-medium"
-            style={{ fontSize: "9.5px" }}
-          >
+          <span className="text-white/35 font-medium" style={{ fontSize: "9px" }}>
             {min}
           </span>
           <span
             className="font-medium whitespace-nowrap"
-            style={{ fontSize: "8.5px", color: `${param.accentHex}80` }}
+            style={{ fontSize: "8px", color: `${param.accentHex}70` }}
           >
             {param.nominal?.toFixed(param.decimals ?? 1)} nom
           </span>
-          <span
-            className="text-blue-200/65 font-medium"
-            style={{ fontSize: "9.5px" }}
-          >
+          <span className="text-white/35 font-medium" style={{ fontSize: "9px" }}>
             {max}
           </span>
         </div>
@@ -202,8 +187,8 @@ const AnalogCard: React.FC<{ param: PLCParameter }> = ({ param }) => {
 
       {/* Ambient glow */}
       <div
-        className="absolute -bottom-6 -right-6 w-16 h-16 blur-[20px] rounded-full pointer-events-none group-hover/card:scale-125 transition-all duration-700"
-        style={{ backgroundColor: `${param.accentHex}08` }}
+        className="absolute -bottom-6 -right-6 w-14 h-14 blur-[18px] rounded-full pointer-events-none group-hover/card:scale-125 transition-all duration-700"
+        style={{ backgroundColor: `${param.accentHex}06` }}
       />
     </div>
   );
@@ -435,105 +420,34 @@ const PLCParametersWidget: React.FC<{ className?: string }> = ({
 
   return (
     <div
-      className={`card p-4 flex flex-col gap-2.5 animate-fade-in delay-2 ${className}`}
+      className={`card p-3.5 flex flex-col gap-2.5 animate-fade-in delay-2 rounded-2xl ${className}`}
     >
       {/* Header */}
       <div className="flex justify-between items-center flex-none">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 bg-gradient-to-br from-cyan-500/[0.12] to-blue-500/[0.06] rounded-lg flex items-center justify-center border border-cyan-400/[0.12] shadow-[0_0_10px_rgba(6,182,212,0.08)]">
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 16 16"
-              fill="none"
-              className="opacity-70"
-            >
-              <rect
-                x="4"
-                y="4"
-                width="8"
-                height="8"
-                rx="1"
-                stroke="white"
-                strokeWidth="1.2"
-              />
-              <line
-                x1="2"
-                y1="6"
-                x2="4"
-                y2="6"
-                stroke="white"
-                strokeWidth="1"
-              />
-              <line
-                x1="2"
-                y1="10"
-                x2="4"
-                y2="10"
-                stroke="white"
-                strokeWidth="1"
-              />
-              <line
-                x1="12"
-                y1="6"
-                x2="14"
-                y2="6"
-                stroke="white"
-                strokeWidth="1"
-              />
-              <line
-                x1="12"
-                y1="10"
-                x2="14"
-                y2="10"
-                stroke="white"
-                strokeWidth="1"
-              />
-              <line
-                x1="6"
-                y1="2"
-                x2="6"
-                y2="4"
-                stroke="white"
-                strokeWidth="1"
-              />
-              <line
-                x1="10"
-                y1="2"
-                x2="10"
-                y2="4"
-                stroke="white"
-                strokeWidth="1"
-              />
-              <line
-                x1="6"
-                y1="12"
-                x2="6"
-                y2="14"
-                stroke="white"
-                strokeWidth="1"
-              />
-              <line
-                x1="10"
-                y1="12"
-                x2="10"
-                y2="14"
-                stroke="white"
-                strokeWidth="1"
-              />
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 bg-gradient-to-br from-indigo-500/[0.12] to-blue-500/[0.06] rounded-lg flex items-center justify-center border border-indigo-400/[0.12]">
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" className="opacity-65">
+              <rect x="4" y="4" width="8" height="8" rx="1" stroke="white" strokeWidth="1.2" />
+              <line x1="2" y1="6" x2="4" y2="6" stroke="white" strokeWidth="1" />
+              <line x1="2" y1="10" x2="4" y2="10" stroke="white" strokeWidth="1" />
+              <line x1="12" y1="6" x2="14" y2="6" stroke="white" strokeWidth="1" />
+              <line x1="12" y1="10" x2="14" y2="10" stroke="white" strokeWidth="1" />
+              <line x1="6" y1="2" x2="6" y2="4" stroke="white" strokeWidth="1" />
+              <line x1="10" y1="2" x2="10" y2="4" stroke="white" strokeWidth="1" />
+              <line x1="6" y1="12" x2="6" y2="14" stroke="white" strokeWidth="1" />
+              <line x1="10" y1="12" x2="10" y2="14" stroke="white" strokeWidth="1" />
             </svg>
           </div>
-          <h3 className="text-[13px] font-semibold text-blue-100/90 uppercase tracking-[0.15em]">
+          <h3 className="text-[12px] font-semibold text-white/80 uppercase tracking-[0.16em]">
             PLC Parameters
           </h3>
         </div>
-        <div className="flex items-center gap-2">
-          {/* RFID operator-badge indicator — gates the intake stage */}
+        <div className="flex items-center gap-1.5">
           <span
-            className={`text-[10px] font-semibold flex items-center gap-1.5 px-2 py-0.5 rounded-md border ${
+            className={`text-[9px] font-semibold flex items-center gap-1 px-2 py-0.5 rounded-lg border ${
               rfidAuthorized
-                ? "bg-emerald-500/[0.08] border-emerald-500/30 text-emerald-300"
-                : "bg-amber-500/[0.08] border-amber-500/30 text-amber-300"
+                ? "bg-emerald-500/[0.06] border-emerald-500/25 text-emerald-300"
+                : "bg-amber-500/[0.06] border-amber-500/25 text-amber-300"
             }`}
             title={
               rfidAuthorized
@@ -541,42 +455,25 @@ const PLCParametersWidget: React.FC<{ className?: string }> = ({
                 : "No authorized badge — intake stage is locked"
             }
           >
-            <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
-              <rect
-                x="2"
-                y="3"
-                width="12"
-                height="10"
-                rx="1.5"
-                stroke="currentColor"
-                strokeWidth="1.3"
-              />
-              <path
-                d="M5 8a3 3 0 0 1 3 0M5.5 9.5a4 4 0 0 1 5 0M6 11a2 2 0 0 1 4 0"
-                stroke="currentColor"
-                strokeWidth="1.1"
-                strokeLinecap="round"
-                fill="none"
-              />
+            <svg width="9" height="9" viewBox="0 0 16 16" fill="none">
+              <rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
+              <path d="M5 8a3 3 0 0 1 3 0M5.5 9.5a4 4 0 0 1 5 0M6 11a2 2 0 0 1 4 0" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" fill="none" />
             </svg>
             RFID {rfidAuthorized ? "Auth" : "Locked"}
           </span>
-          <span className="text-[11px] text-blue-100/80 font-medium flex items-center gap-1.5 bg-blue-500/[0.04] px-2 py-0.5 rounded-md border border-blue-400/[0.06]">
-            <span
-              className="w-1.5 h-1.5 rounded-full bg-blue-400/60 animate-pulse-glow"
-              style={{ color: "#60a5fa" }}
-            />
+          <span className="text-[9px] text-white/60 font-medium flex items-center gap-1 bg-white/[0.03] px-2 py-0.5 rounded-lg border border-white/[0.05]">
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400/60 animate-pulse-glow" style={{ color: "#7ab4ee" }} />
             Live
           </span>
         </div>
       </div>
 
-      {/* RFID operator-gate strip — prominent status row */}
+      {/* RFID operator-gate strip */}
       <div
-        className={`flex items-center justify-between px-3 py-2 rounded-md border transition-colors ${
+        className={`flex items-center justify-between px-3 py-2 rounded-xl border transition-colors ${
           rfidAuthorized
-            ? "bg-emerald-500/[0.06] border-emerald-500/25"
-            : "bg-amber-500/[0.10] border-amber-500/35"
+            ? "bg-emerald-500/[0.04] border-emerald-500/20"
+            : "bg-amber-500/[0.06] border-amber-500/25"
         }`}
       >
         <div className="flex items-center gap-2.5">
@@ -687,14 +584,14 @@ const PLCParametersWidget: React.FC<{ className?: string }> = ({
 
       {/* Footer */}
       <div className="flex items-center justify-between flex-none pt-1">
-        <span className="text-[11px] text-blue-200/65 uppercase tracking-[0.12em] font-medium">
+        <span className="text-[9px] text-white/40 uppercase tracking-[0.14em] font-medium">
           Modbus RTU · RS485 · 8-ch relay
         </span>
         <span
-          className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${
+          className={`text-[9px] font-semibold px-2 py-0.5 rounded-lg ${
             isConnected
-              ? "bg-emerald-500/[0.06] border border-emerald-500/[0.10] text-emerald-400/80"
-              : "bg-amber-500/[0.06] border border-amber-500/[0.10] text-amber-400/80"
+              ? "bg-emerald-500/[0.05] border border-emerald-500/[0.12] text-emerald-400/75"
+              : "bg-amber-500/[0.05] border border-amber-500/[0.12] text-amber-400/75"
           }`}
         >
           {isConnected ? "Online" : "Connecting..."}

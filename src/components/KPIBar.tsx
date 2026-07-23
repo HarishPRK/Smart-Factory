@@ -117,11 +117,23 @@ interface KPIBarProps {
   onPredictClick?: () => void;
   onDigitalTwinClick?: () => void;
   onDpsClick?: () => void;
+  onRoutingClick?: () => void;
+  onGatewayTwinClick?: () => void;
   onVideoClick?: () => void;
   predAlertCount?: number;
 }
 
-const KPIBar: React.FC<KPIBarProps> = ({ onOeeClick, onAnalyticsClick, onPredictClick, onDigitalTwinClick, onDpsClick, onVideoClick, predAlertCount = 0 }) => {
+const KPIBar: React.FC<KPIBarProps> = ({
+  onOeeClick,
+  onAnalyticsClick,
+  onPredictClick,
+  onDigitalTwinClick,
+  onDpsClick,
+  onRoutingClick,
+  onGatewayTwinClick,
+  onVideoClick,
+  predAlertCount = 0,
+}) => {
   const { state, dispatch } = useFilters();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -162,12 +174,12 @@ const KPIBar: React.FC<KPIBarProps> = ({ onOeeClick, onAnalyticsClick, onPredict
         onClick={() => scrollByAmount(-1)}
         aria-label="Scroll KPIs left"
         disabled={!canScrollLeft}
-        className={`flex-none w-8 h-8 rounded-full glass flex items-center justify-center text-cyan-100/80 hover:text-white transition-all duration-200 ${
-          canScrollLeft ? "opacity-100" : "opacity-30 cursor-not-allowed"
+        className={`flex-none w-7 h-7 rounded-lg glass flex items-center justify-center text-white/70 hover:text-white transition-all duration-200 ${
+          canScrollLeft ? "opacity-100" : "opacity-25 cursor-not-allowed"
         }`}
       >
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-          <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+          <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
 
@@ -199,9 +211,9 @@ const KPIBar: React.FC<KPIBarProps> = ({ onOeeClick, onAnalyticsClick, onPredict
                   dispatch({ type: "SET_KPI", kpi: kpi.id });
                 }
               }}
-              className={`card shimmer-border ${kpi.hoverBorder} p-3.5 flex flex-col justify-between h-[96px] min-w-[190px] max-w-[320px] flex-1 basis-[190px] relative overflow-hidden animate-fade-in delay-${i + 1} group cursor-pointer transition-all duration-300 ${
+              className={`card ${kpi.hoverBorder} px-4 py-3.5 flex flex-col h-[100px] min-w-[200px] max-w-[320px] flex-1 basis-[200px] relative overflow-hidden animate-fade-in delay-${i + 1} group cursor-pointer transition-all duration-300 rounded-2xl ${
                 isSelected
-                  ? "ring-1 ring-white/20 shadow-[0_0_20px_rgba(0,92,185,0.20)] scale-[1.02]"
+                  ? "ring-1 ring-white/10 scale-[1.02]"
                   : ""
               }`}
             >
@@ -211,27 +223,24 @@ const KPIBar: React.FC<KPIBarProps> = ({ onOeeClick, onAnalyticsClick, onPredict
                 } transition-opacity duration-500 pointer-events-none`}
               ></div>
 
-              <div className="absolute bottom-2 right-3 z-0">
-                <MiniSparkline data={zoneData.sparkData} color={kpi.sparkColor} />
-              </div>
-
-              <div className="flex justify-between items-start relative z-10">
-                <div className="flex items-center gap-2">
+              {/* Row 1: Icon + Label + Trend — vertically centered */}
+              <div className="flex items-center justify-between relative z-10">
+                <div className="flex items-center gap-2.5">
                   <div
-                    className={`w-7 h-7 ${kpi.iconBg} rounded-lg flex items-center justify-center border ${kpi.iconBorder} ${kpi.iconGlow} transition-all duration-300 group-hover:scale-105`}
+                    className={`w-8 h-8 ${kpi.iconBg} rounded-[10px] flex items-center justify-center border ${kpi.iconBorder} transition-all duration-300 group-hover:scale-105`}
                   >
                     <img
                       src={kpi.icon}
                       alt={kpi.label}
-                      className="w-3.5 h-3.5 opacity-75 invert"
+                      className="w-4 h-4 opacity-85 invert"
                     />
                   </div>
-                  <span className="text-[11px] text-blue-100/85 uppercase tracking-[0.12em] font-semibold">
+                  <span className="text-[11px] text-white/60 uppercase tracking-[0.08em] font-semibold">
                     {kpi.label}
                   </span>
                 </div>
                 <div
-                  className={`flex items-center gap-0.5 text-[10px] font-semibold ${kpi.trendColor} bg-white/[0.03] px-2 py-0.5 rounded-md border border-white/[0.04]`}
+                  className={`flex items-center gap-1 text-[10px] font-semibold ${kpi.trendColor}`}
                 >
                   <svg
                     width="8"
@@ -245,204 +254,261 @@ const KPIBar: React.FC<KPIBarProps> = ({ onOeeClick, onAnalyticsClick, onPredict
                   {zoneData.trend}
                 </div>
               </div>
-              <div className="flex items-baseline gap-1.5 mt-auto relative z-10">
-                <span className="text-[26px] font-semibold gradient-number leading-none tracking-tight tabular-nums">
-                  <KpiCountUp value={zoneData.value} />
-                </span>
-                <span className="text-[11px] text-blue-200/70 font-medium">
-                  {kpi.unit}
-                </span>
+
+              {/* Row 2: Value + Unit + Sparkline — pushed to bottom */}
+              <div className="flex items-end justify-between mt-auto relative z-10">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-[22px] font-medium gradient-number leading-none">
+                    <KpiCountUp value={zoneData.value} />
+                  </span>
+                  <span className="text-[11px] text-white/35 font-medium">
+                    {kpi.unit}
+                  </span>
+                </div>
+                <MiniSparkline data={zoneData.sparkData} color={kpi.sparkColor} />
               </div>
 
               {isSelected && (
-                <div className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-blue-400 shadow-[0_0_6px_rgba(59,130,246,0.6)] z-20"></div>
+                <div className="absolute top-2.5 right-2.5 w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_6px_rgba(122,180,238,0.5)] z-20"></div>
               )}
             </div>
           );
         })}
 
-        {/* Analytics button — styled as KPI card */}
+        {/* Analytics */}
         {onAnalyticsClick && (
           <button
             onClick={onAnalyticsClick}
-            className="card shimmer-border hover:border-cyan-400/30 p-3.5 flex flex-col justify-between h-[96px] min-w-[190px] max-w-[320px] flex-1 basis-[190px] relative overflow-hidden group/analytics cursor-pointer transition-all duration-300 text-left"
+            className="card hover:border-cyan-400/25 px-4 py-3.5 flex flex-col h-[100px] min-w-[200px] max-w-[320px] flex-1 basis-[200px] relative overflow-hidden group/analytics cursor-pointer transition-all duration-300 text-left rounded-2xl"
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/[0.12] to-blue-500/[0.04] opacity-0 group-hover/analytics:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-            <div className="absolute bottom-2 right-3 z-0 opacity-50 group-hover/analytics:opacity-75 transition-opacity duration-500">
-              <svg width="60" height="24" viewBox="0 0 60 24" fill="none">
-                <rect x="2"  y="14" width="6" height="8"  rx="1" fill="#22d3ee" opacity="0.9" />
-                <rect x="12" y="9"  width="6" height="13" rx="1" fill="#38bdf8" opacity="0.85" />
-                <rect x="22" y="5"  width="6" height="17" rx="1" fill="#60a5fa" opacity="0.8" />
-                <rect x="32" y="11" width="6" height="11" rx="1" fill="#38bdf8" opacity="0.75" />
-                <rect x="42" y="2"  width="6" height="20" rx="1" fill="#22d3ee" />
-              </svg>
-            </div>
-            <div className="flex justify-between items-start relative z-10">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 bg-cyan-500/[0.12] rounded-lg flex items-center justify-center border border-cyan-400/[0.15] shadow-[0_0_10px_rgba(34,211,238,0.10)] transition-all duration-300 group-hover/analytics:scale-105">
-                  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" className="text-cyan-200">
-                    <rect x="2" y="10" width="3" height="8"  rx="1" fill="currentColor" />
-                    <rect x="7" y="6"  width="3" height="12" rx="1" fill="currentColor" />
-                    <rect x="12" y="3" width="3" height="15" rx="1" fill="currentColor" />
-                    <path d="M3 9L8 5L13 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.6" />
-                  </svg>
-                </div>
-                <span className="text-[11px] text-cyan-100/90 uppercase tracking-[0.12em] font-semibold">Analytics</span>
+            <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/[0.08] to-transparent opacity-0 group-hover/analytics:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+            <div className="flex items-center gap-2.5 relative z-10">
+              <div className="w-8 h-8 bg-cyan-500/[0.10] rounded-[10px] flex items-center justify-center border border-cyan-400/[0.12] transition-all duration-300 group-hover/analytics:scale-105">
+                <svg width="15" height="15" viewBox="0 0 20 20" fill="none" className="text-cyan-300">
+                  <rect x="2" y="11" width="3" height="7" rx="1" fill="currentColor" opacity="0.6" />
+                  <rect x="7" y="7" width="3" height="11" rx="1" fill="currentColor" opacity="0.8" />
+                  <rect x="12" y="3" width="3" height="15" rx="1" fill="currentColor" />
+                  <path d="M3.5 10L8.5 6L13.5 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" opacity="0.5" />
+                </svg>
               </div>
+              <span className="text-[11px] text-white/60 uppercase tracking-[0.08em] font-semibold">Analytics</span>
             </div>
-            <div className="flex items-baseline gap-1.5 mt-auto relative z-10">
-              <span className="text-[14px] font-semibold text-cyan-200/90 leading-none tracking-tight">Open</span>
-              <span className="text-[10px] text-cyan-300/60 font-medium">trends</span>
+            <div className="flex items-end justify-between mt-auto relative z-10">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-[13px] font-medium text-cyan-300/80 leading-none">Open</span>
+                <span className="text-[11px] text-white/30">trends</span>
+              </div>
+              <svg width="60" height="24" viewBox="0 0 60 24" fill="none" className="opacity-50 group-hover/analytics:opacity-75 transition-opacity">
+                <rect x="2" y="14" width="6" height="8" rx="1.5" fill="#22d3ee" opacity="0.9" />
+                <rect x="12" y="9" width="6" height="13" rx="1.5" fill="#38bdf8" opacity="0.85" />
+                <rect x="22" y="5" width="6" height="17" rx="1.5" fill="#60a5fa" opacity="0.8" />
+                <rect x="32" y="11" width="6" height="11" rx="1.5" fill="#38bdf8" opacity="0.75" />
+                <rect x="42" y="2" width="6" height="20" rx="1.5" fill="#22d3ee" />
+              </svg>
             </div>
           </button>
         )}
 
-        {/* Predict button — styled as KPI card */}
+        {/* Predict */}
         {onPredictClick && (
           <button
             onClick={onPredictClick}
-            className="card shimmer-border hover:border-purple-400/30 p-3.5 flex flex-col justify-between h-[96px] min-w-[190px] max-w-[320px] flex-1 basis-[190px] relative overflow-hidden group/predict cursor-pointer transition-all duration-300 text-left"
+            className="card hover:border-purple-400/25 px-4 py-3.5 flex flex-col h-[100px] min-w-[200px] max-w-[320px] flex-1 basis-[200px] relative overflow-hidden group/predict cursor-pointer transition-all duration-300 text-left rounded-2xl"
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/[0.14] to-fuchsia-500/[0.04] opacity-0 group-hover/predict:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-            <div className="absolute bottom-2 right-3 z-0 opacity-55 group-hover/predict:opacity-80 transition-opacity duration-500">
-              <svg width="60" height="24" viewBox="0 0 60 24" fill="none">
-                <path d="M2 18L14 12L28 15L44 4L58 8" stroke="#c084fc" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M44 4L58 8" stroke="#e879f9" strokeWidth="1.5" strokeDasharray="2 2" strokeLinecap="round" />
-                <circle cx="14" cy="12" r="1.6" fill="#c084fc" opacity="0.7" />
-                <circle cx="28" cy="15" r="1.6" fill="#c084fc" opacity="0.7" />
-                <circle cx="44" cy="4"  r="1.8" fill="#e879f9" />
-              </svg>
-            </div>
-            <div className="flex justify-between items-start relative z-10">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 bg-purple-500/[0.12] rounded-lg flex items-center justify-center border border-purple-400/[0.16] shadow-[0_0_10px_rgba(168,85,247,0.12)] transition-all duration-300 group-hover/predict:scale-105">
-                  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" className="text-purple-200">
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/[0.08] to-transparent opacity-0 group-hover/predict:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+            <div className="flex items-center justify-between relative z-10">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 bg-purple-500/[0.10] rounded-[10px] flex items-center justify-center border border-purple-400/[0.12] transition-all duration-300 group-hover/predict:scale-105">
+                  <svg width="15" height="15" viewBox="0 0 20 20" fill="none" className="text-purple-300">
                     <path d="M2 14L6 10L10 12L14 6L18 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M14 6L18 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="2 2" opacity="0.5" />
+                    <path d="M14 6L18 3" strokeDasharray="2 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity="0.5" />
                     <circle cx="14" cy="6" r="1.5" fill="currentColor" />
                   </svg>
                 </div>
-                <span className="text-[11px] text-purple-100/90 uppercase tracking-[0.12em] font-semibold">Predict</span>
+                <span className="text-[11px] text-white/60 uppercase tracking-[0.08em] font-semibold">Predict</span>
               </div>
               {predAlertCount > 0 && (
-                <div className="flex items-center gap-0.5 text-[10px] font-semibold text-amber-300 bg-amber-500/[0.10] px-2 py-0.5 rounded-md border border-amber-400/20">
-                  {predAlertCount}
-                </div>
+                <span className="text-[9px] font-bold text-amber-300 bg-amber-500/[0.12] px-1.5 py-0.5 rounded-md">{predAlertCount}</span>
               )}
             </div>
-            <div className="flex items-baseline gap-1.5 mt-auto relative z-10">
-              <span className="text-[14px] font-semibold text-purple-200/90 leading-none tracking-tight">Forecast</span>
-              <span className="text-[10px] text-purple-300/60 font-medium">risks</span>
+            <div className="flex items-end justify-between mt-auto relative z-10">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-[13px] font-medium text-purple-300/80 leading-none">Forecast</span>
+                <span className="text-[11px] text-white/30">risks</span>
+              </div>
+              <svg width="60" height="24" viewBox="0 0 60 24" fill="none" className="opacity-50 group-hover/predict:opacity-75 transition-opacity">
+                <path d="M2 18L14 12L28 15L44 4L58 8" stroke="#c084fc" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M44 4L58 8" stroke="#e879f9" strokeWidth="1.5" strokeDasharray="2 2" strokeLinecap="round" />
+                <circle cx="14" cy="12" r="1.6" fill="#c084fc" opacity="0.7" />
+                <circle cx="44" cy="4" r="1.8" fill="#e879f9" />
+              </svg>
             </div>
           </button>
         )}
 
-        {/* Digital Twin button — styled as KPI card */}
+        {/* Digital Twin */}
         {onDigitalTwinClick && (
           <button
             onClick={onDigitalTwinClick}
-            className="card shimmer-border hover:border-emerald-400/30 p-3.5 flex flex-col justify-between h-[96px] min-w-[190px] max-w-[320px] flex-1 basis-[190px] relative overflow-hidden group/twin cursor-pointer transition-all duration-300 text-left"
+            className="card hover:border-emerald-400/25 px-4 py-3.5 flex flex-col h-[100px] min-w-[200px] max-w-[320px] flex-1 basis-[200px] relative overflow-hidden group/twin cursor-pointer transition-all duration-300 text-left rounded-2xl"
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/[0.12] to-teal-500/[0.04] opacity-0 group-hover/twin:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-            <div className="absolute bottom-2 right-3 z-0 opacity-55 group-hover/twin:opacity-80 transition-opacity duration-500">
-              <svg width="60" height="24" viewBox="0 0 60 24" fill="none">
-                <rect x="2"  y="4"  width="14" height="10" rx="1.5" stroke="#34d399" strokeWidth="1.3" fill="none" />
-                <rect x="32" y="4"  width="14" height="10" rx="1.5" stroke="#34d399" strokeWidth="1.3" fill="none" />
-                <rect x="17" y="15" width="14" height="7" rx="1.5" stroke="#6ee7b7" strokeWidth="1.3" fill="none" />
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/[0.08] to-transparent opacity-0 group-hover/twin:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+            <div className="flex items-center gap-2.5 relative z-10">
+              <div className="w-8 h-8 bg-emerald-500/[0.10] rounded-[10px] flex items-center justify-center border border-emerald-400/[0.12] transition-all duration-300 group-hover/twin:scale-105">
+                <svg width="15" height="15" viewBox="0 0 20 20" fill="none" className="text-emerald-300">
+                  <rect x="2" y="3" width="6" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.2" fill="none" />
+                  <rect x="12" y="3" width="6" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.2" fill="none" />
+                  <rect x="7" y="12" width="6" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.2" fill="none" />
+                  <path d="M5 8v3l5 1M15 8v3l-5 1" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.6" />
+                </svg>
+              </div>
+              <span className="text-[11px] text-white/60 uppercase tracking-[0.08em] font-semibold">Twin</span>
+            </div>
+            <div className="flex items-end justify-between mt-auto relative z-10">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-[13px] font-medium text-emerald-300/80 leading-none">Simulate</span>
+                <span className="text-[11px] text-white/30">live</span>
+              </div>
+              <svg width="60" height="24" viewBox="0 0 60 24" fill="none" className="opacity-50 group-hover/twin:opacity-75 transition-opacity">
+                <rect x="2" y="4" width="14" height="10" rx="2" stroke="#34d399" strokeWidth="1.3" fill="none" />
+                <rect x="32" y="4" width="14" height="10" rx="2" stroke="#34d399" strokeWidth="1.3" fill="none" />
+                <rect x="17" y="15" width="14" height="7" rx="2" stroke="#6ee7b7" strokeWidth="1.3" fill="none" />
                 <path d="M9 14v3l12 1M39 14v3l-12 1" stroke="#34d399" strokeWidth="1" strokeLinecap="round" opacity="0.6" />
               </svg>
             </div>
-            <div className="flex justify-between items-start relative z-10">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 bg-emerald-500/[0.12] rounded-lg flex items-center justify-center border border-emerald-400/[0.16] shadow-[0_0_10px_rgba(16,185,129,0.12)] transition-all duration-300 group-hover/twin:scale-105">
-                  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" className="text-emerald-200">
-                    <rect x="2" y="4" width="6" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" fill="none" />
-                    <rect x="12" y="4" width="6" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" fill="none" />
-                    <rect x="7" y="12" width="6" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" fill="none" />
-                    <path d="M5 9v2l5 1M15 9v2l-5 1" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.6" />
-                  </svg>
-                </div>
-                <span className="text-[11px] text-emerald-100/90 uppercase tracking-[0.12em] font-semibold">Twin</span>
-              </div>
-            </div>
-            <div className="flex items-baseline gap-1.5 mt-auto relative z-10">
-              <span className="text-[14px] font-semibold text-emerald-200/90 leading-none tracking-tight">Simulate</span>
-              <span className="text-[10px] text-emerald-300/60 font-medium">live</span>
-            </div>
           </button>
         )}
 
-        {/* Dynamic Path Selection — opens DPS modal */}
+        {/* DPS */}
         {onDpsClick && (
           <button
             onClick={onDpsClick}
-            className="card shimmer-border hover:border-blue-400/30 p-3.5 flex flex-col justify-between h-[96px] min-w-[190px] max-w-[320px] flex-1 basis-[190px] relative overflow-hidden group/dps cursor-pointer transition-all duration-300 text-left"
+            className="card hover:border-blue-400/25 px-4 py-3.5 flex flex-col h-[100px] min-w-[200px] max-w-[320px] flex-1 basis-[200px] relative overflow-hidden group/dps cursor-pointer transition-all duration-300 text-left rounded-2xl"
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/[0.14] to-sky-500/[0.04] opacity-0 group-hover/dps:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-            <div className="absolute bottom-2 right-3 z-0 opacity-55 group-hover/dps:opacity-80 transition-opacity duration-500">
-              <svg width="60" height="24" viewBox="0 0 60 24" fill="none">
-                {/* Two parallel underlay paths converging on a gateway */}
-                <path d="M2 6 Q14 6 22 12 Q34 18 56 18" stroke="#60a5fa" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-                <path d="M2 18 Q14 18 22 12 Q34 6 56 6" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="3 2" fill="none" />
-                <circle cx="22" cy="12" r="2.2" fill="#ffffff" />
-                <circle cx="56" cy="6"  r="1.6" fill="#60a5fa" />
-                <circle cx="56" cy="18" r="1.6" fill="#3b82f6" />
-              </svg>
-            </div>
-            <div className="flex justify-between items-start relative z-10">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 bg-blue-500/[0.12] rounded-lg flex items-center justify-center border border-blue-400/[0.16] shadow-[0_0_10px_rgba(59,130,246,0.12)] transition-all duration-300 group-hover/dps:scale-105">
-                  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" className="text-blue-200">
-                    <path d="M2 5 Q8 5 10 10 Q12 15 18 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-                    <path d="M2 15 Q8 15 10 10 Q12 5 18 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="2 2" fill="none" opacity="0.7" />
-                    <circle cx="10" cy="10" r="1.8" fill="currentColor" />
-                  </svg>
-                </div>
-                <span className="text-[11px] text-blue-100/90 uppercase tracking-[0.12em] font-semibold">DPS</span>
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/[0.08] to-transparent opacity-0 group-hover/dps:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+            <div className="flex items-center gap-2.5 relative z-10">
+              <div className="w-8 h-8 bg-blue-500/[0.10] rounded-[10px] flex items-center justify-center border border-blue-400/[0.12] transition-all duration-300 group-hover/dps:scale-105">
+                <svg width="15" height="15" viewBox="0 0 20 20" fill="none" className="text-blue-300">
+                  <path d="M2 5Q8 5 10 10Q12 15 18 15" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none" />
+                  <path d="M2 15Q8 15 10 10Q12 5 18 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeDasharray="2 2" fill="none" opacity="0.5" />
+                  <circle cx="10" cy="10" r="2" fill="currentColor" />
+                </svg>
               </div>
+              <span className="text-[11px] text-white/60 uppercase tracking-[0.08em] font-semibold">DPS</span>
             </div>
-            <div className="flex items-baseline gap-1.5 mt-auto relative z-10">
-              <span className="text-[14px] font-semibold text-blue-200/90 leading-none tracking-tight">Paths</span>
-              <span className="text-[10px] text-blue-300/60 font-medium">fiber · 5G</span>
+            <div className="flex items-end justify-between mt-auto relative z-10">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-[13px] font-medium text-blue-300/80 leading-none">Paths</span>
+                <span className="text-[11px] text-white/30">fiber · 5G</span>
+              </div>
+              <svg width="60" height="24" viewBox="0 0 60 24" fill="none" className="opacity-50 group-hover/dps:opacity-75 transition-opacity">
+                <path d="M2 6Q14 6 22 12Q34 18 56 18" stroke="#60a5fa" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+                <path d="M2 18Q14 18 22 12Q34 6 56 6" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="3 2" fill="none" />
+                <circle cx="22" cy="12" r="2.2" fill="#ffffff" />
+              </svg>
             </div>
           </button>
         )}
 
-        {/* Video Analytics — opens video modal */}
+        {/* Application Traffic Routing */}
+        {onRoutingClick && (
+          <button
+            onClick={onRoutingClick}
+            className="card hover:border-violet-400/25 px-4 py-3.5 flex flex-col h-[100px] min-w-[200px] max-w-[320px] flex-1 basis-[200px] relative overflow-hidden group/routing cursor-pointer transition-all duration-300 text-left rounded-2xl"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-violet-500/[0.08] to-transparent opacity-0 group-hover/routing:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+            <div className="flex items-center gap-2.5 relative z-10">
+              <div className="w-8 h-8 bg-violet-500/[0.10] rounded-[10px] flex items-center justify-center border border-violet-400/[0.12] transition-all duration-300 group-hover/routing:scale-105">
+                <svg width="15" height="15" viewBox="0 0 20 20" fill="none" className="text-violet-300">
+                  <circle cx="4" cy="5" r="2" stroke="currentColor" strokeWidth="1.3" />
+                  <circle cx="4" cy="15" r="2" stroke="currentColor" strokeWidth="1.3" />
+                  <circle cx="16" cy="5" r="2" stroke="currentColor" strokeWidth="1.3" />
+                  <circle cx="16" cy="15" r="2" stroke="currentColor" strokeWidth="1.3" />
+                  <path d="M6 5h8M6 15h8M10 5v10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                </svg>
+              </div>
+              <span className="text-[11px] text-white/60 uppercase tracking-[0.08em] font-semibold">App Routing</span>
+            </div>
+            <div className="flex items-end justify-between mt-auto relative z-10">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-[13px] font-medium text-violet-300/80 leading-none">Steer</span>
+                <span className="text-[11px] text-white/30">apps · tunnels</span>
+              </div>
+              <svg width="60" height="24" viewBox="0 0 60 24" fill="none" className="opacity-50 group-hover/routing:opacity-75 transition-opacity">
+                <path d="M3 5h14c8 0 8 14 16 14h23" stroke="#a78bfa" strokeWidth="1.5" strokeLinecap="round" />
+                <path d="M3 19h14c8 0 8-14 16-14h23" stroke="#c084fc" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="3 2" />
+                <circle cx="33" cy="19" r="2.2" fill="#ddd6fe" />
+              </svg>
+            </div>
+          </button>
+        )}
+
+        {/* Gateway Twin — opens the external gateway digital twin. */}
+        {onGatewayTwinClick && (
+          <button
+            onClick={onGatewayTwinClick}
+            title="Open Gateway Twin"
+            className="card hover:border-cyan-400/25 px-4 py-3.5 flex flex-col h-[100px] min-w-[200px] max-w-[320px] flex-1 basis-[200px] relative overflow-hidden group/gateway-twin cursor-pointer transition-all duration-300 text-left rounded-2xl"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/[0.08] to-transparent opacity-0 group-hover/gateway-twin:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+            <div className="flex items-center gap-2.5 relative z-10">
+              <div className="w-8 h-8 bg-cyan-500/[0.10] rounded-[10px] flex items-center justify-center border border-cyan-400/[0.12] transition-all duration-300 group-hover/gateway-twin:scale-105">
+                <svg width="16" height="16" viewBox="0 0 20 20" fill="none" className="text-cyan-300">
+                  <rect x="2.5" y="4" width="6" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.25" />
+                  <rect x="11.5" y="4" width="6" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.25" opacity="0.72" />
+                  <path d="M8.5 7h3M8.5 13h3" stroke="currentColor" strokeWidth="1.15" strokeLinecap="round" />
+                  <circle cx="5.5" cy="7" r="0.8" fill="currentColor" />
+                  <circle cx="14.5" cy="13" r="0.8" fill="currentColor" opacity="0.8" />
+                </svg>
+              </div>
+              <span className="text-[11px] text-white/60 uppercase tracking-[0.08em] font-semibold">Gateway Twin</span>
+            </div>
+            <div className="flex items-end justify-between mt-auto relative z-10">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-[13px] font-medium text-cyan-300/80 leading-none">Open</span>
+                <span className="text-[11px] text-white/30">digital gateway</span>
+              </div>
+              <svg width="60" height="24" viewBox="0 0 60 24" fill="none" className="opacity-50 group-hover/gateway-twin:opacity-80 transition-opacity">
+                <rect x="3" y="4" width="16" height="16" rx="3" stroke="#67e8f9" strokeWidth="1.4" />
+                <rect x="41" y="4" width="16" height="16" rx="3" stroke="#22d3ee" strokeWidth="1.4" opacity="0.75" />
+                <path d="M19 8h11l4 4-4 4-11 0M41 8H30" stroke="#67e8f9" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="11" cy="12" r="2" fill="#cffafe" />
+                <circle cx="49" cy="12" r="2" fill="#67e8f9" />
+              </svg>
+            </div>
+          </button>
+        )}
+
+        {/* Video */}
         {onVideoClick && (
           <button
             onClick={onVideoClick}
-            className="card shimmer-border hover:border-rose-400/30 p-3.5 flex flex-col justify-between h-[96px] min-w-[190px] max-w-[320px] flex-1 basis-[190px] relative overflow-hidden group/video cursor-pointer transition-all duration-300 text-left"
+            className="card hover:border-rose-400/25 px-4 py-3.5 flex flex-col h-[100px] min-w-[200px] max-w-[320px] flex-1 basis-[200px] relative overflow-hidden group/video cursor-pointer transition-all duration-300 text-left rounded-2xl"
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-rose-500/[0.12] to-red-500/[0.04] opacity-0 group-hover/video:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-            <div className="absolute bottom-2 right-3 z-0 opacity-55 group-hover/video:opacity-80 transition-opacity duration-500">
-              <svg width="60" height="24" viewBox="0 0 60 24" fill="none">
-                {/* Grid of inference tiles */}
-                <rect x="2"  y="3"  width="13" height="8"  rx="1.5" fill="#fb7185" opacity="0.85" />
-                <rect x="17" y="3"  width="13" height="8"  rx="1.5" fill="#f43f5e" opacity="0.75" />
-                <rect x="32" y="3"  width="13" height="8"  rx="1.5" fill="#fb7185" opacity="0.65" />
-                <rect x="2"  y="13" width="13" height="8"  rx="1.5" fill="#f43f5e" opacity="0.75" />
-                <rect x="17" y="13" width="13" height="8"  rx="1.5" fill="#fb7185" opacity="0.85" />
-                <rect x="32" y="13" width="13" height="8"  rx="1.5" fill="#f43f5e" opacity="0.65" />
-                <circle cx="50" cy="6"  r="1.8" fill="#ef4444" />
-                <circle cx="50" cy="18" r="1.8" fill="#ef4444" opacity="0.55" />
-              </svg>
-            </div>
-            <div className="flex justify-between items-start relative z-10">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 bg-rose-500/[0.12] rounded-lg flex items-center justify-center border border-rose-400/[0.16] shadow-[0_0_10px_rgba(244,63,94,0.12)] transition-all duration-300 group-hover/video:scale-105">
-                  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" className="text-rose-200">
-                    <rect x="2" y="3" width="12" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.4" fill="none" />
-                    <path d="M14 6L18 4V11L14 9V6Z" fill="currentColor" />
-                    <circle cx="8" cy="7.5" r="1.4" fill="currentColor" opacity="0.8" />
-                  </svg>
-                </div>
-                <span className="text-[11px] text-rose-100/90 uppercase tracking-[0.12em] font-semibold">Video</span>
+            <div className="absolute inset-0 bg-gradient-to-br from-rose-500/[0.08] to-transparent opacity-0 group-hover/video:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+            <div className="flex items-center gap-2.5 relative z-10">
+              <div className="w-8 h-8 bg-rose-500/[0.10] rounded-[10px] flex items-center justify-center border border-rose-400/[0.12] transition-all duration-300 group-hover/video:scale-105">
+                <svg width="15" height="15" viewBox="0 0 20 20" fill="none" className="text-rose-300">
+                  <rect x="2" y="4" width="11" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.3" fill="none" />
+                  <path d="M13 7L17 5V11L13 9V7Z" fill="currentColor" opacity="0.8" />
+                  <circle cx="7.5" cy="8" r="1.5" fill="currentColor" opacity="0.6" />
+                </svg>
               </div>
+              <span className="text-[11px] text-white/60 uppercase tracking-[0.08em] font-semibold">Video</span>
             </div>
-            <div className="flex items-baseline gap-1.5 mt-auto relative z-10">
-              <span className="text-[14px] font-semibold text-rose-200/90 leading-none tracking-tight">Streams</span>
-              <span className="text-[10px] text-rose-300/60 font-medium">edge · AI</span>
+            <div className="flex items-end justify-between mt-auto relative z-10">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-[13px] font-medium text-rose-300/80 leading-none">Streams</span>
+                <span className="text-[11px] text-white/30">edge · AI</span>
+              </div>
+              <svg width="60" height="24" viewBox="0 0 60 24" fill="none" className="opacity-50 group-hover/video:opacity-75 transition-opacity">
+                <rect x="2" y="3" width="12" height="8" rx="2" fill="#fb7185" opacity="0.8" />
+                <rect x="17" y="3" width="12" height="8" rx="2" fill="#f43f5e" opacity="0.65" />
+                <rect x="2" y="13" width="12" height="8" rx="2" fill="#f43f5e" opacity="0.65" />
+                <rect x="17" y="13" width="12" height="8" rx="2" fill="#fb7185" opacity="0.8" />
+                <circle cx="42" cy="12" r="3" stroke="#ef4444" strokeWidth="1.2" fill="none" />
+                <circle cx="42" cy="12" r="1" fill="#ef4444" />
+              </svg>
             </div>
           </button>
         )}
@@ -463,12 +529,12 @@ const KPIBar: React.FC<KPIBarProps> = ({ onOeeClick, onAnalyticsClick, onPredict
         onClick={() => scrollByAmount(1)}
         aria-label="Scroll KPIs right"
         disabled={!canScrollRight}
-        className={`flex-none w-8 h-8 rounded-full glass flex items-center justify-center text-cyan-100/80 hover:text-white transition-all duration-200 ${
-          canScrollRight ? "opacity-100" : "opacity-30 cursor-not-allowed"
+        className={`flex-none w-7 h-7 rounded-lg glass flex items-center justify-center text-white/70 hover:text-white transition-all duration-200 ${
+          canScrollRight ? "opacity-100" : "opacity-25 cursor-not-allowed"
         }`}
       >
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-          <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+          <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
     </div>

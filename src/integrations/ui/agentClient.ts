@@ -16,7 +16,6 @@ export interface AgentRunRequest {
     agentName?: string;
   };
 }
-
 export interface AgentEvent {
   event: string;
   data: Record<string, unknown>;
@@ -78,7 +77,11 @@ function _streamSSE(
         signal: ctrl.signal,
       });
     } catch (err) {
-      handlers.onError?.(err instanceof Error ? err.message : String(err));
+      // An aborted request (unmount / regenerate / StrictMode remount) is
+      // intentional — never surface it as an analysis error.
+      if ((err as { name?: string })?.name !== 'AbortError') {
+        handlers.onError?.(err instanceof Error ? err.message : String(err));
+      }
       return;
     }
 

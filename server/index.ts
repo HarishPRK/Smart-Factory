@@ -1,5 +1,5 @@
 /**
- * Express server for Dynamic Path Selection + Video Analytics modals.
+ * Express server for Smart Factory integration modals.
  * Run via `npm run dev:server` (uses `tsx watch`).
  *
  * Routes registered:
@@ -7,6 +7,13 @@
  *   GET  /api/ipsec/stream         (SSE)
  *   POST /api/gateway/path
  *   POST /api/ipsec/insight        (SSE, Bedrock-powered)
+ *   GET  /api/aar/snapshot
+ *   GET  /api/aar/stream           (SSE)
+ *   POST /api/approute/publish     (binary AppRouteCommand)
+ *   POST /api/approute/suggest
+ *   POST /api/insight              (generic AI insight SSE)
+ *   GET  /api/devices/snapshot
+ *   GET  /api/devices/stream       (SSE)
  *   GET  /api/video                (list streams)
  *   GET  /api/video/:id            (MJPEG passthrough)
  *
@@ -23,9 +30,11 @@ import express from 'express';
 import cors from 'cors';
 import { registerIpsecRoutes } from './ipsec-routes.js';
 import { registerIpsecInsightRoute } from './ipsec-insight-route.js';
+import { registerAppRouteRoutes } from './app-route-routes.js';
+import { registerDeviceRoutes } from './device-routes.js';
+import { registerGenericInsightRoute } from './generic-insight-route.js';
 import { registerVideoRoutes } from './video-routes.js';
 import { ipsecSource } from './ipsecSource.js';
-import { pathControlSource } from './pathControlSource.js';
 
 const app = express();
 app.use(cors());
@@ -35,6 +44,9 @@ app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
 registerIpsecRoutes(app);
 registerIpsecInsightRoute(app);
+registerAppRouteRoutes(app);
+registerDeviceRoutes(app);
+registerGenericInsightRoute(app);
 registerVideoRoutes(app);
 
 const PORT = Number(process.env.PORT ?? 3001);
@@ -44,11 +56,7 @@ app.listen(PORT, "127.0.0.1", () => {
   // eslint-disable-next-line no-console
   console.log(`[server] listening on http://127.0.0.1:${PORT}`);
   // Kick off the AWS IoT subscription — without this the dashboard never
-  // receives any IPsec telemetry (this was the missing piece).
+  // receives IPsec, AAR, or device telemetry. This one connection also owns
+  // rdk/prpl path-control and AppRoute publishes.
   void ipsecSource.start();
-  // Pre-connect the path-control publisher so the rdk/path/control/result
-  // subscription is live before the first DPS button press (it would otherwise
-  // connect lazily on the first /api/gateway/path call). Swallow startup
-  // errors — the route surfaces them per-request if creds are missing.
-  void pathControlSource.start().catch(() => { /* logged inside start() */ });
 });

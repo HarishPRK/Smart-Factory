@@ -2,7 +2,26 @@ import type { PLCParameter } from "../types";
 import { plcParameters } from "../data/mockData";
 import { latencyMonitor } from "./latencyMonitor";
 
-/* ── Raw MQTT payload from plc/data topic ────────────── */
+/* ── PLC telemetry topics ────────────────────────────────
+ * The PLC publishes its data split across per-source subtopics of this base
+ * (UNS layout): data/boardA, data/boardB, data/esp32, data/system_metrics.
+ * Each message carries only that source's keys, so transports subscribe to
+ * the `/#` wildcard and merge partial payloads before parsing. Both transport
+ * paths (direct IoT Core subscription and the Mosquitto WS bridge filter)
+ * key off these constants — change them here when the plant/line topology
+ * moves.
+ */
+export const PLC_DATA_TOPIC = "prplHome/McKinney/lineA/plc1/data";
+// `base/#` also matches the base topic itself per the MQTT spec, so an
+// unsplit publish on the bare data topic still comes through.
+export const PLC_DATA_TOPIC_FILTER = `${PLC_DATA_TOPIC}/#`;
+
+/** True for the base data topic and any of its per-source subtopics. */
+export function isPLCDataTopic(topic: string): boolean {
+  return topic === PLC_DATA_TOPIC || topic.startsWith(`${PLC_DATA_TOPIC}/`);
+}
+
+/* ── Raw MQTT payload from the PLC data topic ────────────── */
 
 export interface RawPLCPayload {
   [key: string]: number | number[] | [number] | undefined;
@@ -125,7 +144,7 @@ export interface RawPLCPayload {
   push_button?: [number];
   temperature?: [number];
   pH?: [number];
-  // Aggregate OEE metrics — published on `plc/data` as shift-rollup values
+  // Aggregate OEE metrics — published on the PLC data topic as shift-rollup values
   // alongside (or instead of) raw sensor channels. Consumed by the OEE
   // dashboard via subscribeRawPLCPayload.
   OEE?: number;
@@ -138,7 +157,7 @@ export interface RawPLCPayload {
 }
 
 /* ── Raw payload broadcaster ──────────────────────────────
- * Not every `plc/data` publish is sensor-shaped. Aggregate metrics (OEE,
+ * Not every PLC data publish is sensor-shaped. Aggregate metrics (OEE,
  * availability, uptime) ride the same topic under different keys, so we
  * broadcast the raw object to any interested subscriber before the sensor
  * parser reduces it to typed PLCParameter rows. Used by the OEE dashboard.
@@ -196,6 +215,26 @@ export function subscribeLorawanMessage(cb: LorawanMessageListener): () => void 
 
 function emitLorawanMessage(topic: string, payload: unknown) {
   for (const cb of lorawanMessageListeners) cb(topic, payload);
+}
+
+/* ── Any-message broadcaster ─────────────────────────────
+ * The UNS explorer builds the namespace tree straight from broker traffic,
+ * so it needs every envelope the transport sees — including topics no other
+ * widget consumes. Emitted before the per-prefix routing, on both the
+ * Mosquitto WS path and the direct IoT Core path.
+ */
+export type AnyMessageListener = (topic: string, payload: unknown) => void;
+const anyMessageListeners = new Set<AnyMessageListener>();
+
+export function subscribeAnyMessage(cb: AnyMessageListener): () => void {
+  anyMessageListeners.add(cb);
+  return () => {
+    anyMessageListeners.delete(cb);
+  };
+}
+
+function emitAnyMessage(topic: string, payload: unknown) {
+  for (const cb of anyMessageListeners) cb(topic, payload);
 }
 
 // Module-level memory of the previous E-stop signal state. Used to detect
@@ -1411,7 +1450,14 @@ export class IoTCorePLCService implements PLCService {
   private client: import("mqtt").MqttClient | null = null;
   private listeners: Set<(state: PLCState) => void> = new Set();
   private lastState: PLCState | null = null;
-  private pendingRaw: RawPLCPayload | null = null;
+  // Union of the latest values from every per-source subtopic slice (boardA /
+  // boardB / esp32 / system_metrics). Must persist across flushes: each slice
+  // carries only its own keys, so a per-flush reset hands the parser a single
+  // slice and lets lower-priority fallback keys win — signals with cross-board
+  // fallbacks (MQ gas, pressure) then alternate between different physical
+  // sensors on every message.
+  private mergedRaw: RawPLCPayload = {};
+  private hasUnflushed = false;
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly endpoint: string;
   private readonly identityPoolId: string;
@@ -1511,21 +1557,27 @@ export class IoTCorePLCService implements PLCService {
 
       this.client.on("connect", () => {
         console.log("[IoTCore] Connected — direct MQTT, no Lambda delay");
-        this.client!.subscribe("plc/data", { qos: 0 }, (err) => {
+        this.client!.subscribe(PLC_DATA_TOPIC_FILTER, { qos: 0 }, (err) => {
           if (err) console.error("[IoTCore] Subscribe error:", err);
-          else console.log("[IoTCore] Subscribed to plc/data");
+          else console.log(`[IoTCore] Subscribed to ${PLC_DATA_TOPIC_FILTER}`);
         });
       });
 
-      this.client.on("message", (_topic: string, payload: Buffer) => {
+      this.client.on("message", (topic: string, payload: Buffer) => {
         try {
-          this.pendingRaw = JSON.parse(payload.toString()) as RawPLCPayload;
+          const incoming = JSON.parse(payload.toString()) as RawPLCPayload;
+          emitAnyMessage(topic, incoming);
+          // Fold this slice into the persistent union. Fresh object each time
+          // so subscribers holding the previous frame never see it mutate.
+          this.mergedRaw = { ...this.mergedRaw, ...incoming };
+          this.hasUnflushed = true;
 
           // Latency measurement: the bridge stamps `_bridgeTs` (epoch ms) when
-          // it republishes plc/data to IoT Core. Compare against now to get the
-          // bridge → IoT Core → browser transport latency for the direct path.
+          // it republishes plc/data to IoT Core. Read it off the incoming slice
+          // — not the union, where a stale stamp would be re-recorded on every
+          // later message — to get bridge → IoT Core → browser latency.
           latencyMonitor.record(
-            (this.pendingRaw as { _bridgeTs?: number })._bridgeTs,
+            (incoming as { _bridgeTs?: number })._bridgeTs,
             "iotcore",
           );
 
@@ -1533,17 +1585,19 @@ export class IoTCorePLCService implements PLCService {
           // KPI tiles) before the sensor parser reduces it. plc/data carries the
           // shift-rollup OEE fields alongside the sensor channels, so this must
           // fire on the IoTCore path too — not just the Mosquitto bridge path.
-          emitRawPLCPayload(this.pendingRaw);
+          emitRawPLCPayload(this.mergedRaw);
 
+          // Coalesce ~20 ms of arrivals into one parse/render — bounded, so no
+          // perceptible delay is added; matches the Mosquitto bridge path.
           if (!this.flushTimer) {
             this.flushTimer = setTimeout(() => {
               this.flushTimer = null;
-              if (!this.pendingRaw) return;
-              const state = parsePLCPayload(this.pendingRaw, this.lastState);
-              this.pendingRaw = null;
+              if (!this.hasUnflushed) return;
+              this.hasUnflushed = false;
+              const state = parsePLCPayload(this.mergedRaw, this.lastState);
               this.lastState = state;
               this.listeners.forEach((cb) => cb(state));
-            }, 50);
+            }, 20);
           }
         } catch (err) {
           console.error("[IoTCore] Parse error:", err);
@@ -1770,7 +1824,11 @@ export class MosquittoPLCService implements PLCService {
   private lastState: PLCState | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private disconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  private pendingRaw: RawPLCPayload | null = null;
+  // Persistent union of the per-source subtopic slices — see the field note on
+  // IoTCorePLCService.mergedRaw. Resetting this per flush made cross-board
+  // fallback signals (MQ gas, pressure) alternate between physical sensors.
+  private mergedRaw: RawPLCPayload = {};
+  private hasUnflushed = false;
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly wsUrl: string;
 
@@ -1843,6 +1901,8 @@ export class MosquittoPLCService implements PLCService {
           publishedAt?: number;
         };
 
+        if (msg.topic) emitAnyMessage(msg.topic, msg.payload);
+
         // KOS topics (forwarded from AWS IoT by the bridge) take a separate
         // route — they're consumed by the dispenser widget, not the PLC
         // sensor parser. Match `kos/...` and `KOS/...` (case-insensitive,
@@ -1858,19 +1918,22 @@ export class MosquittoPLCService implements PLCService {
           return;
         }
 
-        if (msg.topic !== "plc/data") return;
+        if (!msg.topic || !isPLCDataTopic(msg.topic)) return;
 
         // Latency measurement: the bridge stamps `publishedAt` (epoch ms) on
-        // the WS envelope when it forwards plc/data. Gives the local
+        // the WS envelope when it forwards PLC data. Gives the local
         // bridge → WS → browser baseline to compare against the iotcore path.
         latencyMonitor.record(msg.publishedAt, "mosquitto");
 
-        // Always keep the latest raw payload — never drop a message
-        this.pendingRaw = msg.payload as RawPLCPayload;
+        // Fold this slice into the persistent union. Fresh object each time
+        // so subscribers holding the previous frame never see it mutate.
+        // Never drop a message.
+        this.mergedRaw = { ...this.mergedRaw, ...(msg.payload as RawPLCPayload) };
+        this.hasUnflushed = true;
 
         // Broadcast the raw payload to non-sensor subscribers (OEE dashboard,
         // KPI tiles) before the sensor parser reduces it.
-        emitRawPLCPayload(this.pendingRaw);
+        emitRawPLCPayload(this.mergedRaw);
 
         // Flush within ~20 ms. Intentionally aggressive — PLCContext has its
         // own rAF coalesce layer above this that bundles rapid successive
@@ -1881,9 +1944,9 @@ export class MosquittoPLCService implements PLCService {
         if (!this.flushTimer) {
           this.flushTimer = setTimeout(() => {
             this.flushTimer = null;
-            if (!this.pendingRaw) return;
-            const state = parsePLCPayload(this.pendingRaw, this.lastState);
-            this.pendingRaw = null;
+            if (!this.hasUnflushed) return;
+            this.hasUnflushed = false;
+            const state = parsePLCPayload(this.mergedRaw, this.lastState);
             this.lastState = state;
             this.listeners.forEach((cb) => cb(state));
           }, 20);
@@ -1924,6 +1987,21 @@ export class MosquittoPLCService implements PLCService {
 
 /* ── Factory ───────────────────────────────────────────── */
 
+/** Resolve the bridge WS URL from where the page is served: dev hosts
+ *  (localhost / LAN) talk straight to the bridge on port 9001; anything
+ *  public goes through the nginx `/ws` proxy on the same origin, so the
+ *  build survives EC2 hostname changes without a rebuild. */
+function defaultBridgeUrl(): string {
+  const { protocol, hostname, host } = window.location;
+  const isLocal =
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    /^192\.168\./.test(hostname) ||
+    /^10\./.test(hostname);
+  if (isLocal) return `ws://${hostname}:9001`;
+  return `${protocol === "https:" ? "wss:" : "ws:"}//${host}/ws`;
+}
+
 export function createPLCService(): PLCService {
   const mode = import.meta.env.VITE_PLC_MODE ?? "mock";
 
@@ -1940,7 +2018,9 @@ export function createPLCService(): PLCService {
   }
 
   if (mode === "mosquitto") {
-    const bridgeUrl = import.meta.env.VITE_MQTT_BRIDGE_URL ?? `ws://${window.location.hostname}:9001`;
+    // `||` (not `??`): an empty VITE_MQTT_BRIDGE_URL in .env.production means
+    // "auto-detect" — Vite bakes it in as "", which is not nullish.
+    const bridgeUrl = import.meta.env.VITE_MQTT_BRIDGE_URL || defaultBridgeUrl();
     return new MosquittoPLCService(bridgeUrl);
   }
 

@@ -76,12 +76,25 @@ const localClient = mqtt.connect(mqttUrl, {
   reconnectPeriod: 5000,
 });
 
+// PLC telemetry now publishes on the UNS per-source subtopics; each carries
+// only that source's keys (the frontend merges them back into one frame).
+// The legacy plc/# filter is kept for plc/cmd echoes and the transition period.
+const PLC_TOPICS = [
+  "prplHome/McKinney/lineA/plc1/data/boardA",
+  "prplHome/McKinney/lineA/plc1/data/boardB",
+  "prplHome/McKinney/lineA/plc1/data/esp32",
+  "prplHome/McKinney/lineA/plc1/data/system_metrics",
+  "plc/#",
+];
+
 localClient.on("connect", () => {
   console.log(`[bridge] Connected to local MQTT broker at ${mqttUrl}`);
-  localClient.subscribe("plc/#", { qos: 0 }, (err) => {
-    if (err) console.error("[bridge] Local subscribe error:", err);
-    else console.log("[bridge] Subscribed to plc/# on local broker");
-  });
+  for (const filter of PLC_TOPICS) {
+    localClient.subscribe(filter, { qos: 0 }, (err) => {
+      if (err) console.error(`[bridge] Local subscribe error (${filter}):`, err);
+      else console.log(`[bridge] Subscribed to ${filter} on local broker`);
+    });
+  }
   // LoRaWAN soil/irrigation telemetry — published on `lorawan/data` (single
   // shared topic). Wildcard tolerates per-device subtopics if the gateway
   // ever splits them out.

@@ -581,7 +581,11 @@ const SceneContent: React.FC<{
 
 /* â”€â”€ Main exported component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
-const FactoryScene: React.FC = () => {
+const FactoryScene: React.FC<{
+  /** Freeze the WebGL render loop (e.g. while a full-screen modal covers the
+   *  scene) so the GPU is free for whatever is on top. */
+  paused?: boolean;
+}> = ({ paused = false }) => {
   const [isNight, setIsNight] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [discoMode, setDiscoMode] = useState(false);
@@ -670,6 +674,10 @@ const FactoryScene: React.FC = () => {
         // shadowed pixel for barely-visible extra softness. At 120 Hz that
         // 30 % matters.
         shadows
+        // "never" halts the render loop entirely while a full-screen modal
+        // hides the scene — on integrated GPUs the scene otherwise keeps
+        // burning the whole GPU budget behind the overlay.
+        frameloop={paused ? "never" : "always"}
         dpr={MAX_DPR}
         performance={{ min: 0.6, debounce: 200 }}
         gl={{

@@ -96,14 +96,13 @@ const EmergencyLightWidget: React.FC<EmergencyLightWidgetProps> = ({
 }) => {
   const { sendCommand } = usePLCContext(false);
   const emergencyLightOn = usePLCStore((s) => s.emergencyLightOn);
-  const alerts = usePLCStore((s) => s.alerts);
   const [manualAlert, setManualAlert] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animRef = useRef<number>(0);
 
-  // Active if manually toggled OR PLC relay[1] is on OR PLC alerts triggered
-  const plcAlert = emergencyLightOn || alerts.some(Boolean);
-  const hasAlert = manualAlert || plcAlert;
+  // Active only on manual toggle or explicit emergencyLightOn from PLC.
+  // Ignore alerts array (relay yellow / fingerprint 0 causes false positives).
+  const hasAlert = manualAlert || emergencyLightOn;
   const [bannerEpoch, setBannerEpoch] = useState(0);
   const [dismissedBannerEpoch, setDismissedBannerEpoch] = useState(0);
   const sirenRef = useRef<{ stop: () => void } | null>(null);
@@ -441,48 +440,36 @@ const EmergencyLightWidget: React.FC<EmergencyLightWidgetProps> = ({
 
   return (
     <div
-      className={`card p-3 flex flex-col gap-2 animate-fade-in delay-5 cursor-pointer active:scale-[0.97] transition-all duration-300 ${className}`}
+      className={`card p-3 flex flex-col gap-2 animate-fade-in delay-5 cursor-pointer active:scale-[0.97] transition-all duration-300 rounded-xl ${className}`}
       onClick={handleToggle}
     >
       {/* Header */}
       <div className="flex justify-between items-center flex-none">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <div
-            className={`w-6 h-6 bg-gradient-to-br rounded-lg flex items-center justify-center border transition-all duration-500 ${
+            className={`w-5 h-5 bg-gradient-to-br rounded-md flex items-center justify-center border transition-all duration-500 ${
               hasAlert
-                ? "from-red-500/[0.2] to-red-600/[0.1] border-red-400/[0.2] shadow-[0_0_8px_rgba(239,68,68,0.15)]"
-                : "from-red-500/[0.08] to-blue-500/[0.04] border-red-400/[0.08] shadow-[0_0_8px_rgba(239,68,68,0.05)]"
+                ? "from-red-500/[0.18] to-red-600/[0.08] border-red-400/[0.2]"
+                : "from-red-500/[0.06] to-blue-500/[0.03] border-white/[0.06]"
             }`}
           >
-            <svg
-              width="10"
-              height="10"
-              viewBox="0 0 16 16"
-              fill="none"
-              className="opacity-75"
-            >
-              <path
-                d="M8 1 L9 6 L14 5 L10 8 L14 11 L9 10 L8 15 L7 10 L2 11 L6 8 L2 5 L7 6 Z"
-                stroke="white"
-                strokeWidth="0.8"
-                fill="none"
-                strokeLinejoin="round"
-              />
+            <svg width="9" height="9" viewBox="0 0 16 16" fill="none" className="opacity-65">
+              <path d="M8 1 L9 6 L14 5 L10 8 L14 11 L9 10 L8 15 L7 10 L2 11 L6 8 L2 5 L7 6 Z" stroke="white" strokeWidth="0.8" fill="none" strokeLinejoin="round" />
             </svg>
           </div>
-          <h3 className="text-[13px] font-semibold text-blue-100/90 uppercase tracking-[0.15em]">
+          <h3 className="text-[11px] font-semibold text-white/75 uppercase tracking-[0.14em]">
             Emergency
           </h3>
         </div>
         <span
-          className={`text-[12px] font-medium flex items-center gap-1.5 px-2 py-0.5 rounded-md border transition-all duration-500 ${
+          className={`text-[9px] font-semibold flex items-center gap-1 px-1.5 py-0.5 rounded-md border transition-all duration-500 ${
             hasAlert
-              ? "text-red-400/90 bg-red-500/[0.1] border-red-500/[0.2]"
-              : "text-blue-200/60 bg-blue-500/[0.04] border-blue-400/[0.06]"
+              ? "text-red-400/85 bg-red-500/[0.08] border-red-500/[0.2]"
+              : "text-white/40 bg-white/[0.02] border-white/[0.05]"
           }`}
         >
           <span
-            className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${hasAlert ? "bg-red-400 animate-pulse" : "bg-blue-400/30"}`}
+            className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${hasAlert ? "bg-red-400 animate-pulse" : "bg-white/20"}`}
           />
           {hasAlert ? "Active" : "Clear"}
         </span>

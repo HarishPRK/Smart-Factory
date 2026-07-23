@@ -1,6 +1,11 @@
 import React, { useEffect } from "react";
 import ReactDOM from "react-dom";
-import { useLorawanSensors, type LorawanDevice } from "../hooks/useLorawanSensors";
+import {
+  useLorawanSensors,
+  syntheticSeries,
+  type LorawanDevice,
+  type SimMetric,
+} from "../hooks/useLorawanSensors";
 
 interface LorawanDetailDrawerProps {
   open: boolean;
@@ -308,12 +313,14 @@ const EmptyHint: React.FC<{ label: string }> = ({ label }) => (
 
 /* ── Sparkline + Device card ───────────────────────────── */
 
-const Sparkline: React.FC<{ values: number[]; color: string; min?: number; max?: number }> = ({
-  values,
-  color,
-  min,
-  max,
-}) => {
+const Sparkline: React.FC<{
+  values: number[];
+  color: string;
+  min?: number;
+  max?: number;
+  /** Draw dashed to mark the series as a stand-in, not measured history. */
+  dashed?: boolean;
+}> = ({ values, color, min, max, dashed }) => {
   if (values.length < 2) {
     return (
       <div
@@ -341,13 +348,14 @@ const Sparkline: React.FC<{ values: number[]; color: string; min?: number; max?:
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   });
   return (
-    <svg width={W} height={H} style={{ display: "block" }}>
+    <svg width={W} height={H} style={{ display: "block", opacity: dashed ? 0.5 : 1 }}>
       <polyline
         fill="none"
         stroke={color}
         strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
+        strokeDasharray={dashed ? "3 2" : undefined}
         points={pts.join(" ")}
       />
       <circle
@@ -368,7 +376,9 @@ const MetricRow: React.FC<{
   color: string;
   min?: number;
   max?: number;
-}> = ({ label, value, unit, history, color, min, max }) => (
+  /** Stand-in value — device never reports this metric. Rendered dimmed. */
+  simulated?: boolean;
+}> = ({ label, value, unit, history, color, min, max, simulated }) => (
   <div
     style={{
       display: "grid",
@@ -388,29 +398,39 @@ const MetricRow: React.FC<{
         color,
         fontVariantNumeric: "tabular-nums",
         textAlign: "right",
+        // Dimmed so a stand-in never reads as a measured value at a glance.
+        opacity: simulated ? 0.55 : 1,
       }}
     >
       {value}
       <span style={{ fontSize: "10px", color: "#64748b", marginLeft: "3px" }}>{unit}</span>
     </div>
-    <Sparkline values={history} color={color} min={min} max={max} />
+    <Sparkline
+      values={history}
+      color={color}
+      min={min}
+      max={max}
+      dashed={simulated}
+    />
   </div>
 );
 
 const DeviceCard: React.FC<{ device: LorawanDevice }> = ({ device }) => {
   const r = device.latest;
-  const tempHistory = device.history
-    .map((h) => h.soilTempC)
-    .filter((v): v is number => typeof v === "number");
-  const moistHistory = device.history
-    .map((h) => h.soilMoisturePct)
-    .filter((v): v is number => typeof v === "number");
-  const condHistory = device.history
-    .map((h) => h.conductivityUsCm)
-    .filter((v): v is number => typeof v === "number");
-  const batHistory = device.history
-    .map((h) => h.batteryV)
-    .filter((v): v is number => typeof v === "number");
+  const sim = r.simulated ?? {};
+  const anySimulated = Object.keys(sim).length > 0;
+
+  /** Real series when the device reports the metric; a back-filled stand-in
+   *  series otherwise, so simulated rows draw a curve instead of "gathering…". */
+  const seriesFor = (metric: SimMetric, pick: (h: typeof r) => number | undefined) =>
+    sim[metric]
+      ? syntheticSeries(device.devEui, metric)
+      : device.history.map(pick).filter((v): v is number => typeof v === "number");
+
+  const tempHistory = seriesFor("soilTempC", (h) => h.soilTempC);
+  const moistHistory = seriesFor("soilMoisturePct", (h) => h.soilMoisturePct);
+  const condHistory = seriesFor("conductivityUsCm", (h) => h.conductivityUsCm);
+  const batHistory = seriesFor("batteryV", (h) => h.batteryV);
 
   // Battery: red below 3.3V, amber 3.3-3.5, green above
   const bat = r.batteryV;
@@ -436,8 +456,11 @@ const DeviceCard: React.FC<{ device: LorawanDevice }> = ({ device }) => {
         }}
       >
         <div>
-          <div style={{ fontSize: "13px", fontWeight: 700, color: "#f0f9ff" }}>
-            {device.deviceName}
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <span style={{ fontSize: "13px", fontWeight: 700, color: "#f0f9ff" }}>
+              {device.deviceName}
+            </span>
+            {anySimulated && <SimBadge />}
           </div>
           <div
             style={{
@@ -461,6 +484,7 @@ const DeviceCard: React.FC<{ device: LorawanDevice }> = ({ device }) => {
           unit="°C"
           history={tempHistory}
           color="#fbbf24"
+          simulated={sim.soilTempC}
         />
         <MetricRow
           label="Moisture"
@@ -470,6 +494,7 @@ const DeviceCard: React.FC<{ device: LorawanDevice }> = ({ device }) => {
           color="#34d399"
           min={0}
           max={100}
+          simulated={sim.soilMoisturePct}
         />
         <MetricRow
           label="Conductivity"
@@ -477,6 +502,7 @@ const DeviceCard: React.FC<{ device: LorawanDevice }> = ({ device }) => {
           unit="µS/cm"
           history={condHistory}
           color="#60a5fa"
+          simulated={sim.conductivityUsCm}
         />
         <MetricRow
           label="Battery"
@@ -486,6 +512,7 @@ const DeviceCard: React.FC<{ device: LorawanDevice }> = ({ device }) => {
           color={batColor}
           min={3.0}
           max={3.7}
+          simulated={sim.batteryV}
         />
       </div>
 
@@ -505,6 +532,27 @@ const DeviceCard: React.FC<{ device: LorawanDevice }> = ({ device }) => {
     </div>
   );
 };
+
+/** Marks a card whose greyed-out rows are stand-ins, not gateway readings. */
+const SimBadge: React.FC = () => (
+  <span
+    title="This device doesn't report soil metrics — dimmed values are simulated stand-ins"
+    style={{
+      fontSize: "8px",
+      fontWeight: 700,
+      letterSpacing: "0.08em",
+      textTransform: "uppercase",
+      color: "#c4b5fd",
+      background: "rgba(167, 139, 250, 0.12)",
+      border: "1px solid rgba(167, 139, 250, 0.3)",
+      borderRadius: "4px",
+      padding: "1px 4px",
+      whiteSpace: "nowrap",
+    }}
+  >
+    Sim
+  </span>
+);
 
 const BatteryPill: React.FC<{ voltage?: number; color: string }> = ({ voltage, color }) => {
   // Map 3.0V (empty) → 3.7V (full) onto 0-100% fill

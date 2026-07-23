@@ -18,16 +18,16 @@
  *   MQTT_HOST              local broker, default 192.168.10.254
  *   MQTT_PORT             default 1883
  *   EDGE_TOPICS           comma-separated local topic filters to mirror,
- *                         default "plc/#,lorawan/#"
+ *                         default "prplHome/McKinney/lineA/plc1/#,plc/#,lorawan/#"
  *   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY [/ AWS_SESSION_TOKEN]  required
  *   AWS_IOT_ENDPOINT (or IOT_ENDPOINT)   default alht1i2bx8tzt-ats.iot.us-east-1.amazonaws.com
  *   AWS_REGION (or IOT_REGION)           default us-east-1
  *
  * Authorization (IAM policy on the access key — NOT an IoT cert policy):
  *   iot:Connect   on  client/edge-republish-*
- *   iot:Publish   on  topic/plc/data        (and any other mirrored topics)
- * The latency probe already proved Publish works on plc/*; if a mirrored topic
- * is denied, add iot:Publish for it to the IAM identity.
+ *   iot:Publish   on  topic/prplHome/McKinney/lineA/plc1/data  (and any other
+ *                 mirrored topics)
+ * If a mirrored topic is denied, add iot:Publish for it to the IAM identity.
  */
 
 import fs from "node:fs";
@@ -64,7 +64,7 @@ function loadDotenv() {
 
 const MQTT_HOST = process.env.MQTT_HOST ?? "192.168.10.254";
 const MQTT_PORT = Number(process.env.MQTT_PORT ?? 1883);
-const EDGE_TOPICS = (process.env.EDGE_TOPICS ?? "plc/#,lorawan/#")
+const EDGE_TOPICS = (process.env.EDGE_TOPICS ?? "prplHome/McKinney/lineA/plc1/#,plc/#,lorawan/#")
   .split(",")
   .map((t) => t.trim())
   .filter(Boolean);

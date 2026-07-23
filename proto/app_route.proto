@@ -1,0 +1,72 @@
+// Application → tunnel steering command, published by the dashboard when an
+// operator re-patches a client's wire on the Application Traffic Routing page.
+//
+//   Topic:    <prefix>/approute/control      (rdk = Plano, prpl = McKinney)
+//   Payload:  binary proto3 AppRouteCommand
+//
+// The encoder lives in src/proto/appRoute.ts (browser) and the decoder in
+// server/appRouteProto.ts — both hand-rolled, same no-protobufjs policy as
+// the ipsec_metrics schema this project already decodes.
+
+syntax = "proto3";
+
+package approute;
+
+// One application riding one IPsec tunnel. `tunnel` is the tunnel ifname
+// exactly as the gateway reports it on <prefix>/ipsec/metrics
+// (e.g. "vti-fiber1", "vti-cell2").
+message TunnelBinding {
+  string application = 1;  // e.g. "Netflix", "Microsoft Teams"
+  string tunnel      = 2;  // tunnel ifname from ipsec metrics
+}
+
+// Who initiated a route change: a manual operator drag on the patchboard, or
+// the AI route advisor (Bedrock reasoning vs the deterministic fallback).
+enum RouteOrigin {
+  ROUTE_ORIGIN_UNSPECIFIED       = 0;
+  ROUTE_ORIGIN_OPERATOR          = 1;
+  ROUTE_ORIGIN_ADVISOR_AI        = 2;
+  ROUTE_ORIGIN_ADVISOR_HEURISTIC = 3;
+}
+
+message ClientRouteChange {
+  string client_mac    = 1;
+  string client_name   = 2;
+  TunnelBinding current = 3;  // what the client rides today
+  TunnelBinding desired = 4;  // what the operator patched it to
+  RouteOrigin origin    = 5;  // operator drag vs AI-advisor-applied
+  string advisor_reason = 6;  // advisor's cited reasoning (advisor origins only)
+  double expected_gain_ms = 7; // advisor's net latency gain incl. modeled load
+  // The client's routing-freeze state at the time of this change. ALWAYS
+  // written on the wire (including false) so the key is never absent.
+  bool   freeze         = 8;
+}
+
+// Routing lock for one client's application. Published when the operator
+// toggles freeze on the patchboard; the gateway SHOULD reject/ignore steering
+// for a frozen client+application until a frozen=false follows.
+message ClientFreeze {
+  string client_mac  = 1;
+  string client_name = 2;
+  string application = 3;
+  // true = lock routing, false = release. ALWAYS written on the wire (proto3
+  // would normally drop a false), so an unfreeze still carries the key.
+  // Named `freeze` to match ClientRouteChange.freeze.
+  bool   freeze      = 4;
+  // The tunnel the application is pinned to at the moment of the freeze —
+  // what the gateway should hold it on while `freeze` is true.
+  string tunnel      = 5;
+}
+
+message AppRouteCommand {
+  uint64 timestamp_ms = 1;
+  string source       = 2;  // topic family: "rdk" | "prpl"
+  string gateway      = 3;  // gateway name from ipsec metrics
+  repeated ClientRouteChange changes = 4;
+  repeated ClientFreeze freezes      = 5;  // freeze toggles (may arrive without changes)
+  // What triggered this publish. "user_initiated" for anything a person did
+  // on the dashboard (drag, click-to-rewire, keyboard, advisor Apply, freeze
+  // toggle). Reserved for future automated senders.
+  string type         = 6;
+}
+

@@ -1,7 +1,9 @@
 /**
  * Lambda: plc-transform
  *
- * Triggered by IoT Rule:  SELECT * FROM 'plc/data'
+ * Triggered by IoT Rule:  SELECT * FROM 'prplHome/McKinney/lineA/plc1/data'
+ * (update the rule SQL in the AWS IoT console when the topic changes —
+ * the rule lives in AWS, not in this repo)
  * Pushes raw payload to all connected WebSocket clients via API Gateway.
  *
  * Environment variables:

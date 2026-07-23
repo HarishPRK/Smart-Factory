@@ -1992,7 +1992,10 @@ const Scene: React.FC<SceneProps> = ({
    EXPORT
    ══════════════════════════════════════════════════════════ */
 
-const PLCControlRoom: React.FC = () => {
+const PLCControlRoom: React.FC<{
+  /** Freeze the WebGL render loop while a full-screen modal covers the scene. */
+  paused?: boolean;
+}> = ({ paused = false }) => {
   const { sendCommand } = usePLCContext(false);
 
   // Start simulation on mount, stop on unmount
@@ -2019,6 +2022,7 @@ const PLCControlRoom: React.FC = () => {
 
   return (
     <Canvas
+      frameloop={paused ? "never" : "always"}
       dpr={[1, 1.5]}
       gl={{ antialias: true, alpha: false }}
       camera={{ position: [0, 2.5, 5.5], fov: 45, near: 0.1, far: 50 }}
