@@ -792,11 +792,16 @@
 }
 .integration-scope .va-live-badge .dot { width: 6px; height: 6px; background: #f87171; box-shadow: 0 0 6px #ef4444; }
 
-/* Fullscreen exit button (top-right of fullscreened tile) */
-.integration-scope .va-fs-exit {
+/* Stream controls — stop is shown only for feeds with an upstream stop API. */
+.integration-scope .va-stream-actions {
   position: absolute;
   top: 16px;
   right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.integration-scope .va-stream-action {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -809,8 +814,29 @@
   font-weight: 600;
   cursor: pointer;
   backdrop-filter: blur(8px);
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
-.integration-scope .va-fs-exit:hover { background: rgba(0, 0, 0, 0.75); }
+.integration-scope .va-stream-action:hover {
+  background: rgba(0, 0, 0, 0.75);
+  border-color: rgba(255, 255, 255, 0.34);
+}
+.integration-scope .va-stream-action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.integration-scope .va-stream-action:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+.integration-scope .va-stream-action.va-stop-feed {
+  background: rgba(127, 29, 29, 0.82);
+  border-color: rgba(248, 113, 113, 0.72);
+  color: #fee2e2;
+}
+.integration-scope .va-stream-action.va-stop-feed:hover:not(:disabled) {
+  background: rgba(153, 27, 27, 0.94);
+  border-color: #f87171;
+}
 
 /* Open-feed button below idle thumbnails */
 .integration-scope .va-open-btn {

@@ -16,6 +16,7 @@
  *   GET  /api/devices/stream       (SSE)
  *   GET  /api/video                (list streams)
  *   GET  /api/video/:id            (MJPEG passthrough)
+ *   POST /api/video/:id/stop       (stop upstream inference pipeline)
  *
  * dotenv MUST load before any other import that consumes env vars (the AWS
  * IoT SDK inside ipsecSource reads IOT_IPSEC_TOPIC / creds / endpoint at

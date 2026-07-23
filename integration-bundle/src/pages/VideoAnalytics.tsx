@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageHeader } from '../components/PageHeader';
 import { Card } from '../components/Card';
+import { useToast } from '../ui/Toast';
 import {
-  AlertCircle, Cpu, Loader2, Maximize2, Minimize2, Play, RefreshCw, Video, Wifi,
+  AlertCircle, Cpu, Loader2, Maximize2, Minimize2, Play, RefreshCw, Square, Video, Wifi,
 } from 'lucide-react';
 
 type StreamGroup = 'Nvidia' | 'Hailo';
@@ -12,6 +13,7 @@ interface VideoStream {
   name: string;
   description: string;
   url: string;
+  stopUrl?: string;
   group: StreamGroup;
 }
 
@@ -21,19 +23,19 @@ interface VideoStream {
  *  via VIDEO_UPSTREAM_<ID>, or by group via VIDEO_BASE_NVIDIA / VIDEO_BASE_HAILO. */
 const STREAMS: VideoStream[] = [
   // ── Nvidia · GPU inference
-  { id: 'nv-nanoowl',  name: 'Inventory Management', description: 'Open-vocabulary object detection',  url: '/api/video/nv-nanoowl',  group: 'Nvidia' },
-  { id: 'nv-violence', name: 'Violence detection', description: 'Aggressive-behaviour classifier',     url: '/api/video/nv-violence', group: 'Nvidia' },
-  { id: 'nv-fall',     name: 'Fall detection',     description: 'Detects person falls in zones',       url: '/api/video/nv-fall',     group: 'Nvidia' },
-  { id: 'nv-ppe',      name: 'PPE compliance',     description: 'Hard-hat · vest',                     url: '/api/video/nv-ppe',      group: 'Nvidia' },
+  { id: 'nv-nanoowl',  name: 'Inventory Management', description: 'Open-vocabulary object detection',  url: '/api/video/nv-nanoowl',  stopUrl: '/api/video/nv-nanoowl/stop',  group: 'Nvidia' },
+  { id: 'nv-violence', name: 'Violence detection', description: 'Aggressive-behaviour classifier',     url: '/api/video/nv-violence', stopUrl: '/api/video/nv-violence/stop', group: 'Nvidia' },
+  { id: 'nv-fall',     name: 'Fall detection',     description: 'Detects person falls in zones',       url: '/api/video/nv-fall',     stopUrl: '/api/video/nv-fall/stop',     group: 'Nvidia' },
+  { id: 'nv-ppe',      name: 'PPE compliance',     description: 'Hard-hat · vest',                     url: '/api/video/nv-ppe',      stopUrl: '/api/video/nv-ppe/stop',      group: 'Nvidia' },
   { id: 'nv-table',    name: 'Table monitor',      description: 'Table occupancy and dwell-time',      url: '/api/video/nv-table',    group: 'Nvidia' },
   { id: 'nv-weapon',   name: 'Weapon detection',   description: 'Firearms and edged-weapon classifier', url: '/api/video/nv-weapon',   group: 'Nvidia' },
   { id: 'nv-parking',  name: 'Parking monitor',    description: 'Bay occupancy and dwell-time',        url: '/api/video/nv-parking',  group: 'Nvidia' },
   // ── Hailo · NPU inference
   { id: 'ha-anpd',     name: 'ANPR',               description: 'Automatic number-plate recognition',  url: '/api/video/ha-anpd',     group: 'Hailo' },
-  { id: 'ha-intruder', name: 'Intruder detection', description: 'Perimeter intrusion alerts',          url: '/api/video/ha-intruder', group: 'Hailo' },
-  { id: 'ha-hairnet',  name: 'Hairnet monitor',    description: 'Food-safety hairnet compliance',      url: '/api/video/ha-hairnet',  group: 'Hailo' },
-  { id: 'ha-fire',     name: 'Fire detection',     description: 'Smoke and flame classifier',          url: '/api/video/ha-fire',     group: 'Hailo' },
-  { id: 'ha-crowd',    name: 'Crowd analytics',    description: 'Density and flow analysis',           url: '/api/video/ha-crowd',    group: 'Hailo' },
+  { id: 'ha-intruder', name: 'Intruder detection', description: 'Perimeter intrusion alerts',          url: '/api/video/ha-intruder', stopUrl: '/api/video/ha-intruder/stop', group: 'Hailo' },
+  { id: 'ha-hairnet',  name: 'Hairnet monitor',    description: 'Food-safety hairnet compliance',      url: '/api/video/ha-hairnet',  stopUrl: '/api/video/ha-hairnet/stop',  group: 'Hailo' },
+  { id: 'ha-fire',     name: 'Fire detection',     description: 'Smoke and flame classifier',          url: '/api/video/ha-fire',     stopUrl: '/api/video/ha-fire/stop',     group: 'Hailo' },
+  { id: 'ha-crowd',    name: 'Crowd analytics',    description: 'Density and flow analysis',           url: '/api/video/ha-crowd',    stopUrl: '/api/video/ha-crowd/stop',    group: 'Hailo' },
   { id: 'ha-drive',    name: 'Drive-thru monitor', description: 'Lane occupancy and wait time',        url: '/api/video/ha-drive',    group: 'Hailo' },
 ];
 
@@ -110,6 +112,7 @@ function StreamGroupCard({ group, streams }: { group: StreamGroup; streams: Vide
 
 function StreamTile({ stream }: { stream: VideoStream }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const { push } = useToast();
   /** When `true`, the <img> for the stream is mounted (network request fires). */
   const [isLive, setIsLive] = useState(false);
   const [errored, setErrored] = useState(false);
@@ -117,6 +120,7 @@ function StreamTile({ stream }: { stream: VideoStream }) {
   const [loaded, setLoaded] = useState(false);
   const [version, setVersion] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
 
   useEffect(() => {
     function onFsChange() {
@@ -152,6 +156,32 @@ function StreamTile({ stream }: { stream: VideoStream }) {
     setIsLive(false);
     setErrored(false);
     setLoaded(false);
+  }
+
+  async function stopStream() {
+    if (!stream.stopUrl || isStopping) return;
+    setIsStopping(true);
+    try {
+      const response = await fetch(stream.stopUrl, { method: 'POST' });
+      if (!response.ok) {
+        const detail = await response.text();
+        throw new Error(detail || `Stop API returned ${response.status}`);
+      }
+      closeStream();
+      push({
+        kind: 'success',
+        title: `${stream.name} stopped`,
+        detail: 'The upstream inference pipeline confirmed the stop request.',
+      });
+    } catch (error) {
+      push({
+        kind: 'error',
+        title: `Could not stop ${stream.name}`,
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setIsStopping(false);
+    }
   }
 
   function retry() {
@@ -226,16 +256,31 @@ function StreamTile({ stream }: { stream: VideoStream }) {
             LIVE
           </div>
         )}
-        {isFullscreen && (
-          <button
-            className="va-fs-exit"
-            onClick={closeStream}
-            title="Exit fullscreen (ESC)"
-            aria-label="Exit fullscreen"
-          >
-            <Minimize2 size={16} />
-            Exit fullscreen
-          </button>
+        {isLive && loaded && (stream.stopUrl || isFullscreen) && (
+          <div className="va-stream-actions">
+            {stream.stopUrl && (
+              <button
+                className="va-stream-action va-stop-feed"
+                onClick={stopStream}
+                disabled={isStopping}
+                title={`Stop ${stream.name} at the inference node`}
+              >
+                {isStopping ? <Loader2 size={16} className="spin" /> : <Square size={14} fill="currentColor" />}
+                {isStopping ? 'Stopping…' : 'Stop feed'}
+              </button>
+            )}
+            {isFullscreen && (
+              <button
+                className="va-stream-action"
+                onClick={closeStream}
+                title="Exit fullscreen (ESC)"
+                aria-label="Exit fullscreen"
+              >
+                <Minimize2 size={16} />
+                Exit fullscreen
+              </button>
+            )}
+          </div>
         )}
       </div>
 
