@@ -115,7 +115,7 @@ const PulseDot: React.FC<{ lastSeen: number }> = ({ lastSeen }) => {
 const TagGrid: React.FC<{ payload: unknown }> = ({ payload }) => {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     return (
-      <div className="pl-9 pr-3 py-1.5 text-[10px] font-mono text-sky-200/50">
+      <div className="uns-explorer__payload pl-9 pr-3 py-1.5 font-mono text-sky-200/65 break-words">
         {formatValue(payload)}
       </div>
     );
@@ -130,11 +130,12 @@ const TagGrid: React.FC<{ payload: unknown }> = ({ payload }) => {
           key={k}
           className="flex items-baseline justify-between gap-3 py-[3px] border-b border-white/[0.03] last:border-0"
         >
-          <span className="text-[10px] font-mono text-sky-200/45 truncate">{k}</span>
+          <span className="uns-explorer__payload min-w-0 font-mono text-sky-200/60 truncate">{k}</span>
           {/* key = value → the flash restarts only when the reading changes */}
           <span
             key={formatValue(v)}
-            className="uns-value-flash text-[10px] font-mono tabular-nums text-cyan-50/90 rounded px-1"
+            className="uns-explorer__payload uns-value-flash max-w-[65%] truncate font-mono tabular-nums text-cyan-50/95 rounded px-1"
+            title={formatValue(v)}
           >
             {formatValue(v)}
           </span>
@@ -165,7 +166,7 @@ const TreeRow: React.FC<{
     <div>
       <button
         onClick={() => onToggle(node)}
-        className={`w-full flex items-center gap-2 px-3 py-[5px] rounded-lg text-left transition-colors duration-150 hover:bg-white/[0.04] ${
+        className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-left transition-colors duration-150 hover:bg-white/[0.04] ${
           stale ? "opacity-45" : ""
         }`}
         style={{ paddingLeft: `${12 + (node.depth - 1) * 18}px` }}
@@ -186,12 +187,12 @@ const TreeRow: React.FC<{
 
         <PulseDot lastSeen={node.lastSeen} />
 
-        <span className={`text-[11px] font-mono truncate ${node.isTopic ? "text-cyan-50/90" : "text-white/70"}`}>
+        <span className={`uns-explorer__node min-w-0 font-mono truncate ${node.isTopic ? "text-cyan-50/95" : "text-white/80"}`}>
           {node.name}
         </span>
 
         {levelLabel && (
-          <span className="flex-none text-[8px] uppercase tracking-[0.14em] text-cyan-300/45 border border-cyan-300/12 rounded px-1 py-px">
+          <span className="uns-explorer__level flex-none uppercase tracking-[0.08em] text-cyan-300/65 border border-cyan-300/20 rounded px-1.5 py-0.5">
             {levelLabel}
           </span>
         )}
@@ -200,15 +201,15 @@ const TreeRow: React.FC<{
 
         {node.isTopic && (
           <>
-            <span className="flex-none text-[9px] font-mono tabular-nums text-sky-200/55 w-14 text-right">
+            <span className="uns-explorer__metadata flex-none font-mono tabular-nums text-sky-200/70 w-16 text-right">
               {rateHz(node).toFixed(1)} Hz
             </span>
             {tagCount !== null && (
-              <span className="flex-none text-[9px] font-mono tabular-nums text-white/35 w-14 text-right">
+              <span className="uns-explorer__metadata uns-explorer__metadata--secondary flex-none font-mono tabular-nums text-white/55 w-16 text-right">
                 {tagCount} tags
               </span>
             )}
-            <span className="flex-none text-[9px] font-mono text-white/30 w-14 text-right">
+            <span className="uns-explorer__metadata uns-explorer__metadata--secondary flex-none font-mono text-white/50 w-16 text-right">
               {ageLabel(node.lastSeen)}
             </span>
           </>
@@ -331,8 +332,8 @@ const UNSExplorerPanel: React.FC<UNSExplorerPanelProps> = ({ open, onClose }) =>
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-cyan-300/[0.08]">
           <div>
-            <h2 className="text-[16px] font-semibold text-cyan-50 tracking-tight">UNS Explorer</h2>
-            <p className="text-[11px] text-sky-200/60 font-medium mt-0.5">
+            <h2 className="uns-explorer__title font-semibold text-cyan-50 tracking-tight">UNS Explorer</h2>
+            <p className="uns-explorer__subtitle text-sky-200/75 font-medium mt-1">
               Unified Namespace — discovered live from broker traffic
             </p>
           </div>
@@ -349,9 +350,9 @@ const UNSExplorerPanel: React.FC<UNSExplorerPanelProps> = ({ open, onClose }) =>
         {/* Tree */}
         <div className="flex-1 overflow-y-auto px-3 py-3">
           {root.children.size === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center gap-2 text-center px-10">
-              <div className="text-[12px] text-sky-200/60 font-medium">Waiting for broker traffic</div>
-              <div className="text-[10px] text-white/30 max-w-[340px]">
+            <div className="h-full flex flex-col items-center justify-center gap-2.5 text-center px-10">
+              <div className="uns-explorer__empty-title text-sky-100/85 font-semibold">Waiting for broker traffic</div>
+              <div className="uns-explorer__empty-copy text-white/55 max-w-[420px]">
                 The namespace builds itself from live messages — as soon as a device
                 publishes, its branch appears here.
               </div>
@@ -372,12 +373,11 @@ const UNSExplorerPanel: React.FC<UNSExplorerPanelProps> = ({ open, onClose }) =>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center gap-4 px-6 py-2.5 border-t border-cyan-300/[0.08] text-[9px] font-mono tabular-nums text-white/35">
+        <div className="uns-explorer__footer flex flex-wrap items-center gap-x-4 gap-y-1 px-6 py-3 border-t border-cyan-300/[0.08] font-mono tabular-nums text-white/55">
           <span>{topicCount} topics</span>
-          <span className="text-white/10">|</span>
+          <span className="text-white/20">|</span>
           <span>{statsRef.current.messages.toLocaleString()} messages this session</span>
-          <span className="flex-1" />
-          <span className="uppercase tracking-[0.14em] text-cyan-300/40">ISA-95 · MQTT</span>
+          <span className="ml-auto uppercase tracking-[0.1em] text-cyan-300/60">ISA-95 · MQTT</span>
         </div>
       </div>
     </div>

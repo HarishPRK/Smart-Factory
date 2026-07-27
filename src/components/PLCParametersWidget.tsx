@@ -77,9 +77,9 @@ const statusConfig = {
 
 /* ── Label rendering ──────────────────────────────────── */
 
-// Cramped sensor cells can't fit two-word labels at 13px (the global font
-// bump). The internal id stays the same; we just display a shorter label
-// here so it fits on one line. Full name still tooltipped on hover.
+// Cramped sensor cells use abbreviated display labels so the readable
+// metadata role can survive fit-to-width scaling without wrapping. The full
+// name remains available on hover.
 const SHORT_LABELS: Record<string, string> = {
   forming_pressure: "Pressure",
   forming_light: "Light",
@@ -99,9 +99,7 @@ const SensorLabel: React.FC<{ param: PLCParameter; className?: string }> = ({
     <span
       className={`text-blue-200/80 uppercase tracking-[0.06em] font-medium whitespace-nowrap ${className}`}
       title={param.label}
-      // Pinned inline so the universal text-[Xpx] bump in index.css can't
-      // grow this back beyond the cell width.
-      style={{ fontSize: "11px" }}
+      style={{ fontSize: "calc(11px + var(--fit-text-boost, 0px))" }}
     >
       {display}
     </span>
@@ -113,7 +111,7 @@ const StatusBadge: React.FC<{
 }> = ({ cfg }) => (
   <span
     className={`font-semibold px-1.5 py-0.5 rounded-md bg-white/[0.03] border border-white/[0.05] flex items-center gap-1 whitespace-nowrap ${cfg.text}`}
-    style={{ fontSize: "9.5px" }}
+    style={{ fontSize: "calc(11px + var(--fit-text-boost, 0px))" }}
   >
     <span className={`w-1 h-1 rounded-full ${cfg.dot} ${cfg.glow}`} />
     {cfg.label}
@@ -170,16 +168,16 @@ const AnalogCard: React.FC<{ param: PLCParameter }> = ({ param }) => {
           />
         </div>
         <div className="flex justify-between items-center mt-1 gap-1">
-          <span className="text-white/35 font-medium" style={{ fontSize: "9px" }}>
+          <span className="text-white/55 font-medium" style={{ fontSize: "calc(11px + var(--fit-text-boost, 0px))" }}>
             {min}
           </span>
           <span
             className="font-medium whitespace-nowrap"
-            style={{ fontSize: "8px", color: `${param.accentHex}70` }}
+            style={{ fontSize: "calc(10.5px + var(--fit-text-boost, 0px))", color: `${param.accentHex}90` }}
           >
             {param.nominal?.toFixed(param.decimals ?? 1)} nom
           </span>
-          <span className="text-white/35 font-medium" style={{ fontSize: "9px" }}>
+          <span className="text-white/55 font-medium" style={{ fontSize: "calc(11px + var(--fit-text-boost, 0px))" }}>
             {max}
           </span>
         </div>

@@ -16,20 +16,21 @@ import IntegrationModal from "./IntegrationModal";
 import { usePredictionStore } from "../stores/predictionStore";
 
 const FactoryScene = lazy(() => import("./factory3d/FactoryScene"));
-const PLCControlRoom = lazy(() => import("./factory3d/PLCControlRoom"));
 const AIAssistantModal = lazy(() => import("./AIAssistantModal"));
 const LanggraphAgentPanel = lazy(() => import("./LanggraphAgentPanel"));
 const NotificationDrawer = lazy(() => import("./NotificationDrawer"));
 const KPIAnalyticsPanel = lazy(() => import("./KPIAnalyticsPanel"));
 const OEEPanel = lazy(() => import("./OEEPanel"));
 const PredictivePanel = lazy(() => import("./PredictivePanel"));
-const DigitalTwinPanel = lazy(() => import("./DigitalTwinPanel"));
 const UNSExplorerPanel = lazy(() => import("./UNSExplorerPanel"));
 const DynamicPathSelectionPage = lazy(() =>
   import("../integrations/pages/DynamicPathSelection").then((m) => ({ default: m.DynamicPathSelectionPage })),
 );
 const ApplicationAwareRoutingPage = lazy(() =>
   import("../integrations/pages/ApplicationAwareRouting").then((m) => ({ default: m.ApplicationAwareRoutingPage })),
+);
+const DevicesPage = lazy(() =>
+  import("../integrations/pages/Devices").then((m) => ({ default: m.DevicesPage })),
 );
 const VideoAnalyticsPage = lazy(() =>
   import("../integrations/pages/VideoAnalytics").then((m) => ({ default: m.VideoAnalyticsPage })),
@@ -84,20 +85,19 @@ const Dashboard: React.FC = () => {
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [oeeOpen, setOeeOpen] = useState(false);
   const [predictiveOpen, setPredictiveOpen] = useState(false);
-  const [digitalTwinOpen, setDigitalTwinOpen] = useState(false);
   const [dpsOpen, setDpsOpen] = useState(false);
   const [appRoutingOpen, setAppRoutingOpen] = useState(false);
+  const [devicesDomain, setDevicesDomain] = useState<"IT" | "OT" | null>(null);
   const [networkBranchId, setNetworkBranchId] = useState<NetworkBranchId>("b-mck-03");
   const [videoOpen, setVideoOpen] = useState(false);
   const [unsOpen, setUnsOpen] = useState(false);
   const predAlertCount = usePredictionStore((s) => s.anomalyAlerts.length);
-  const [sceneView, setSceneView] = useState<"factory" | "plc">("factory");
   const { filteredAlerts } = useFilters();
 
   // The integration modals cover the whole screen, so freeze the 3D render
   // loop while one is open — on integrated GPUs the scene otherwise competes
   // with the modal for the GPU and makes it take seconds to appear.
-  const scenePaused = dpsOpen || appRoutingOpen || videoOpen;
+  const scenePaused = dpsOpen || appRoutingOpen || devicesDomain !== null || videoOpen;
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -105,7 +105,7 @@ const Dashboard: React.FC = () => {
   }, []);
 
   return (
-    <div className="min-h-dvh xl:h-dvh xl:max-h-dvh text-white px-3 py-3 xl:px-5 xl:py-3.5 font-sans flex flex-col overflow-y-auto xl:overflow-hidden gap-3">
+    <div className="smart-factory-ui min-h-dvh xl:h-dvh xl:max-h-dvh text-white px-3 py-3 xl:px-5 xl:py-3.5 font-sans flex flex-col overflow-y-auto xl:overflow-hidden gap-3">
       {/* Header — minimal, modern */}
       <header className="flex items-center justify-between gap-4 flex-none animate-fade-in px-3 py-2">
         <div className="flex items-center gap-3.5 min-w-0">
@@ -120,7 +120,7 @@ const Dashboard: React.FC = () => {
             <div className="text-[15px] font-semibold tracking-[0.06em] text-white/92 uppercase truncate leading-none">
               Manufacturing Industry
             </div>
-            <div className="text-[10px] text-white/30 font-medium tracking-[0.12em] mt-1 uppercase">
+            <div className="text-[10px] text-white/55 font-medium tracking-[0.1em] mt-1 uppercase">
               Live Operations
             </div>
           </div>
@@ -128,12 +128,12 @@ const Dashboard: React.FC = () => {
 
         <div className="flex items-center gap-4">
           {/* Compact inline time + weather */}
-          <div className="hidden lg:flex items-center gap-4 text-[13px] text-white/45 font-medium tabular-nums">
+          <div className="hidden lg:flex items-center gap-4 text-[13px] text-white/60 font-medium tabular-nums">
             <span>{currentTime.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })}</span>
             <span className="text-white/8">|</span>
             <span className="flex items-center gap-2">
               <span className="text-[15px] text-white/75 font-semibold">25°</span>
-              <span className="text-white/35">Colorado</span>
+              <span className="text-white/55">Colorado</span>
             </span>
           </div>
 
@@ -147,7 +147,7 @@ const Dashboard: React.FC = () => {
               <path d="M8 17a2 2 0 004 0" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
             </svg>
             {filteredAlerts.length > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] bg-red-500 rounded-full text-[8px] font-bold flex items-center justify-center px-0.5 text-white">
+              <span className="absolute -top-1 -right-1 min-w-5 h-5 bg-red-500 rounded-full text-[8px] leading-none font-bold flex items-center justify-center px-1 text-white">
                 {filteredAlerts.length}
               </span>
             )}
@@ -194,9 +194,10 @@ const Dashboard: React.FC = () => {
             onOeeClick={() => setOeeOpen(true)}
             onAnalyticsClick={() => setAnalyticsOpen(true)}
             onPredictClick={() => setPredictiveOpen(true)}
-            onDigitalTwinClick={() => setDigitalTwinOpen(true)}
             onDpsClick={() => setDpsOpen(true)}
             onRoutingClick={() => setAppRoutingOpen(true)}
+            onItDevicesClick={() => setDevicesDomain("IT")}
+            onOtDevicesClick={() => setDevicesDomain("OT")}
             onGatewayTwinClick={() =>
               window.open("http://52.7.12.103/", "_blank", "noopener,noreferrer")
             }
@@ -212,43 +213,14 @@ const Dashboard: React.FC = () => {
                 </div>
               }
             >
-              {sceneView === "factory" ? (
-                <FactoryScene paused={scenePaused} />
-              ) : (
-                <PLCControlRoom paused={scenePaused} />
-              )}
+              <FactoryScene paused={scenePaused} />
             </Suspense>
 
             {/* Gradient overlays */}
             <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-[#0b0c1a]/70 to-transparent pointer-events-none z-10"></div>
             <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#0b0c1a]/80 to-transparent pointer-events-none z-10"></div>
 
-            {/* View switcher */}
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex gap-0.5 p-1 rounded-xl bg-black/50 backdrop-blur-xl border border-white/[0.06]">
-              {(
-                [
-                  ["factory", "Factory Floor"],
-                  ["plc", "PLC Controls"],
-                ] as const
-              ).map(([id, label]) => (
-                <button
-                  key={id}
-                  onClick={() => setSceneView(id)}
-                  className={`px-3.5 py-1.5 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all duration-200 pointer-events-auto ${
-                    sceneView === id
-                      ? "bg-white/[0.08] text-white/90 border border-white/[0.12] shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
-                      : "text-white/40 hover:text-white/70 border border-transparent"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            {/* Overlays — only show on factory view */}
-            <div
-              className={`absolute top-14 left-5 z-20 pointer-events-auto ${sceneView !== "factory" ? "hidden" : ""}`}
-            >
+            <div className="absolute top-14 left-5 z-20 pointer-events-auto">
               <ZoneTabs />
             </div>
 
@@ -273,7 +245,7 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* Alert Cards — hidden in factory view for full 3D scene visibility */}
-            {filteredAlerts.length > 0 && sceneView === "factory" && false && (
+            {filteredAlerts.length > 0 && false && (
               <>
                 <div className="absolute bottom-24 left-5 z-20">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-red-200/75">
@@ -415,12 +387,6 @@ const Dashboard: React.FC = () => {
             onClose={() => setPredictiveOpen(false)}
           />
         )}
-        {digitalTwinOpen && (
-          <DigitalTwinPanel
-            open={digitalTwinOpen}
-            onClose={() => setDigitalTwinOpen(false)}
-          />
-        )}
         {unsOpen && (
           <UNSExplorerPanel open={unsOpen} onClose={() => setUnsOpen(false)} />
         )}
@@ -451,6 +417,18 @@ const Dashboard: React.FC = () => {
           <Suspense fallback={<IntegrationLoading />}>
             <GatewaySourceSelector value={networkBranchId} onChange={setNetworkBranchId} />
             <ApplicationAwareRoutingPage branchId={networkBranchId} />
+          </Suspense>
+        </IntegrationModal>
+      )}
+      {devicesDomain && (
+        <IntegrationModal
+          open
+          onClose={() => setDevicesDomain(null)}
+          title={`${devicesDomain} Devices`}
+        >
+          <Suspense fallback={<IntegrationLoading />}>
+            <GatewaySourceSelector value={networkBranchId} onChange={setNetworkBranchId} />
+            <DevicesPage domain={devicesDomain} branchId={networkBranchId} />
           </Suspense>
         </IntegrationModal>
       )}

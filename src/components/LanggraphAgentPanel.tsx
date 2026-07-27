@@ -28,51 +28,137 @@ export default LanggraphAgentPanel;
 
 /* -- Floating button ------------------------------------- */
 
+const AgenticCoreMark: React.FC<{ size?: number; active?: boolean }> = ({
+  size = 64,
+  active = false,
+}) => (
+  <svg
+    aria-hidden
+    width={size}
+    height={size}
+    viewBox="0 0 100 100"
+    fill="none"
+    style={{ display: "block", overflow: "visible" }}
+  >
+    <defs>
+      <linearGradient id="lg-core-gradient" x1="18" y1="14" x2="84" y2="88">
+        <stop stopColor="#DCC8FF" />
+        <stop offset="0.42" stopColor="#A855F7" />
+        <stop offset="1" stopColor="#4F46E5" />
+      </linearGradient>
+      <linearGradient id="lg-core-orbit" x1="10" y1="0" x2="90" y2="100">
+        <stop stopColor="#5EEAD4" stopOpacity="0.9" />
+        <stop offset="0.55" stopColor="#C084FC" stopOpacity="0.15" />
+        <stop offset="1" stopColor="#818CF8" stopOpacity="0.9" />
+      </linearGradient>
+      <filter id="lg-core-glow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="4" result="blur" />
+        <feMerge>
+          <feMergeNode in="blur" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
+    </defs>
+    <g opacity={active ? 0.95 : 0.72}>
+      <ellipse
+        cx="50"
+        cy="50"
+        rx="43"
+        ry="18"
+        stroke="url(#lg-core-orbit)"
+        strokeWidth="1.5"
+        strokeDasharray="4 4"
+      >
+        <animateTransform
+          attributeName="transform"
+          type="rotate"
+          from="0 50 50"
+          to="360 50 50"
+          dur="8s"
+          repeatCount="indefinite"
+        />
+      </ellipse>
+      <ellipse
+        cx="50"
+        cy="50"
+        rx="18"
+        ry="43"
+        stroke="url(#lg-core-orbit)"
+        strokeWidth="1.2"
+        opacity="0.7"
+      >
+        <animateTransform
+          attributeName="transform"
+          type="rotate"
+          from="360 50 50"
+          to="0 50 50"
+          dur="10s"
+          repeatCount="indefinite"
+        />
+      </ellipse>
+    </g>
+    <circle cx="50" cy="50" r="25" fill="url(#lg-core-gradient)" filter="url(#lg-core-glow)">
+      <animate attributeName="r" values="24;26;24" dur="3s" repeatCount="indefinite" />
+    </circle>
+    <circle cx="50" cy="50" r="17" fill="rgba(16, 12, 39, 0.3)" stroke="rgba(255,255,255,0.35)" />
+    <path
+      d="M50 25c2.6 16.3 7.3 21 23 25-15.7 4-20.4 8.7-23 25-2.6-16.3-7.3-21-23-25 15.7-4 20.4-8.7 23-25Z"
+      fill="#F5F3FF"
+    />
+    <circle cx="70" cy="31" r="3.1" fill="#5EEAD4">
+      <animate attributeName="opacity" values="0.45;1;0.45" dur="1.8s" repeatCount="indefinite" />
+    </circle>
+    <circle cx="30" cy="69" r="2.2" fill="#C4B5FD" />
+  </svg>
+);
+
 const FloatingButton: React.FC<{ open: boolean; onClick: () => void }> = ({
   open,
   onClick,
 }) => (
   <button
     onClick={onClick}
-    aria-label="Langgraph agent"
+    aria-label={open ? "Close Agentic AI assistant" : "Open Agentic AI assistant"}
+    aria-pressed={open}
+    title="Agentic AI · Plant intelligence"
+    className="lg-agent-trigger"
     style={{
       position: "fixed",
-      left: "20px",
-      bottom: "20px",
+      left: "18px",
+      bottom: "18px",
       zIndex: 40,
-      width: "56px",
-      height: "56px",
-      borderRadius: "16px",
-      border: "1px solid rgba(139, 92, 246, 0.45)",
+      width: "66px",
+      height: "66px",
+      padding: 0,
+      borderRadius: "20px",
+      border: "1px solid rgba(167, 139, 250, 0.58)",
       background:
-        "linear-gradient(135deg, rgba(91, 33, 182, 0.88), rgba(30, 58, 138, 0.88))",
+        "radial-gradient(circle at 28% 20%, rgba(196,181,253,0.28), transparent 43%), linear-gradient(145deg, rgba(60, 26, 130, 0.96), rgba(13, 25, 67, 0.98))",
       boxShadow: open
-        ? "0 0 0 3px rgba(139, 92, 246, 0.25), 0 12px 28px rgba(0,0,0,0.45)"
-        : "0 10px 24px rgba(0,0,0,0.45)",
-      color: "#e9d5ff",
+        ? "0 0 0 3px rgba(139, 92, 246, 0.25), 0 0 28px rgba(124, 58, 237, 0.5), 0 14px 34px rgba(0,0,0,0.56)"
+        : "0 0 22px rgba(124, 58, 237, 0.28), 0 12px 30px rgba(0,0,0,0.5)",
       cursor: "pointer",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      transition: "box-shadow 0.15s ease, transform 0.15s ease",
-      transform: open ? "translateY(-2px)" : "translateY(0)",
+      display: "grid",
+      placeItems: "center",
+      transition: "box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease",
+      transform: open ? "translateY(-3px) scale(1.02)" : "translateY(0)",
     }}
   >
-    {/* Graph-ish glyph so it reads "agent" not "chat" */}
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-      <circle cx="5" cy="6" r="2" fill="currentColor" />
-      <circle cx="19" cy="6" r="2" fill="currentColor" />
-      <circle cx="12" cy="14" r="2.4" fill="currentColor" />
-      <circle cx="6" cy="19" r="1.8" fill="currentColor" />
-      <circle cx="18" cy="19" r="1.8" fill="currentColor" />
-      <path
-        d="M5 6 L12 14 L19 6 M6 19 L12 14 L18 19"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinecap="round"
-        opacity="0.55"
-      />
-    </svg>
+    <AgenticCoreMark size={57} active={open} />
+    <span
+      aria-hidden
+      style={{
+        position: "absolute",
+        right: "8px",
+        bottom: "8px",
+        width: "8px",
+        height: "8px",
+        borderRadius: "999px",
+        background: "#34d399",
+        border: "2px solid #18112e",
+        boxShadow: "0 0 10px rgba(52, 211, 153, 0.9)",
+      }}
+    />
   </button>
 );
 
@@ -220,12 +306,13 @@ const Drawer: React.FC<DrawerProps> = ({ chat, onClose }) => {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Factory assistant"
+        aria-label="Agentic AI factory assistant"
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: "min(820px, 94vw)",
+          position: "relative",
+          width: "min(1080px, 96vw)",
           height: "min(900px, 92vh)",
-          borderRadius: "20px",
+          borderRadius: "22px",
           border: "1px solid rgba(139, 92, 246, 0.32)",
           background: "rgba(10, 12, 22, 0.96)",
           boxShadow:
@@ -314,37 +401,80 @@ const Drawer: React.FC<DrawerProps> = ({ chat, onClose }) => {
               }}
             />
           </div>
-          <div style={{ minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: "18px",
-                fontWeight: 700,
-                color: "#f5f3ff",
-              }}
-            >
-              Factory Assistant
-            </div>
-            <div
-              style={{
-                fontSize: "13px",
-                color: "#a78bfa",
-                marginTop: "2px",
-              }}
-            >
-              Ask anything about the plant
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+            <AgenticCoreMark size={34} />
+            <div style={{ minWidth: 0 }}>
+              <div
+                style={{
+                  fontSize: "10px",
+                  fontWeight: 800,
+                  letterSpacing: "0.16em",
+                  textTransform: "uppercase",
+                  color: "#a78bfa",
+                  marginBottom: "2px",
+                }}
+              >
+                Agentic AI
+              </div>
+              <div
+                style={{
+                  fontSize: "18px",
+                  fontWeight: 700,
+                  color: "#f5f3ff",
+                }}
+              >
+                Factory Assistant
+              </div>
             </div>
           </div>
-          <div style={{ display: "flex", gap: "6px" }}>
-            <IconButton
-              onClick={clear}
-              disabled={pending || messages.length === 0}
-              title="Clear conversation"
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              marginLeft: "auto",
+            }}
+          >
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "5px",
+                padding: "5px 9px",
+                borderRadius: "999px",
+                border: "1px solid rgba(52, 211, 153, 0.25)",
+                background: "rgba(16, 185, 129, 0.08)",
+                color: "#a7f3d0",
+                fontSize: "10px",
+                fontWeight: 700,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+              }}
             >
-              Clear
-            </IconButton>
-            <IconButton onClick={onClose} title="Close">
-              X
-            </IconButton>
+              <span
+                aria-hidden
+                style={{
+                  width: "6px",
+                  height: "6px",
+                  borderRadius: "50%",
+                  background: "#34d399",
+                  boxShadow: "0 0 8px #34d399",
+                }}
+              />
+              Live plant data
+            </div>
+            <div style={{ display: "flex", gap: "6px" }}>
+              <IconButton
+                onClick={clear}
+                disabled={pending || messages.length === 0}
+                title="Clear conversation"
+              >
+                Clear
+              </IconButton>
+              <IconButton onClick={onClose} title="Close">
+                X
+              </IconButton>
+            </div>
           </div>
         </div>
 
@@ -356,7 +486,7 @@ const Drawer: React.FC<DrawerProps> = ({ chat, onClose }) => {
             zIndex: 2,
             flex: 1,
             overflowY: "auto",
-            padding: "14px",
+            padding: "18px clamp(16px, 7vw, 132px)",
             display: "flex",
             flexDirection: "column",
             gap: "10px",
@@ -365,6 +495,10 @@ const Drawer: React.FC<DrawerProps> = ({ chat, onClose }) => {
         >
           {messages.length === 0 ? (
             <EmptyState
+              input={input}
+              pending={pending}
+              onChange={setInput}
+              onSubmit={handleSubmit}
               onPromptClick={(p) => {
                 if (pending) return;
                 void send(p);
@@ -378,69 +512,15 @@ const Drawer: React.FC<DrawerProps> = ({ chat, onClose }) => {
           )}
         </div>
 
-        {/* Composer */}
-        <form
-          onSubmit={handleSubmit}
-          style={{
-            position: "relative",
-            zIndex: 2,
-            display: "flex",
-            gap: "8px",
-            padding: "10px 12px 12px",
-            borderTop: "1px solid rgba(139, 92, 246, 0.22)",
-            background: "rgba(8, 10, 18, 0.78)",
-          }}
-        >
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={
-              pending ? "Thinking..." : "Ask me anything about the plant"
-            }
-            disabled={pending}
-            style={{
-              flex: 1,
-              background: "rgba(30, 27, 75, 0.35)",
-              border: "1px solid rgba(139, 92, 246, 0.25)",
-              borderRadius: "10px",
-              padding: "11px 14px",
-              color: "#e5e7eb",
-              fontSize: "15px",
-              outline: "none",
-            }}
-            onFocus={(e) => {
-              (e.currentTarget as HTMLInputElement).style.borderColor =
-                "rgba(167, 139, 250, 0.6)";
-            }}
-            onBlur={(e) => {
-              (e.currentTarget as HTMLInputElement).style.borderColor =
-                "rgba(139, 92, 246, 0.25)";
-            }}
+        {messages.length > 0 && (
+          <AssistantComposer
+            compact
+            input={input}
+            pending={pending}
+            onChange={setInput}
+            onSubmit={handleSubmit}
           />
-          <button
-            type="submit"
-            disabled={pending || input.trim().length === 0}
-            style={{
-              background:
-                pending || input.trim().length === 0
-                  ? "rgba(91, 33, 182, 0.35)"
-                  : "linear-gradient(135deg, #7c3aed, #4338ca)",
-              border: "1px solid rgba(167, 139, 250, 0.45)",
-              borderRadius: "10px",
-              color: "#f5f3ff",
-              fontSize: "14px",
-              fontWeight: 700,
-              letterSpacing: "0.05em",
-              padding: "0 18px",
-              cursor:
-                pending || input.trim().length === 0 ? "default" : "pointer",
-              opacity: pending || input.trim().length === 0 ? 0.6 : 1,
-            }}
-          >
-            SEND
-          </button>
-        </form>
+        )}
       </div>
     </div>,
     document.body,
@@ -476,6 +556,100 @@ const IconButton: React.FC<{
   </button>
 );
 
+const AssistantComposer: React.FC<{
+  input: string;
+  pending: boolean;
+  compact?: boolean;
+  onChange: (value: string) => void;
+  onSubmit: (event: React.FormEvent) => void;
+}> = ({ input, pending, compact = false, onChange, onSubmit }) => {
+  const ready = !pending && input.trim().length > 0;
+
+  return (
+    <form
+      onSubmit={onSubmit}
+      style={{
+        position: "relative",
+        zIndex: 2,
+        width: compact ? "100%" : "min(760px, 100%)",
+        margin: compact ? 0 : "6px auto 2px",
+        display: "flex",
+        alignItems: "center",
+        gap: "10px",
+        padding: compact ? "10px 14px" : "11px 12px 11px 16px",
+        border: "1px solid rgba(139, 92, 246, 0.42)",
+        borderRadius: compact ? 0 : "16px",
+        background: compact ? "rgba(8, 10, 18, 0.9)" : "rgba(20, 12, 43, 0.66)",
+        boxShadow: compact ? undefined : "0 18px 42px rgba(0, 0, 0, 0.28)",
+      }}
+    >
+      <div
+        aria-hidden
+        style={{
+          display: compact ? "none" : "inline-flex",
+          alignItems: "center",
+          gap: "6px",
+          color: "#a7f3d0",
+          fontSize: "10px",
+          fontWeight: 700,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          whiteSpace: "nowrap",
+        }}
+      >
+        <span
+          style={{
+            width: "7px",
+            height: "7px",
+            borderRadius: "50%",
+            background: "#34d399",
+            boxShadow: "0 0 9px rgba(52, 211, 153, 0.85)",
+          }}
+        />
+        Live context
+      </div>
+      <input
+        type="text"
+        value={input}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={pending ? "Agent is processing your request…" : "Ask anything about the plant…"}
+        disabled={pending}
+        style={{
+          flex: 1,
+          minWidth: 0,
+          border: "none",
+          outline: "none",
+          background: "transparent",
+          color: "#f5f3ff",
+          fontFamily: "inherit",
+          fontSize: compact ? "14px" : "15px",
+          lineHeight: 1.45,
+          padding: compact ? "2px 0" : "5px 0",
+        }}
+      />
+      <button
+        type="submit"
+        aria-label="Send message"
+        disabled={!ready}
+        style={{
+          width: compact ? "44px" : "38px",
+          height: compact ? "36px" : "38px",
+          border: "1px solid rgba(196, 181, 253, 0.4)",
+          borderRadius: "50%",
+          background: ready ? "#6d3bd3" : "rgba(91, 33, 182, 0.24)",
+          color: "#f5f3ff",
+          cursor: ready ? "pointer" : "default",
+          fontSize: "20px",
+          lineHeight: 1,
+          opacity: ready ? 1 : 0.48,
+        }}
+      >
+        ↑
+      </button>
+    </form>
+  );
+};
+
 const SAMPLE_PROMPTS = [
   "How is my overall system performance?",
   "How many units have been produced so far?",
@@ -488,12 +662,282 @@ const SAMPLE_PROMPTS = [
   "Predict downtime risk for the plant."
 ];
 
+const FEATURED_PROMPTS = [
+  {
+    title: "Emergency recovery",
+    detail: "Get the safe restart path when the plant enters an emergency state.",
+    prompt: SAMPLE_PROMPTS[3],
+    glyph: "!",
+  },
+  {
+    title: "Connected devices",
+    detail: "Inspect the devices connected to the PLC through Modbus / RS485.",
+    prompt: SAMPLE_PROMPTS[4],
+    glyph: "⌘",
+  },
+  {
+    title: "Motor energy analysis",
+    detail: "Analyze single-phase motor power, voltage, and current together.",
+    prompt: SAMPLE_PROMPTS[6],
+    glyph: "ϟ",
+  },
+];
+
+const SECONDARY_PROMPTS = [
+  SAMPLE_PROMPTS[0],
+  SAMPLE_PROMPTS[1],
+  SAMPLE_PROMPTS[2],
+  SAMPLE_PROMPTS[5],
+  SAMPLE_PROMPTS[7],
+  SAMPLE_PROMPTS[8],
+];
+
 interface EmptyStateProps {
+  input: string;
+  pending: boolean;
+  onChange: (value: string) => void;
+  onSubmit: (event: React.FormEvent) => void;
   onPromptClick: (prompt: string) => void;
   disabled?: boolean;
 }
 
-const EmptyState: React.FC<EmptyStateProps> = ({ onPromptClick, disabled }) => (
+const AgenticOperationsMesh: React.FC = () => (
+  <div
+    aria-hidden
+    style={{
+      position: "relative",
+      width: "min(520px, 100%)",
+      height: "198px",
+      marginBottom: "-2px",
+      pointerEvents: "none",
+    }}
+  >
+    <div
+      style={{
+        position: "absolute",
+        inset: "30px 76px 22px",
+        borderRadius: "50%",
+        background:
+          "radial-gradient(ellipse, rgba(124, 58, 237, 0.2) 0%, rgba(49, 46, 129, 0.1) 42%, transparent 72%)",
+        filter: "blur(12px)",
+      }}
+    />
+    <svg
+      width="100%"
+      height="100%"
+      viewBox="0 0 520 198"
+      fill="none"
+      style={{ position: "absolute", inset: 0, overflow: "visible" }}
+    >
+      <defs>
+        <linearGradient id="lg-mesh-line" x1="55" y1="38" x2="461" y2="164">
+          <stop stopColor="#5EEAD4" stopOpacity="0.8" />
+          <stop offset="0.5" stopColor="#C084FC" stopOpacity="0.82" />
+          <stop offset="1" stopColor="#818CF8" stopOpacity="0.72" />
+        </linearGradient>
+        <filter id="lg-mesh-glow" x="-40%" y="-40%" width="180%" height="180%">
+          <feGaussianBlur stdDeviation="3" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+      <path
+        d="M260 95 L72 48 M260 95 L448 48 M260 95 L260 171"
+        stroke="url(#lg-mesh-line)"
+        strokeWidth="1.4"
+        strokeDasharray="5 7"
+        opacity="0.78"
+      >
+        <animate
+          attributeName="stroke-dashoffset"
+          from="48"
+          to="0"
+          dur="3.2s"
+          repeatCount="indefinite"
+        />
+      </path>
+      <path
+        d="M72 48 Q156 5 260 34 Q364 5 448 48"
+        stroke="rgba(196, 181, 253, 0.3)"
+        strokeWidth="1"
+        strokeDasharray="2 8"
+      />
+      <path
+        d="M72 48 Q136 176 260 171 Q384 176 448 48"
+        stroke="rgba(94, 234, 212, 0.18)"
+        strokeWidth="1"
+      />
+      {[
+        [72, 48, "#5eead4"],
+        [448, 48, "#a78bfa"],
+        [260, 171, "#818cf8"],
+      ].map(([cx, cy, color], index) => (
+        <g key={index}>
+          <circle
+            cx={cx}
+            cy={cy}
+            r="12"
+            fill="rgba(15, 23, 42, 0.9)"
+            stroke={color as string}
+            strokeWidth="1.2"
+            filter="url(#lg-mesh-glow)"
+          />
+          <circle cx={cx} cy={cy} r="3.5" fill={color as string}>
+            <animate
+              attributeName="r"
+              values="2.8;4.2;2.8"
+              dur="2.1s"
+              begin={`${index * 0.32}s`}
+              repeatCount="indefinite"
+            />
+          </circle>
+        </g>
+      ))}
+      <circle
+        cx="260"
+        cy="95"
+        r="56"
+        stroke="rgba(196, 181, 253, 0.28)"
+        strokeWidth="1"
+        strokeDasharray="2 7"
+      >
+        <animateTransform
+          attributeName="transform"
+          type="rotate"
+          from="0 260 95"
+          to="360 260 95"
+          dur="17s"
+          repeatCount="indefinite"
+        />
+      </circle>
+      <circle cx="260" cy="95" r="70" stroke="rgba(139, 92, 246, 0.14)" strokeWidth="1" />
+    </svg>
+    <div
+      style={{
+        position: "absolute",
+        left: "50%",
+        top: "39px",
+        transform: "translateX(-50%)",
+        filter: "drop-shadow(0 12px 20px rgba(76, 29, 149, 0.35))",
+      }}
+    >
+      <AgenticCoreMark size={112} active />
+    </div>
+    <MeshLabel side="left" top="22px" label="Recovery route" accent="#5eead4" />
+    <MeshLabel side="right" top="22px" label="PLC device map" accent="#c4b5fd" />
+    <MeshLabel side="bottom" top="168px" label="Motor signals" accent="#a5b4fc" />
+    <div
+      style={{
+        position: "absolute",
+        left: "50%",
+        top: "119px",
+        transform: "translateX(-50%)",
+        color: "#ddd6fe",
+        fontSize: "9px",
+        fontWeight: 800,
+        letterSpacing: "0.15em",
+        textTransform: "uppercase",
+        whiteSpace: "nowrap",
+      }}
+    >
+      Agentic operations mesh
+    </div>
+  </div>
+);
+
+const MeshLabel: React.FC<{
+  side: "left" | "right" | "bottom";
+  top: string;
+  label: string;
+  accent: string;
+}> = ({ side, top, label, accent }) => {
+  const position =
+    side === "left"
+      ? { left: "0" }
+      : side === "right"
+        ? { right: "0" }
+        : { left: "50%", transform: "translateX(-50%)" };
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top,
+        ...position,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "6px",
+        color: "#cbd5e1",
+        fontSize: "9px",
+        fontWeight: 700,
+        letterSpacing: "0.1em",
+        textTransform: "uppercase",
+        whiteSpace: "nowrap",
+      }}
+    >
+      <span
+        style={{
+          width: "5px",
+          height: "5px",
+          borderRadius: "50%",
+          background: accent,
+          boxShadow: `0 0 8px ${accent}`,
+        }}
+      />
+      {label}
+    </div>
+  );
+};
+
+const CommandHeroMark: React.FC = () => (
+  <div
+    aria-hidden
+    style={{
+      width: "min(430px, 88vw)",
+      height: "54px",
+      display: "grid",
+      placeItems: "center",
+      marginBottom: "4px",
+    }}
+  >
+    <svg width="100%" height="54" viewBox="0 0 430 54" fill="none">
+      <defs>
+        <linearGradient id="lg-command-beam" x1="0" y1="27" x2="430" y2="27">
+          <stop stopColor="#8B5CF6" stopOpacity="0" />
+          <stop offset="0.34" stopColor="#A78BFA" stopOpacity="0.46" />
+          <stop offset="0.5" stopColor="#E879F9" stopOpacity="0.96" />
+          <stop offset="0.66" stopColor="#A78BFA" stopOpacity="0.46" />
+          <stop offset="1" stopColor="#8B5CF6" stopOpacity="0" />
+        </linearGradient>
+        <filter id="lg-command-star" x="-40%" y="-60%" width="180%" height="220%">
+          <feGaussianBlur stdDeviation="2.5" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+      <path d="M0 27H430" stroke="url(#lg-command-beam)" strokeWidth="1.2" />
+      <path
+        d="M215 2c2.8 17.2 7.8 22.2 25 25-17.2 2.8-22.2 7.8-25 25-2.8-17.2-7.8-22.2-25-25 17.2-2.8 22.2-7.8 25-25Z"
+        fill="#C084FC"
+        filter="url(#lg-command-star)"
+      />
+      <circle cx="215" cy="27" r="5.4" fill="#F5F3FF" />
+    </svg>
+  </div>
+);
+
+const EmptyState: React.FC<EmptyStateProps> = ({
+  input,
+  pending,
+  onChange,
+  onSubmit,
+  onPromptClick,
+  disabled,
+}) => (
   <div
     style={{
       flex: 1,
@@ -507,69 +951,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({ onPromptClick, disabled }) => (
       padding: "28px 20px",
     }}
   >
-    {/* Glowing orb with pulse rings + slow-rotating sparkle ring */}
-    <div
-      style={{
-        position: "relative",
-        width: "84px",
-        height: "84px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      {/* Expanding pulse rings */}
-      {[0, 1, 2].map((i) => (
-        <div
-          key={i}
-          aria-hidden
-          style={{
-            position: "absolute",
-            inset: 0,
-            borderRadius: "50%",
-            border: "1px solid rgba(167, 139, 250, 0.5)",
-            animation: "lg-orb-ring 2.6s ease-out infinite",
-            animationDelay: `${i * 0.85}s`,
-          }}
-        />
-      ))}
-      {/* Slow-spinning sparkle ring */}
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          inset: "-6px",
-          borderRadius: "50%",
-          border: "1px dashed rgba(196, 181, 253, 0.32)",
-          animation: "lg-orb-spin 14s linear infinite",
-        }}
-      />
-      {/* Core orb */}
-      <div
-        style={{
-          width: "64px",
-          height: "64px",
-          borderRadius: "50%",
-          background:
-            "radial-gradient(circle at 30% 28%, #ddd6fe 0%, #a78bfa 35%, #6d28d9 75%, #4c1d95 100%)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          boxShadow:
-            "0 0 28px rgba(167, 139, 250, 0.7), inset 0 0 14px rgba(255,255,255,0.18)",
-          animation: "lg-orb-pulse 3.2s ease-in-out infinite",
-        }}
-      >
-        <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
-          <path
-            d="M12 3l1.8 5.4L19 10l-5.2 1.6L12 17l-1.8-5.4L5 10l5.2-1.6L12 3z"
-            fill="#f5f3ff"
-          />
-          <circle cx="19" cy="5" r="1.4" fill="#f5f3ff" opacity="0.85" />
-          <circle cx="5" cy="19" r="1" fill="#f5f3ff" opacity="0.6" />
-        </svg>
-      </div>
-    </div>
+    <CommandHeroMark />
 
     {/* Live badge */}
     <div
@@ -599,46 +981,65 @@ const EmptyState: React.FC<EmptyStateProps> = ({ onPromptClick, disabled }) => (
           boxShadow: "0 0 8px #34d399",
         }}
       />
-      Plant Connected
+      Live plant context
     </div>
 
     <div
       style={{
-        fontSize: "20px",
-        fontWeight: 700,
-        letterSpacing: "-0.01em",
+        fontSize: "34px",
+        fontWeight: 400,
+        letterSpacing: "-0.03em",
+        color: "#ddd6fe",
       }}
-      className="lg-shimmer-text"
     >
-      Hi there - how can I help?
+      Good afternoon, operator.
     </div>
     <div
       style={{
-        fontSize: "14px",
-        lineHeight: 1.6,
-        maxWidth: "460px",
-        color: "#cbd5e1",
+        fontSize: "34px",
+        fontWeight: 700,
+        letterSpacing: "-0.03em",
+        color: "#a78bfa",
+        marginTop: "-14px",
       }}
     >
-      I can answer questions about your plant's live operations, machines,
-      alerts, and history. Try one of these to get started:
+      What needs attention on the plant?
     </div>
+    <div
+      style={{
+        fontSize: "11px",
+        lineHeight: 1.6,
+        maxWidth: "540px",
+        color: "#a78bfa",
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+      }}
+    >
+      Ask with live plant context · verify before operational action
+    </div>
+
+    <AssistantComposer
+      input={input}
+      pending={pending}
+      onChange={onChange}
+      onSubmit={onSubmit}
+    />
 
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-        gap: "8px",
+        gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+        gap: "10px",
         width: "100%",
-        maxWidth: "780px",
-        marginTop: "4px",
+        maxWidth: "760px",
+        marginTop: "8px",
       }}
     >
-      {SAMPLE_PROMPTS.map((p, i) => (
+      {FEATURED_PROMPTS.map((item, i) => (
         <button
-          key={p}
+          key={item.title}
           type="button"
-          onClick={() => onPromptClick(p)}
+          onClick={() => onPromptClick(item.prompt)}
           disabled={disabled}
           className="lg-prompt-card"
           style={{
@@ -648,8 +1049,8 @@ const EmptyState: React.FC<EmptyStateProps> = ({ onPromptClick, disabled }) => (
             background:
               "linear-gradient(180deg, rgba(139, 92, 246, 0.14), rgba(91, 33, 182, 0.06))",
             border: "1px solid rgba(139, 92, 246, 0.28)",
-            borderRadius: "10px",
-            padding: "10px 12px 10px 30px",
+            borderRadius: "12px",
+            padding: "13px 14px",
             textAlign: "left",
             cursor: disabled ? "default" : "pointer",
             opacity: disabled ? 0.55 : 1,
@@ -662,26 +1063,87 @@ const EmptyState: React.FC<EmptyStateProps> = ({ onPromptClick, disabled }) => (
             animationDelay: `${0.04 * i + 0.05}s`,
             boxShadow:
               "0 4px 12px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)",
-            minHeight: "52px",
+            minHeight: "112px",
           }}
         >
-          {/* Leading sparkle bullet */}
           <span
             aria-hidden
             style={{
-              position: "absolute",
-              left: "10px",
-              top: "50%",
-              transform: "translateY(-50%)",
-              width: "10px",
-              height: "10px",
-              borderRadius: "50%",
-              background:
-                "radial-gradient(circle, #c4b5fd 0%, #7c3aed 65%, transparent 100%)",
-              boxShadow: "0 0 8px rgba(167, 139, 250, 0.55)",
+              display: "inline-grid",
+              placeItems: "center",
+              width: "22px",
+              height: "22px",
+              borderRadius: "7px",
+              marginBottom: "10px",
+              background: "rgba(124, 58, 237, 0.2)",
+              border: "1px solid rgba(196, 181, 253, 0.24)",
+              color: "#c4b5fd",
+              fontSize: "13px",
+              boxShadow: "0 0 12px rgba(139, 92, 246, 0.22)",
             }}
-          />
-          <span style={{ position: "relative", zIndex: 1 }}>{p}</span>
+          >
+            {item.glyph}
+          </span>
+          <span
+            style={{
+              display: "block",
+              position: "relative",
+              zIndex: 1,
+              fontWeight: 700,
+              marginBottom: "4px",
+            }}
+          >
+            {item.title}
+          </span>
+          <span
+            style={{
+              display: "block",
+              position: "relative",
+              zIndex: 1,
+              color: "#c4b5fd",
+              fontSize: "11px",
+              lineHeight: 1.45,
+            }}
+          >
+            {item.detail}
+          </span>
+        </button>
+      ))}
+    </div>
+    <div
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        justifyContent: "center",
+        gap: "7px",
+        maxWidth: "760px",
+      }}
+    >
+      {SECONDARY_PROMPTS.map((prompt) => (
+        <button
+          key={prompt}
+          type="button"
+          disabled={disabled}
+          onClick={() => onPromptClick(prompt)}
+          style={{
+            border: "1px solid rgba(139, 92, 246, 0.2)",
+            borderRadius: "999px",
+            background: "rgba(30, 27, 75, 0.34)",
+            color: "#ddd6fe",
+            cursor: disabled ? "default" : "pointer",
+            fontFamily: "inherit",
+            fontSize: "10.5px",
+            lineHeight: 1.2,
+            opacity: disabled ? 0.55 : 1,
+            padding: "7px 10px",
+          }}
+        >
+          {prompt
+            .replace("How many ", "")
+            .replace("What is the ", "")
+            .replace("Analyze ", "")
+            .replace("List all ", "")
+            .replace("The system is in emergency state. ", "")}
         </button>
       ))}
     </div>
@@ -701,27 +1163,24 @@ const MessageBubble: React.FC<{
       style={{
         display: "flex",
         justifyContent: isUser ? "flex-end" : "flex-start",
+        width: "100%",
+        maxWidth: "760px",
+        margin: "0 auto",
       }}
     >
       <div
         style={{
-          maxWidth: isPending ? "92%" : "86%",
-          width: isPending ? "92%" : undefined,
-          background: isPending
-            ? "linear-gradient(135deg, rgba(76,29,149,0.45), rgba(30,27,75,0.55))"
-            : accent.bg,
-          border: `1px solid ${accent.border}`,
-          borderRadius: isUser ? "12px 12px 3px 12px" : "12px 12px 12px 3px",
-          padding: isPending ? "14px 16px" : "10px 14px",
+          maxWidth: isPending ? "100%" : isUser ? "76%" : "88%",
+          width: isPending ? "100%" : undefined,
+          background: isPending ? "transparent" : accent.bg,
+          border: isPending ? "none" : `1px solid ${accent.border}`,
+          borderRadius: isUser ? "14px 14px 4px 14px" : "4px 14px 14px 14px",
+          padding: isPending ? "8px 0" : "12px 15px",
           color: accent.text,
-          fontSize: "15px",
-          lineHeight: 1.5,
+          fontSize: "14px",
+          lineHeight: 1.6,
           whiteSpace: "pre-wrap",
           wordBreak: "break-word",
-          // Animated glow ring on the active "thinking" bubble
-          animation: isPending
-            ? "lg-bubble-glow 2.4s ease-in-out infinite"
-            : undefined,
           position: "relative",
           overflow: "hidden",
         }}
@@ -874,6 +1333,8 @@ const ThinkingContent: React.FC<{ elapsedMs: number; onCancel: () => void }> = (
 
   const sec = (elapsedMs / 1000).toFixed(1);
   const current = THINKING_PHASES[phase];
+
+  return <ThinkingRail elapsed={sec} phase={current} onCancel={onCancel} />;
 
   return (
     <div
@@ -1091,3 +1552,97 @@ const ThinkingContent: React.FC<{ elapsedMs: number; onCancel: () => void }> = (
     </div>
   );
 };
+
+const ThinkingRail: React.FC<{
+  elapsed: string;
+  phase: { label: string; name: string };
+  onCancel: () => void;
+}> = ({ elapsed, phase, onCancel }) => (
+  <div
+    style={{
+      display: "grid",
+      gap: "9px",
+      padding: "13px 0",
+      borderTop: "1px solid rgba(139, 92, 246, 0.22)",
+      borderBottom: "1px solid rgba(139, 92, 246, 0.22)",
+    }}
+  >
+    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+      <div
+        aria-hidden
+        style={{
+          width: "24px",
+          height: "24px",
+          display: "grid",
+          placeItems: "center",
+          color: "#d8b4fe",
+          flex: "none",
+        }}
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeOpacity="0.45" />
+          <path d="M12 4.5c1.2 5 2.5 6.3 7.5 7.5-5 1.2-6.3 2.5-7.5 7.5-1.2-5-2.5-6.3-7.5-7.5 5-1.2 6.3-2.5 7.5-7.5Z" fill="currentColor">
+            <animate attributeName="opacity" values="0.42;1;0.42" dur="1.7s" repeatCount="indefinite" />
+          </path>
+        </svg>
+      </div>
+      <span style={{ color: "#f5f3ff", fontSize: "14px", fontWeight: 700 }}>
+        Agent is working
+      </span>
+      <span
+        style={{
+          color: "#a78bfa",
+          fontSize: "11px",
+          fontVariantNumeric: "tabular-nums",
+          marginLeft: "2px",
+        }}
+      >
+        {elapsed}s
+      </span>
+      <button
+        type="button"
+        onClick={onCancel}
+        style={{
+          marginLeft: "auto",
+          border: "none",
+          background: "transparent",
+          color: "#fca5a5",
+          cursor: "pointer",
+          fontFamily: "inherit",
+          fontSize: "11px",
+          fontWeight: 700,
+          letterSpacing: "0.06em",
+          padding: "5px 0 5px 10px",
+          textTransform: "uppercase",
+        }}
+      >
+        Cancel
+      </button>
+    </div>
+    <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+      <span style={{ color: "#c4b5fd", display: "inline-flex", flex: "none" }}>
+        <PhaseGlyph name={phase.name} />
+      </span>
+      <span
+        style={{
+          color: "#cbd5e1",
+          fontSize: "13px",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {phase.label}
+      </span>
+      <span
+        aria-hidden
+        style={{
+          flex: 1,
+          minWidth: "34px",
+          height: "1px",
+          background: "linear-gradient(90deg, rgba(167,139,250,0.48), transparent)",
+        }}
+      />
+    </div>
+  </div>
+);

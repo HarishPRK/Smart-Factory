@@ -26,6 +26,7 @@ import { useLayoutEffect } from "react";
  */
 const DESIGN_WIDTH = 1920;
 const MIN_ZOOM = 0.5;
+const MAX_TEXT_BOOST_PX = 4;
 
 export function useFitToWidth(designWidth: number = DESIGN_WIDTH) {
   useLayoutEffect(() => {
@@ -38,11 +39,20 @@ export function useFitToWidth(designWidth: number = DESIGN_WIDTH) {
       if (zoom >= 1) {
         root.style.removeProperty("zoom");
         root.style.removeProperty("--fit-vh");
+        root.style.removeProperty("--fit-text-boost");
       } else {
         root.style.setProperty("zoom", String(zoom));
         // Logical viewport height: dividing by zoom makes the zoomed result
         // equal the real innerHeight, so the full-height layout fills the screen.
         root.style.setProperty("--fit-vh", `${window.innerHeight / zoom}px`);
+        // Layout still scales down, but very small UI text gets a capped optical
+        // correction so display scaling does not turn 10–12px labels into
+        // unreadable 8–9px text on the physical screen.
+        const textBoost = Math.min(
+          MAX_TEXT_BOOST_PX,
+          Math.max(0, (1 / zoom - 1) * 12),
+        );
+        root.style.setProperty("--fit-text-boost", `${textBoost.toFixed(2)}px`);
       }
     };
 
@@ -52,6 +62,7 @@ export function useFitToWidth(designWidth: number = DESIGN_WIDTH) {
       window.removeEventListener("resize", apply);
       root.style.removeProperty("zoom");
       root.style.removeProperty("--fit-vh");
+      root.style.removeProperty("--fit-text-boost");
     };
   }, [designWidth]);
 }

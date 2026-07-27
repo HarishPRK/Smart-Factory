@@ -1,123 +1,146 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import {
+  BrainCircuit,
+  ChartNoAxesCombined,
+  ChevronLeft,
+  ChevronRight,
+  Flame,
+  Laptop,
+  Route,
+  ServerCog,
+  Shuffle,
+  Video,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useFilters } from "../context/FilterContext";
-import { kpis, getKpiForZone } from "../data/mockData";
+import { getKpiForZone, kpis } from "../data/mockData";
 import { useTweenedNumber } from "../hooks/useTweenedNumber";
-import KOSDispenseWidget from "./KOSDispenseWidget";
+import KpiCard, { type KpiCardStatusTone } from "./KpiCard";
 import LorawanWidget from "./LorawanWidget";
+import WorkspaceVisualization, {
+  type WorkspaceVisualizationKind,
+} from "./WorkspaceVisualizations";
 
-/* ── Count-up KPI value ─────────────────────────────────
- * KPI values arrive as preformatted strings ("2,041", "128.1", "75.2"). This
- * parses the number, sweeps to it (from 0 on first mount, from the current
- * value on zone switches), and re-formats preserving the original grouping
- * and decimal places. Non-numeric values fall through unchanged. */
-function parseKpiValue(s: string) {
-  const cleaned = s.replace(/,/g, "");
-  const num = parseFloat(cleaned);
-  const dot = cleaned.indexOf(".");
-  const decimals = dot >= 0 ? cleaned.length - dot - 1 : 0;
-  return { num, decimals, group: s.includes(",") || num >= 1000, ok: Number.isFinite(num) };
+function parseKpiValue(value: string) {
+  const cleaned = value.replace(/,/g, "");
+  const number = Number.parseFloat(cleaned);
+  const decimalPoint = cleaned.indexOf(".");
+  const decimals = decimalPoint >= 0 ? cleaned.length - decimalPoint - 1 : 0;
+
+  return {
+    decimals,
+    group: value.includes(",") || number >= 1000,
+    number,
+    valid: Number.isFinite(number),
+  };
 }
 
-const KpiCountUp: React.FC<{ value: string }> = ({ value }) => {
-  const { num, decimals, group, ok } = parseKpiValue(value);
+const KpiCountUp = ({ value }: { value: string }) => {
+  const { decimals, group, number, valid } = parseKpiValue(value);
   const [revealed, setRevealed] = useState(false);
+
   useEffect(() => {
-    const id = requestAnimationFrame(() => setRevealed(true));
-    return () => cancelAnimationFrame(id);
+    const frame = requestAnimationFrame(() => setRevealed(true));
+    return () => cancelAnimationFrame(frame);
   }, []);
-  const tweened = useTweenedNumber(ok && revealed ? num : 0, 900);
-  if (!ok) return <>{value}</>;
+
+  const tweened = useTweenedNumber(valid && revealed ? number : 0, 800);
+
+  if (!valid) return <>{value}</>;
+
   return (
     <>
       {tweened.toLocaleString("en-US", {
-        minimumFractionDigits: decimals,
         maximumFractionDigits: decimals,
+        minimumFractionDigits: decimals,
         useGrouping: group,
       })}
     </>
   );
 };
 
-const MiniSparkline: React.FC<{ data: number[]; color: string }> = ({
-  data,
+const MiniSparkline = ({
   color,
+  data,
+}: {
+  color: string;
+  data: number[];
 }) => {
+  if (data.length < 2) return null;
+
   const max = Math.max(...data);
   const min = Math.min(...data);
   const range = max - min || 1;
-  const width = 60;
-  const height = 24;
+  const width = 64;
+  const height = 28;
+  const inset = 2;
 
-  const points = data.map((v, i) => ({
-    x: (i / (data.length - 1)) * width,
-    y: height - ((v - min) / range) * height,
+  const points = data.map((value, index) => ({
+    x: inset + (index / (data.length - 1)) * (width - inset * 2),
+    y: height - inset - ((value - min) / range) * (height - inset * 2),
   }));
 
-  let pathD = `M${points[0].x},${points[0].y}`;
-  for (let i = 1; i < points.length; i++) {
-    const prev = points[i - 1];
-    const curr = points[i];
-    const cpx1 = prev.x + (curr.x - prev.x) * 0.4;
-    const cpx2 = prev.x + (curr.x - prev.x) * 0.6;
-    pathD += ` C${cpx1},${prev.y} ${cpx2},${curr.y} ${curr.x},${curr.y}`;
+  let path = `M${points[0].x},${points[0].y}`;
+  for (let index = 1; index < points.length; index += 1) {
+    const previous = points[index - 1];
+    const current = points[index];
+    const firstControl = previous.x + (current.x - previous.x) * 0.4;
+    const secondControl = previous.x + (current.x - previous.x) * 0.6;
+    path += ` C${firstControl},${previous.y} ${secondControl},${current.y} ${current.x},${current.y}`;
   }
 
-  const areaD = `${pathD} L${width},${height} L0,${height} Z`;
+  const lastPoint = points[points.length - 1];
 
   return (
-    <svg
-      width={width}
-      height={height}
-      viewBox={`0 0 ${width} ${height}`}
-      className="opacity-50 group-hover:opacity-75 transition-opacity duration-500"
-    >
-      <defs>
-        <linearGradient
-          id={`spark-fill-${color.replace("#", "")}`}
-          x1="0"
-          y1="0"
-          x2="0"
-          y2="1"
-        >
-          <stop offset="0%" stopColor={color} stopOpacity="0.35" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={areaD} fill={`url(#spark-fill-${color.replace("#", "")})`} />
+    <svg className="kpi-card__sparkline" viewBox={`0 0 ${width} ${height}`}>
+      <path className="kpi-card__sparkline-track" d={`M2 ${height - 3}H${width - 2}`} />
       <path
-        d={pathD}
+        d={path}
         fill="none"
         stroke={color}
-        strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
+        strokeWidth="1.7"
       />
-      <circle
-        cx={points[points.length - 1].x}
-        cy={points[points.length - 1].y}
-        r="2"
-        fill={color}
-        opacity="0.8"
-        className="group-hover:opacity-100 transition-opacity duration-300"
-      >
-        <animate
-          attributeName="r"
-          values="1.5;2.5;1.5"
-          dur="2s"
-          repeatCount="indefinite"
-        />
-      </circle>
+      <circle cx={lastPoint.x} cy={lastPoint.y} fill={color} r="2.2" />
     </svg>
   );
 };
+
+function hexToRgbChannels(hex: string) {
+  const normalized = hex.replace("#", "");
+  const value = Number.parseInt(normalized, 16);
+  return `${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255}`;
+}
+
+type RailGroup = "metrics" | "workspaces";
+
+interface WorkspaceCardDescriptor {
+  accent: string;
+  accentRgb: string;
+  ariaLabel: string;
+  icon: LucideIcon;
+  id: WorkspaceVisualizationKind;
+  label: string;
+  onClick?: () => void;
+  status?: React.ReactNode;
+  statusTone?: KpiCardStatusTone;
+  visualization: WorkspaceVisualizationKind;
+}
 
 interface KPIBarProps {
   onOeeClick?: () => void;
   onAnalyticsClick?: () => void;
   onPredictClick?: () => void;
-  onDigitalTwinClick?: () => void;
   onDpsClick?: () => void;
   onRoutingClick?: () => void;
+  onItDevicesClick?: () => void;
+  onOtDevicesClick?: () => void;
   onGatewayTwinClick?: () => void;
   onVideoClick?: () => void;
   predAlertCount?: number;
@@ -127,417 +150,408 @@ const KPIBar: React.FC<KPIBarProps> = ({
   onOeeClick,
   onAnalyticsClick,
   onPredictClick,
-  onDigitalTwinClick,
   onDpsClick,
   onRoutingClick,
+  onItDevicesClick,
+  onOtDevicesClick,
   onGatewayTwinClick,
   onVideoClick,
   predAlertCount = 0,
 }) => {
   const { state, dispatch } = useFilters();
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [activeGroup, setActiveGroup] = useState<RailGroup>("metrics");
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
-  const updateScrollState = () => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const maxScroll = el.scrollWidth - el.clientWidth;
-    setCanScrollLeft(el.scrollLeft > 4);
-    setCanScrollRight(el.scrollLeft < maxScroll - 4);
-  };
+  const updateScrollState = useCallback(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+
+    const maxScroll = element.scrollWidth - element.clientWidth;
+    setCanScrollLeft(element.scrollLeft > 4);
+    setCanScrollRight(maxScroll > 4 && element.scrollLeft < maxScroll - 4);
+  }, []);
 
   useEffect(() => {
     updateScrollState();
-    const el = scrollRef.current;
-    if (!el) return;
-    el.addEventListener("scroll", updateScrollState, { passive: true });
-    const ro = new ResizeObserver(updateScrollState);
-    ro.observe(el);
-    return () => {
-      el.removeEventListener("scroll", updateScrollState);
-      ro.disconnect();
-    };
-  }, []);
+    const element = scrollRef.current;
+    if (!element) return;
 
-  const scrollByAmount = (dir: 1 | -1) => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const step = Math.max(240, Math.round(el.clientWidth * 0.7));
-    el.scrollBy({ left: dir * step, behavior: "smooth" });
+    element.addEventListener("scroll", updateScrollState, { passive: true });
+    const observer = new ResizeObserver(updateScrollState);
+    observer.observe(element);
+
+    return () => {
+      element.removeEventListener("scroll", updateScrollState);
+      observer.disconnect();
+    };
+  }, [activeGroup, updateScrollState]);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      if (scrollRef.current) scrollRef.current.scrollLeft = 0;
+      updateScrollState();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [activeGroup, updateScrollState]);
+
+  const scrollByAmount = (direction: 1 | -1) => {
+    const element = scrollRef.current;
+    if (!element) return;
+
+    const reduceMotion =
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    const step = Math.max(240, Math.round(element.clientWidth * 0.72));
+    element.scrollBy({
+      behavior: reduceMotion ? "auto" : "smooth",
+      left: direction * step,
+    });
   };
 
+  const workspaceCount = [
+    onAnalyticsClick,
+    onPredictClick,
+    onDpsClick,
+    onRoutingClick,
+    onItDevicesClick,
+    onOtDevicesClick,
+    onGatewayTwinClick,
+    onVideoClick,
+  ].filter(Boolean).length + 1;
+
+  const groups: Array<{ id: RailGroup; label: string; count: number }> = [
+    { id: "metrics", label: "Plant KPIs", count: kpis.length },
+    { id: "workspaces", label: "Workspaces", count: workspaceCount },
+  ];
+
+  const actionCards: WorkspaceCardDescriptor[] = [
+    {
+      accent: "#22d3ee",
+      accentRgb: "34, 211, 238",
+      ariaLabel: "Open analytics trends",
+      icon: ChartNoAxesCombined,
+      id: "analytics",
+      label: "Analytics",
+      onClick: onAnalyticsClick,
+      visualization: "analytics",
+    },
+    {
+      accent: "#c084fc",
+      accentRgb: "192, 132, 252",
+      ariaLabel:
+        predAlertCount > 0
+          ? `Open predictive risks, ${predAlertCount} alert${predAlertCount === 1 ? "" : "s"}`
+          : "Open predictive risks",
+      icon: BrainCircuit,
+      id: "predict",
+      label: "Predict",
+      onClick: onPredictClick,
+      status:
+        predAlertCount > 0
+          ? `${predAlertCount > 99 ? "99+" : predAlertCount} alert${predAlertCount === 1 ? "" : "s"}`
+          : undefined,
+      statusTone: "warning",
+      visualization: "predict",
+    },
+    {
+      accent: "#60a5fa",
+      accentRgb: "96, 165, 250",
+      ariaLabel: "Open dynamic path selection",
+      icon: Shuffle,
+      id: "dps",
+      label: "DPS",
+      onClick: onDpsClick,
+      visualization: "dps",
+    },
+    {
+      accent: "#a78bfa",
+      accentRgb: "167, 139, 250",
+      ariaLabel: "Open application traffic routing",
+      icon: Route,
+      id: "routing",
+      label: "App routing",
+      onClick: onRoutingClick,
+      visualization: "routing",
+    },
+    {
+      accent: "#5eead4",
+      accentRgb: "94, 234, 212",
+      ariaLabel: "Open IT device inventory",
+      icon: Laptop,
+      id: "it-devices",
+      label: "IT devices",
+      onClick: onItDevicesClick,
+      visualization: "it-devices",
+    },
+    {
+      accent: "#fb7185",
+      accentRgb: "251, 113, 133",
+      ariaLabel: "Open OT device inventory",
+      icon: Flame,
+      id: "ot-devices",
+      label: "OT devices",
+      onClick: onOtDevicesClick,
+      visualization: "ot-devices",
+    },
+    {
+      accent: "#67e8f9",
+      accentRgb: "103, 232, 249",
+      ariaLabel: "Open Gateway Twin in a new tab",
+      icon: ServerCog,
+      id: "gateway",
+      label: "Gateway twin",
+      onClick: onGatewayTwinClick,
+      status: <span aria-hidden="true">↗</span>,
+      statusTone: "neutral",
+      visualization: "gateway",
+    },
+    {
+      accent: "#7ab4ee",
+      accentRgb: "122, 180, 238",
+      ariaLabel: "Open video analytics streams",
+      icon: Video,
+      id: "video",
+      label: "Video",
+      onClick: onVideoClick,
+      visualization: "video",
+    },
+  ];
+
+  const handleTabKeyDown = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    index: number,
+  ) => {
+    let nextIndex: number | null = null;
+
+    if (event.key === "ArrowRight") nextIndex = (index + 1) % groups.length;
+    if (event.key === "ArrowLeft") {
+      nextIndex = (index - 1 + groups.length) % groups.length;
+    }
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = groups.length - 1;
+
+    if (nextIndex === null) return;
+
+    event.preventDefault();
+    setActiveGroup(groups[nextIndex].id);
+    requestAnimationFrame(() => tabRefs.current[nextIndex]?.focus());
+  };
+
+  const renderMetricCards = () =>
+    kpis.map((kpi, index) => {
+      const selected = state.selectedKpi === kpi.id;
+      const zoneData = getKpiForZone(kpi, state.selectedZone);
+      const trendTone: KpiCardStatusTone = kpi.trendColor.includes("red")
+        ? "critical"
+        : "positive";
+      const trendValue = zoneData.trend.replace(/^[+-]/, "");
+      const actionLabel =
+        kpi.id === "oee"
+          ? `Open OEE details. ${zoneData.value} ${kpi.unit}`
+          : `${selected ? "Clear" : "Apply"} ${kpi.label} dashboard filter. ${zoneData.value} ${kpi.unit}`;
+
+      return (
+        <KpiCard
+          key={kpi.id}
+          accent={kpi.sparkColor}
+          accentRgb={hexToRgbChannels(kpi.sparkColor)}
+          aria-haspopup={kpi.id === "oee" ? "dialog" : undefined}
+          aria-label={actionLabel}
+          delayIndex={index}
+          icon={
+            <img
+              alt=""
+              className="kpi-card__source-icon"
+              src={kpi.icon}
+            />
+          }
+          label={kpi.label}
+          onClick={() => {
+            if (kpi.id === "oee" && onOeeClick) {
+              onOeeClick();
+              return;
+            }
+            dispatch({ type: "SET_KPI", kpi: kpi.id });
+          }}
+          primary={<KpiCountUp value={zoneData.value} />}
+          secondary={kpi.unit}
+          selected={selected}
+          status={
+            selected ? (
+              "Filtering"
+            ) : (
+              <>
+                <span aria-hidden="true">
+                  {zoneData.trendUp ? "↑" : "↓"}
+                </span>
+                {trendValue}
+              </>
+            )
+          }
+          statusTone={selected ? "neutral" : trendTone}
+          variant="metric"
+          visualization={
+            <MiniSparkline data={zoneData.sparkData} color={kpi.sparkColor} />
+          }
+        />
+      );
+    });
+
+  const renderWorkspaceCards = () => [
+    ...actionCards.map((card, index) => {
+      if (!card.onClick) return null;
+      const Icon = card.icon;
+
+      return (
+        <KpiCard
+          key={card.id}
+          accent={card.accent}
+          accentRgb={card.accentRgb}
+          aria-haspopup={card.id === "gateway" ? undefined : "dialog"}
+          aria-label={card.ariaLabel}
+          delayIndex={index}
+          icon={<Icon size={17} strokeWidth={1.8} />}
+          label={card.label}
+          onClick={card.onClick}
+          status={card.status}
+          statusTone={card.statusTone}
+          variant="module"
+          visualization={<WorkspaceVisualization kind={card.visualization} />}
+        />
+      );
+    }),
+    <LorawanWidget key="lorawan" />,
+  ];
+
+  const renderActiveCards = () => {
+    if (activeGroup === "metrics") return renderMetricCards();
+    return renderWorkspaceCards();
+  };
+
+  const activeGroupMeta =
+    groups.find((group) => group.id === activeGroup) ?? groups[0];
+  const activeGroupLabel = activeGroupMeta.label;
+
   return (
-    <div className="flex items-center gap-2 w-full">
-      <button
-        type="button"
-        onClick={() => scrollByAmount(-1)}
-        aria-label="Scroll KPIs left"
-        disabled={!canScrollLeft}
-        className={`flex-none w-7 h-7 rounded-lg glass flex items-center justify-center text-white/70 hover:text-white transition-all duration-200 ${
-          canScrollLeft ? "opacity-100" : "opacity-25 cursor-not-allowed"
-        }`}
-      >
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-          <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-
-      {/* KPI cards + action buttons — single-row carousel.
-          Edge-fade mask only on the side(s) with hidden cards, so the cut-off
-          card fades out instead of hard-clipping — a clear "scroll for more"
-          affordance that pairs with the chevron buttons. */}
-      <div
-        ref={scrollRef}
-        className="flex gap-2.5 overflow-x-auto scroll-smooth flex-nowrap flex-1 min-w-0"
-        style={{
-          scrollbarWidth: "none",
-          msOverflowStyle: "none",
-          maskImage: `linear-gradient(90deg, ${canScrollLeft ? "transparent 0, #000 40px" : "#000 0"}, ${canScrollRight ? "#000 calc(100% - 48px), transparent 100%" : "#000 100%"})`,
-          WebkitMaskImage: `linear-gradient(90deg, ${canScrollLeft ? "transparent 0, #000 40px" : "#000 0"}, ${canScrollRight ? "#000 calc(100% - 48px), transparent 100%" : "#000 100%"})`,
-        }}
-      >
-        {kpis.map((kpi, i) => {
-          const isSelected = state.selectedKpi === kpi.id;
-          const zoneData = getKpiForZone(kpi, state.selectedZone);
-
-          return (
-            <div
-              key={kpi.id}
-              onClick={() => {
-                if (kpi.id === "oee" && onOeeClick) {
-                  onOeeClick();
-                } else {
-                  dispatch({ type: "SET_KPI", kpi: kpi.id });
-                }
+    <section className="kpi-deck" aria-label="Factory metrics and tools">
+      <div className="kpi-deck__toolbar">
+        <div
+          aria-label="KPI rail category"
+          className="kpi-deck__tabs"
+          role="tablist"
+        >
+          {groups.map((group, index) => (
+            <button
+              key={group.id}
+              ref={(element) => {
+                tabRefs.current[index] = element;
               }}
-              className={`card ${kpi.hoverBorder} px-4 py-3.5 flex flex-col h-[100px] min-w-[200px] max-w-[320px] flex-1 basis-[200px] relative overflow-hidden animate-fade-in delay-${i + 1} group cursor-pointer transition-all duration-300 rounded-2xl ${
-                isSelected
-                  ? "ring-1 ring-white/10 scale-[1.02]"
-                  : ""
-              }`}
+              aria-controls={`kpi-panel-${group.id}`}
+              aria-selected={activeGroup === group.id}
+              className="kpi-deck__tab"
+              id={`kpi-tab-${group.id}`}
+              onClick={() => setActiveGroup(group.id)}
+              onKeyDown={(event) => handleTabKeyDown(event, index)}
+              role="tab"
+              tabIndex={activeGroup === group.id ? 0 : -1}
+              type="button"
             >
-              <div
-                className={`absolute inset-0 bg-gradient-to-br ${kpi.accent} ${
-                  isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                } transition-opacity duration-500 pointer-events-none`}
-              ></div>
+              <span>{group.label}</span>
+              <span aria-hidden="true" className="kpi-deck__tab-count">
+                {group.count}
+              </span>
+            </button>
+          ))}
+        </div>
 
-              {/* Row 1: Icon + Label + Trend — vertically centered */}
-              <div className="flex items-center justify-between relative z-10">
-                <div className="flex items-center gap-2.5">
-                  <div
-                    className={`w-8 h-8 ${kpi.iconBg} rounded-[10px] flex items-center justify-center border ${kpi.iconBorder} transition-all duration-300 group-hover:scale-105`}
-                  >
-                    <img
-                      src={kpi.icon}
-                      alt={kpi.label}
-                      className="w-4 h-4 opacity-85 invert"
-                    />
-                  </div>
-                  <span className="text-[11px] text-white/60 uppercase tracking-[0.08em] font-semibold">
-                    {kpi.label}
-                  </span>
-                </div>
-                <div
-                  className={`flex items-center gap-1 text-[10px] font-semibold ${kpi.trendColor}`}
-                >
-                  <svg
-                    width="8"
-                    height="8"
-                    viewBox="0 0 8 8"
-                    fill="currentColor"
-                    className={zoneData.trendUp ? "" : "rotate-180"}
-                  >
-                    <path d="M4 1L7 5H1L4 1Z" />
-                  </svg>
-                  {zoneData.trend}
-                </div>
-              </div>
-
-              {/* Row 2: Value + Unit + Sparkline — pushed to bottom */}
-              <div className="flex items-end justify-between mt-auto relative z-10">
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-[22px] font-medium gradient-number leading-none">
-                    <KpiCountUp value={zoneData.value} />
-                  </span>
-                  <span className="text-[11px] text-white/35 font-medium">
-                    {kpi.unit}
-                  </span>
-                </div>
-                <MiniSparkline data={zoneData.sparkData} color={kpi.sparkColor} />
-              </div>
-
-              {isSelected && (
-                <div className="absolute top-2.5 right-2.5 w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_6px_rgba(122,180,238,0.5)] z-20"></div>
-              )}
-            </div>
-          );
-        })}
-
-        {/* Analytics */}
-        {onAnalyticsClick && (
-          <button
-            onClick={onAnalyticsClick}
-            className="card hover:border-cyan-400/25 px-4 py-3.5 flex flex-col h-[100px] min-w-[200px] max-w-[320px] flex-1 basis-[200px] relative overflow-hidden group/analytics cursor-pointer transition-all duration-300 text-left rounded-2xl"
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/[0.08] to-transparent opacity-0 group-hover/analytics:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-            <div className="flex items-center gap-2.5 relative z-10">
-              <div className="w-8 h-8 bg-cyan-500/[0.10] rounded-[10px] flex items-center justify-center border border-cyan-400/[0.12] transition-all duration-300 group-hover/analytics:scale-105">
-                <svg width="15" height="15" viewBox="0 0 20 20" fill="none" className="text-cyan-300">
-                  <rect x="2" y="11" width="3" height="7" rx="1" fill="currentColor" opacity="0.6" />
-                  <rect x="7" y="7" width="3" height="11" rx="1" fill="currentColor" opacity="0.8" />
-                  <rect x="12" y="3" width="3" height="15" rx="1" fill="currentColor" />
-                  <path d="M3.5 10L8.5 6L13.5 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" opacity="0.5" />
-                </svg>
-              </div>
-              <span className="text-[11px] text-white/60 uppercase tracking-[0.08em] font-semibold">Analytics</span>
-            </div>
-            <div className="flex items-end justify-between mt-auto relative z-10">
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-[13px] font-medium text-cyan-300/80 leading-none">Open</span>
-                <span className="text-[11px] text-white/30">trends</span>
-              </div>
-              <svg width="60" height="24" viewBox="0 0 60 24" fill="none" className="opacity-50 group-hover/analytics:opacity-75 transition-opacity">
-                <rect x="2" y="14" width="6" height="8" rx="1.5" fill="#22d3ee" opacity="0.9" />
-                <rect x="12" y="9" width="6" height="13" rx="1.5" fill="#38bdf8" opacity="0.85" />
-                <rect x="22" y="5" width="6" height="17" rx="1.5" fill="#60a5fa" opacity="0.8" />
-                <rect x="32" y="11" width="6" height="11" rx="1.5" fill="#38bdf8" opacity="0.75" />
-                <rect x="42" y="2" width="6" height="20" rx="1.5" fill="#22d3ee" />
-              </svg>
-            </div>
-          </button>
-        )}
-
-        {/* Predict */}
-        {onPredictClick && (
-          <button
-            onClick={onPredictClick}
-            className="card hover:border-purple-400/25 px-4 py-3.5 flex flex-col h-[100px] min-w-[200px] max-w-[320px] flex-1 basis-[200px] relative overflow-hidden group/predict cursor-pointer transition-all duration-300 text-left rounded-2xl"
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/[0.08] to-transparent opacity-0 group-hover/predict:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-            <div className="flex items-center justify-between relative z-10">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 bg-purple-500/[0.10] rounded-[10px] flex items-center justify-center border border-purple-400/[0.12] transition-all duration-300 group-hover/predict:scale-105">
-                  <svg width="15" height="15" viewBox="0 0 20 20" fill="none" className="text-purple-300">
-                    <path d="M2 14L6 10L10 12L14 6L18 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M14 6L18 3" strokeDasharray="2 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity="0.5" />
-                    <circle cx="14" cy="6" r="1.5" fill="currentColor" />
-                  </svg>
-                </div>
-                <span className="text-[11px] text-white/60 uppercase tracking-[0.08em] font-semibold">Predict</span>
-              </div>
-              {predAlertCount > 0 && (
-                <span className="text-[9px] font-bold text-amber-300 bg-amber-500/[0.12] px-1.5 py-0.5 rounded-md">{predAlertCount}</span>
-              )}
-            </div>
-            <div className="flex items-end justify-between mt-auto relative z-10">
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-[13px] font-medium text-purple-300/80 leading-none">Forecast</span>
-                <span className="text-[11px] text-white/30">risks</span>
-              </div>
-              <svg width="60" height="24" viewBox="0 0 60 24" fill="none" className="opacity-50 group-hover/predict:opacity-75 transition-opacity">
-                <path d="M2 18L14 12L28 15L44 4L58 8" stroke="#c084fc" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M44 4L58 8" stroke="#e879f9" strokeWidth="1.5" strokeDasharray="2 2" strokeLinecap="round" />
-                <circle cx="14" cy="12" r="1.6" fill="#c084fc" opacity="0.7" />
-                <circle cx="44" cy="4" r="1.8" fill="#e879f9" />
-              </svg>
-            </div>
-          </button>
-        )}
-
-        {/* Digital Twin */}
-        {onDigitalTwinClick && (
-          <button
-            onClick={onDigitalTwinClick}
-            className="card hover:border-emerald-400/25 px-4 py-3.5 flex flex-col h-[100px] min-w-[200px] max-w-[320px] flex-1 basis-[200px] relative overflow-hidden group/twin cursor-pointer transition-all duration-300 text-left rounded-2xl"
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/[0.08] to-transparent opacity-0 group-hover/twin:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-            <div className="flex items-center gap-2.5 relative z-10">
-              <div className="w-8 h-8 bg-emerald-500/[0.10] rounded-[10px] flex items-center justify-center border border-emerald-400/[0.12] transition-all duration-300 group-hover/twin:scale-105">
-                <svg width="15" height="15" viewBox="0 0 20 20" fill="none" className="text-emerald-300">
-                  <rect x="2" y="3" width="6" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.2" fill="none" />
-                  <rect x="12" y="3" width="6" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.2" fill="none" />
-                  <rect x="7" y="12" width="6" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.2" fill="none" />
-                  <path d="M5 8v3l5 1M15 8v3l-5 1" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.6" />
-                </svg>
-              </div>
-              <span className="text-[11px] text-white/60 uppercase tracking-[0.08em] font-semibold">Twin</span>
-            </div>
-            <div className="flex items-end justify-between mt-auto relative z-10">
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-[13px] font-medium text-emerald-300/80 leading-none">Simulate</span>
-                <span className="text-[11px] text-white/30">live</span>
-              </div>
-              <svg width="60" height="24" viewBox="0 0 60 24" fill="none" className="opacity-50 group-hover/twin:opacity-75 transition-opacity">
-                <rect x="2" y="4" width="14" height="10" rx="2" stroke="#34d399" strokeWidth="1.3" fill="none" />
-                <rect x="32" y="4" width="14" height="10" rx="2" stroke="#34d399" strokeWidth="1.3" fill="none" />
-                <rect x="17" y="15" width="14" height="7" rx="2" stroke="#6ee7b7" strokeWidth="1.3" fill="none" />
-                <path d="M9 14v3l12 1M39 14v3l-12 1" stroke="#34d399" strokeWidth="1" strokeLinecap="round" opacity="0.6" />
-              </svg>
-            </div>
-          </button>
-        )}
-
-        {/* DPS */}
-        {onDpsClick && (
-          <button
-            onClick={onDpsClick}
-            className="card hover:border-blue-400/25 px-4 py-3.5 flex flex-col h-[100px] min-w-[200px] max-w-[320px] flex-1 basis-[200px] relative overflow-hidden group/dps cursor-pointer transition-all duration-300 text-left rounded-2xl"
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/[0.08] to-transparent opacity-0 group-hover/dps:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-            <div className="flex items-center gap-2.5 relative z-10">
-              <div className="w-8 h-8 bg-blue-500/[0.10] rounded-[10px] flex items-center justify-center border border-blue-400/[0.12] transition-all duration-300 group-hover/dps:scale-105">
-                <svg width="15" height="15" viewBox="0 0 20 20" fill="none" className="text-blue-300">
-                  <path d="M2 5Q8 5 10 10Q12 15 18 15" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none" />
-                  <path d="M2 15Q8 15 10 10Q12 5 18 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeDasharray="2 2" fill="none" opacity="0.5" />
-                  <circle cx="10" cy="10" r="2" fill="currentColor" />
-                </svg>
-              </div>
-              <span className="text-[11px] text-white/60 uppercase tracking-[0.08em] font-semibold">DPS</span>
-            </div>
-            <div className="flex items-end justify-between mt-auto relative z-10">
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-[13px] font-medium text-blue-300/80 leading-none">Paths</span>
-                <span className="text-[11px] text-white/30">fiber · 5G</span>
-              </div>
-              <svg width="60" height="24" viewBox="0 0 60 24" fill="none" className="opacity-50 group-hover/dps:opacity-75 transition-opacity">
-                <path d="M2 6Q14 6 22 12Q34 18 56 18" stroke="#60a5fa" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-                <path d="M2 18Q14 18 22 12Q34 6 56 6" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="3 2" fill="none" />
-                <circle cx="22" cy="12" r="2.2" fill="#ffffff" />
-              </svg>
-            </div>
-          </button>
-        )}
-
-        {/* Application Traffic Routing */}
-        {onRoutingClick && (
-          <button
-            onClick={onRoutingClick}
-            className="card hover:border-violet-400/25 px-4 py-3.5 flex flex-col h-[100px] min-w-[200px] max-w-[320px] flex-1 basis-[200px] relative overflow-hidden group/routing cursor-pointer transition-all duration-300 text-left rounded-2xl"
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-violet-500/[0.08] to-transparent opacity-0 group-hover/routing:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-            <div className="flex items-center gap-2.5 relative z-10">
-              <div className="w-8 h-8 bg-violet-500/[0.10] rounded-[10px] flex items-center justify-center border border-violet-400/[0.12] transition-all duration-300 group-hover/routing:scale-105">
-                <svg width="15" height="15" viewBox="0 0 20 20" fill="none" className="text-violet-300">
-                  <circle cx="4" cy="5" r="2" stroke="currentColor" strokeWidth="1.3" />
-                  <circle cx="4" cy="15" r="2" stroke="currentColor" strokeWidth="1.3" />
-                  <circle cx="16" cy="5" r="2" stroke="currentColor" strokeWidth="1.3" />
-                  <circle cx="16" cy="15" r="2" stroke="currentColor" strokeWidth="1.3" />
-                  <path d="M6 5h8M6 15h8M10 5v10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-                </svg>
-              </div>
-              <span className="text-[11px] text-white/60 uppercase tracking-[0.08em] font-semibold">App Routing</span>
-            </div>
-            <div className="flex items-end justify-between mt-auto relative z-10">
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-[13px] font-medium text-violet-300/80 leading-none">Steer</span>
-                <span className="text-[11px] text-white/30">apps · tunnels</span>
-              </div>
-              <svg width="60" height="24" viewBox="0 0 60 24" fill="none" className="opacity-50 group-hover/routing:opacity-75 transition-opacity">
-                <path d="M3 5h14c8 0 8 14 16 14h23" stroke="#a78bfa" strokeWidth="1.5" strokeLinecap="round" />
-                <path d="M3 19h14c8 0 8-14 16-14h23" stroke="#c084fc" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="3 2" />
-                <circle cx="33" cy="19" r="2.2" fill="#ddd6fe" />
-              </svg>
-            </div>
-          </button>
-        )}
-
-        {/* Gateway Twin — opens the external gateway digital twin. */}
-        {onGatewayTwinClick && (
-          <button
-            onClick={onGatewayTwinClick}
-            title="Open Gateway Twin"
-            className="card hover:border-cyan-400/25 px-4 py-3.5 flex flex-col h-[100px] min-w-[200px] max-w-[320px] flex-1 basis-[200px] relative overflow-hidden group/gateway-twin cursor-pointer transition-all duration-300 text-left rounded-2xl"
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/[0.08] to-transparent opacity-0 group-hover/gateway-twin:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-            <div className="flex items-center gap-2.5 relative z-10">
-              <div className="w-8 h-8 bg-cyan-500/[0.10] rounded-[10px] flex items-center justify-center border border-cyan-400/[0.12] transition-all duration-300 group-hover/gateway-twin:scale-105">
-                <svg width="16" height="16" viewBox="0 0 20 20" fill="none" className="text-cyan-300">
-                  <rect x="2.5" y="4" width="6" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.25" />
-                  <rect x="11.5" y="4" width="6" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.25" opacity="0.72" />
-                  <path d="M8.5 7h3M8.5 13h3" stroke="currentColor" strokeWidth="1.15" strokeLinecap="round" />
-                  <circle cx="5.5" cy="7" r="0.8" fill="currentColor" />
-                  <circle cx="14.5" cy="13" r="0.8" fill="currentColor" opacity="0.8" />
-                </svg>
-              </div>
-              <span className="text-[11px] text-white/60 uppercase tracking-[0.08em] font-semibold">Gateway Twin</span>
-            </div>
-            <div className="flex items-end justify-between mt-auto relative z-10">
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-[13px] font-medium text-cyan-300/80 leading-none">Open</span>
-                <span className="text-[11px] text-white/30">digital gateway</span>
-              </div>
-              <svg width="60" height="24" viewBox="0 0 60 24" fill="none" className="opacity-50 group-hover/gateway-twin:opacity-80 transition-opacity">
-                <rect x="3" y="4" width="16" height="16" rx="3" stroke="#67e8f9" strokeWidth="1.4" />
-                <rect x="41" y="4" width="16" height="16" rx="3" stroke="#22d3ee" strokeWidth="1.4" opacity="0.75" />
-                <path d="M19 8h11l4 4-4 4-11 0M41 8H30" stroke="#67e8f9" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                <circle cx="11" cy="12" r="2" fill="#cffafe" />
-                <circle cx="49" cy="12" r="2" fill="#67e8f9" />
-              </svg>
-            </div>
-          </button>
-        )}
-
-        {/* Video */}
-        {onVideoClick && (
-          <button
-            onClick={onVideoClick}
-            className="card hover:border-rose-400/25 px-4 py-3.5 flex flex-col h-[100px] min-w-[200px] max-w-[320px] flex-1 basis-[200px] relative overflow-hidden group/video cursor-pointer transition-all duration-300 text-left rounded-2xl"
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-rose-500/[0.08] to-transparent opacity-0 group-hover/video:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-            <div className="flex items-center gap-2.5 relative z-10">
-              <div className="w-8 h-8 bg-rose-500/[0.10] rounded-[10px] flex items-center justify-center border border-rose-400/[0.12] transition-all duration-300 group-hover/video:scale-105">
-                <svg width="15" height="15" viewBox="0 0 20 20" fill="none" className="text-rose-300">
-                  <rect x="2" y="4" width="11" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.3" fill="none" />
-                  <path d="M13 7L17 5V11L13 9V7Z" fill="currentColor" opacity="0.8" />
-                  <circle cx="7.5" cy="8" r="1.5" fill="currentColor" opacity="0.6" />
-                </svg>
-              </div>
-              <span className="text-[11px] text-white/60 uppercase tracking-[0.08em] font-semibold">Video</span>
-            </div>
-            <div className="flex items-end justify-between mt-auto relative z-10">
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-[13px] font-medium text-rose-300/80 leading-none">Streams</span>
-                <span className="text-[11px] text-white/30">edge · AI</span>
-              </div>
-              <svg width="60" height="24" viewBox="0 0 60 24" fill="none" className="opacity-50 group-hover/video:opacity-75 transition-opacity">
-                <rect x="2" y="3" width="12" height="8" rx="2" fill="#fb7185" opacity="0.8" />
-                <rect x="17" y="3" width="12" height="8" rx="2" fill="#f43f5e" opacity="0.65" />
-                <rect x="2" y="13" width="12" height="8" rx="2" fill="#f43f5e" opacity="0.65" />
-                <rect x="17" y="13" width="12" height="8" rx="2" fill="#fb7185" opacity="0.8" />
-                <circle cx="42" cy="12" r="3" stroke="#ef4444" strokeWidth="1.2" fill="none" />
-                <circle cx="42" cy="12" r="1" fill="#ef4444" />
-              </svg>
-            </div>
-          </button>
-        )}
-
-        {/* KOS dispenser feed — AWS IoT-forwarded pour + recommendation events.
-            Sits at the end of the KPI row so it doesn't push the existing
-            cards around when no data is flowing yet. */}
-        <KOSDispenseWidget />
-
-        {/* LoRaWAN soil/irrigation sensors — local MQTT-bridged feed.
-            Click opens a drawer with per-device soil temp / moisture /
-            conductivity / battery readings and sparklines. */}
-        <LorawanWidget />
+        <span aria-live="polite" className="kpi-deck__position">
+          {activeGroupMeta.count} items
+        </span>
       </div>
 
-      <button
-        type="button"
-        onClick={() => scrollByAmount(1)}
-        aria-label="Scroll KPIs right"
-        disabled={!canScrollRight}
-        className={`flex-none w-7 h-7 rounded-lg glass flex items-center justify-center text-white/70 hover:text-white transition-all duration-200 ${
-          canScrollRight ? "opacity-100" : "opacity-25 cursor-not-allowed"
-        }`}
-      >
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-          <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-    </div>
+      {groups.map((group) => {
+        const active = activeGroup === group.id;
+
+        return (
+          <div
+            key={group.id}
+            aria-labelledby={`kpi-tab-${group.id}`}
+            className="kpi-deck__panel"
+            hidden={!active}
+            id={`kpi-panel-${group.id}`}
+            role="tabpanel"
+          >
+            {active ? (
+              <>
+                <button
+                  aria-controls="kpi-rail-scroll"
+                  aria-label={`Scroll ${activeGroupLabel} left`}
+                  className="kpi-rail__control"
+                  disabled={!canScrollLeft}
+                  onClick={() => scrollByAmount(-1)}
+                  type="button"
+                >
+                  <ChevronLeft aria-hidden="true" size={17} strokeWidth={1.8} />
+                </button>
+
+                <div
+                  ref={scrollRef}
+                  aria-label={`${activeGroupLabel} cards`}
+                  className="kpi-rail__viewport"
+                  id="kpi-rail-scroll"
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) return;
+                    if (event.key === "ArrowLeft") {
+                      event.preventDefault();
+                      scrollByAmount(-1);
+                    }
+                    if (event.key === "ArrowRight") {
+                      event.preventDefault();
+                      scrollByAmount(1);
+                    }
+                  }}
+                  role="region"
+                  style={{
+                    maskImage: `linear-gradient(90deg, ${
+                      canScrollLeft ? "transparent 0, #000 42px" : "#000 0"
+                    }, ${
+                      canScrollRight
+                        ? "#000 calc(100% - 48px), transparent 100%"
+                        : "#000 100%"
+                    })`,
+                    msOverflowStyle: "none",
+                    scrollbarWidth: "none",
+                    WebkitMaskImage: `linear-gradient(90deg, ${
+                      canScrollLeft ? "transparent 0, #000 42px" : "#000 0"
+                    }, ${
+                      canScrollRight
+                        ? "#000 calc(100% - 48px), transparent 100%"
+                        : "#000 100%"
+                    })`,
+                  }}
+                  tabIndex={0}
+                >
+                  {renderActiveCards()}
+                </div>
+
+                <button
+                  aria-controls="kpi-rail-scroll"
+                  aria-label={`Scroll ${activeGroupLabel} right`}
+                  className="kpi-rail__control"
+                  disabled={!canScrollRight}
+                  onClick={() => scrollByAmount(1)}
+                  type="button"
+                >
+                  <ChevronRight aria-hidden="true" size={17} strokeWidth={1.8} />
+                </button>
+              </>
+            ) : null}
+          </div>
+        );
+      })}
+    </section>
   );
 };
 
