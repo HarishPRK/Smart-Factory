@@ -13,6 +13,7 @@ import PLCParametersWidget from "./PLCParametersWidget";
 import MotorFanWidget from "./MotorFanWidget";
 import EmergencyLightWidget from "./EmergencyLightWidget";
 import IntegrationModal from "./IntegrationModal";
+import GatewayTwinEmbed from "./GatewayTwinEmbed";
 import { usePredictionStore } from "../stores/predictionStore";
 
 const FactoryScene = lazy(() => import("./factory3d/FactoryScene"));
@@ -31,6 +32,9 @@ const ApplicationAwareRoutingPage = lazy(() =>
 );
 const DevicesPage = lazy(() =>
   import("../integrations/pages/Devices").then((m) => ({ default: m.DevicesPage })),
+);
+const OnboardingPage = lazy(() =>
+  import("../integrations/pages/Onboarding").then((m) => ({ default: m.OnboardingPage })),
 );
 const VideoAnalyticsPage = lazy(() =>
   import("../integrations/pages/VideoAnalytics").then((m) => ({ default: m.VideoAnalyticsPage })),
@@ -88,8 +92,10 @@ const Dashboard: React.FC = () => {
   const [dpsOpen, setDpsOpen] = useState(false);
   const [appRoutingOpen, setAppRoutingOpen] = useState(false);
   const [devicesDomain, setDevicesDomain] = useState<"IT" | "OT" | null>(null);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [networkBranchId, setNetworkBranchId] = useState<NetworkBranchId>("b-mck-03");
   const [videoOpen, setVideoOpen] = useState(false);
+  const [gwTwinOpen, setGwTwinOpen] = useState(false);
   const [unsOpen, setUnsOpen] = useState(false);
   const predAlertCount = usePredictionStore((s) => s.anomalyAlerts.length);
   const { filteredAlerts } = useFilters();
@@ -97,7 +103,7 @@ const Dashboard: React.FC = () => {
   // The integration modals cover the whole screen, so freeze the 3D render
   // loop while one is open — on integrated GPUs the scene otherwise competes
   // with the modal for the GPU and makes it take seconds to appear.
-  const scenePaused = dpsOpen || appRoutingOpen || devicesDomain !== null || videoOpen;
+  const scenePaused = dpsOpen || appRoutingOpen || devicesDomain !== null || onboardingOpen || videoOpen || gwTwinOpen;
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -198,9 +204,8 @@ const Dashboard: React.FC = () => {
             onRoutingClick={() => setAppRoutingOpen(true)}
             onItDevicesClick={() => setDevicesDomain("IT")}
             onOtDevicesClick={() => setDevicesDomain("OT")}
-            onGatewayTwinClick={() =>
-              window.open("http://52.7.12.103/", "_blank", "noopener,noreferrer")
-            }
+            onOnboardingClick={() => setOnboardingOpen(true)}
+            onGatewayTwinClick={() => setGwTwinOpen(true)}
             onVideoClick={() => setVideoOpen(true)}
             predAlertCount={predAlertCount}
           />
@@ -362,8 +367,8 @@ const Dashboard: React.FC = () => {
       </div>
 
       <Suspense fallback={null}>
-        {/* Langgraph agent — always mounted so its own floating button is
-            available in the corner. Talks to VITE_LANGGRAPH_API_BASE. */}
+        {/* External agentic-AI assistant. It sends only user-submitted prompts
+            and remains separate from the governed Bedrock insight routes. */}
         <LanggraphAgentPanel />
         {notifOpen && (
           <NotificationDrawer
@@ -432,6 +437,18 @@ const Dashboard: React.FC = () => {
           </Suspense>
         </IntegrationModal>
       )}
+      {onboardingOpen && (
+        <IntegrationModal
+          open
+          onClose={() => setOnboardingOpen(false)}
+          title="Gateway Onboarding"
+        >
+          <Suspense fallback={<IntegrationLoading />}>
+            <GatewaySourceSelector value={networkBranchId} onChange={setNetworkBranchId} />
+            <OnboardingPage branchId={networkBranchId} />
+          </Suspense>
+        </IntegrationModal>
+      )}
       {videoOpen && (
         <IntegrationModal
           open={videoOpen}
@@ -441,6 +458,20 @@ const Dashboard: React.FC = () => {
           <Suspense fallback={<IntegrationLoading />}>
             <VideoAnalyticsPage />
           </Suspense>
+        </IntegrationModal>
+      )}
+      {/* Gateway Digital Twin — local embedded widget (public/widgets/gw-twin,
+          built from the GW-Operational-Twin repo). Fully self-contained:
+          in-browser TR-181 simulator, no backend, no external host. */}
+      {gwTwinOpen && (
+        <IntegrationModal
+          open={gwTwinOpen}
+          onClose={() => setGwTwinOpen(false)}
+          title="Gateway Digital Twin"
+        >
+          <div style={{ height: "78vh", minHeight: 480, borderRadius: 12, overflow: "hidden" }}>
+            <GatewayTwinEmbed />
+          </div>
         </IntegrationModal>
       )}
     </div>
