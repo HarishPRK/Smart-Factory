@@ -96,9 +96,9 @@ function applyStatus(s: StatusPayload) {
   emit();
 }
 
-function markDisconnected() {
-  if (!current.connected) return;
-  current = { ...current, connected: false };
+function markDisconnected(reason = 'Telemetry backend unavailable') {
+  if (!current.connected && current.lastError === reason) return;
+  current = { ...current, connected: false, lastError: reason };
   emit();
 }
 
@@ -108,9 +108,18 @@ function startFeed() {
   // Hydrate from /snapshot first so we have data immediately.
   snapAbort = new AbortController();
   fetch('/api/ipsec/snapshot', { signal: snapAbort.signal })
-    .then((r) => r.json() as Promise<SnapshotPayload>)
+    .then(async (r) => {
+      const contentType = r.headers.get('content-type') ?? '';
+      if (!r.ok || !contentType.includes('application/json')) {
+        throw new Error(`IPsec snapshot unavailable (HTTP ${r.status})`);
+      }
+      return r.json() as Promise<SnapshotPayload>;
+    })
     .then(applySnapshot)
-    .catch(() => { /* swallow — stream will recover */ });
+    .catch((error: unknown) => {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      markDisconnected(error instanceof Error ? error.message : 'IPsec snapshot unavailable');
+    });
 
   // Live updates via SSE.
   const source = new EventSource('/api/ipsec/stream');
@@ -125,8 +134,9 @@ function startFeed() {
   source.addEventListener('status', (e) => {
     try { applyStatus(JSON.parse((e as MessageEvent).data)); } catch { /* ignore */ }
   });
-  // EventSource auto-reconnects; just mark disconnected for now.
-  source.onerror = () => markDisconnected();
+  // EventSource auto-reconnects. Surface the initial failure instead of
+  // leaving the dashboard on an indefinite, unactionable "Connecting…" pill.
+  source.onerror = () => markDisconnected('Telemetry stream unavailable');
 }
 
 function stopFeed() {

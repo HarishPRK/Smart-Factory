@@ -99,6 +99,23 @@ sudo systemctl enable --now cloud-bridge
 sudo journalctl -u cloud-bridge -f      # should show "Subscribed to plc/#"
 ```
 
+### Optional GW Operational Twin live overlay
+
+The embedded Twin uses a separate read-only SSE bridge so its DeviceInfo
+samples never enter or reshape the existing `/ws` factory stream. Install the
+repository's `deploy/gateway-twin-bridge.service` after copying
+`scripts/gateway-twin-bridge.mjs` to the EC2 checkout:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now gateway-twin-bridge
+sudo journalctl -u gateway-twin-bridge -f
+```
+
+The nginx config exposes it at `/api/gateway-logs/stream`; the EC2 role needs
+only `iot:Subscribe` on `topicfilter/prplos/deviceinfo/*` in addition to its
+existing factory permissions. `iot:Receive` remains read-only.
+
 ## Step 4 — Build & deploy the frontend
 
 The frontend talks to the cloud-bridge through nginx's `/ws`. Build with:

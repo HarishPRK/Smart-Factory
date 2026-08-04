@@ -1,6 +1,6 @@
 import type { AIAnalysisResult, ParameterPrediction, RULEstimate, HealthScore } from "../types/predictions";
 
-const AI_URL = import.meta.env.VITE_AI_PROXY_URL as string | undefined ?? "http://localhost:9002";
+const AI_URL = import.meta.env.VITE_AI_PROXY_URL as string | undefined ?? "/api/factory-ai";
 
 export async function requestAIAnalysis(
   predictions: ParameterPrediction[],
@@ -81,7 +81,7 @@ Respond with ONLY a JSON object (no markdown, no code blocks):
       healthScore: healthScore.overall,
       riskLevel: "medium",
       summary: `AI analysis unavailable: ${(err as Error).message}. Based on client-side analysis, system health is ${healthScore.overall}/100.`,
-      recommendations: ["Ensure AI proxy is running on port 9002", "Run: npm run ai-proxy"],
+      recommendations: ["Verify that the governed Bedrock service is available"],
       patterns: [],
       timestamp: Date.now(),
     };

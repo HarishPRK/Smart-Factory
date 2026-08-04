@@ -1,0 +1,17 @@
+[Unit]
+Description=Smart Factory GW Operational Twin telemetry bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=/opt/smart-factory
+ExecStart=/usr/bin/node scripts/gateway-twin-bridge.mjs
+Restart=always
+RestartSec=3
+Environment=AWS_REGION=us-east-1
+Environment=GATEWAY_TWIN_STREAM_HOST=127.0.0.1
+Environment=GATEWAY_TWIN_STREAM_PORT=46121
+User=ec2-user
+
+[Install]
+WantedBy=multi-user.target

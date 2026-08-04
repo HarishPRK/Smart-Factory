@@ -1,7 +1,7 @@
 /**
- * LLM client factory — picks between the direct Anthropic API and AWS Bedrock
- * based on env vars. Both clients share the same Messages API surface, so the
- * agent loop stays identical regardless of provider.
+ * Governed LLM client factory. Bedrock is the default and only provider allowed
+ * in production. Direct Anthropic is available solely for explicit local
+ * development with ALLOW_DIRECT_ANTHROPIC=true.
  *
  * Bedrock supports two auth styles:
  *   1. Traditional SigV4 — AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY (+ optional session token)
@@ -9,9 +9,8 @@
  *      AWS's newer convenience auth introduced in 2025. Decodes server-side
  *      into temporary AWS credentials.
  *
- * Both styles are supported here. If ANTHROPIC_API_KEY contains a value that
- * starts with "bedrock-api-key-", we auto-detect and route it to Bedrock so
- * the server "just works" without further config.
+ * Bedrock auth supports either temporary/default-chain AWS credentials or a
+ * Bedrock bearer token. Production should use an IAM role/default chain.
  */
 import Anthropic from '@anthropic-ai/sdk';
 import AnthropicBedrock from '@anthropic-ai/bedrock-sdk';
@@ -50,22 +49,40 @@ export function makeLLM(): LLMSetup {
     (isBedrockApiKey(process.env.ANTHROPIC_API_KEY) ? process.env.ANTHROPIC_API_KEY : undefined);
 
   // ── Pick a provider ──
-  // Explicit LLM_PROVIDER wins. Otherwise, presence of a Bedrock bearer auto-routes
-  // to Bedrock; everything else defaults to Anthropic.
+  // Fail closed: Bedrock is the default. Direct Anthropic requires two explicit
+  // local-development switches and is never allowed when NODE_ENV=production.
   const explicit = (process.env.LLM_PROVIDER ?? '').toLowerCase();
-  let provider: Provider =
-    explicit === 'bedrock' ? 'bedrock' :
-    explicit === 'anthropic' ? 'anthropic' :
-    (bedrockBearer ? 'bedrock' : 'anthropic');
+  const production = process.env.NODE_ENV === 'production';
+  const directAnthropicAllowed =
+    !production && process.env.ALLOW_DIRECT_ANTHROPIC === 'true';
+  const provider: Provider = explicit === 'anthropic' ? 'anthropic' : 'bedrock';
 
-  // If they set LLM_PROVIDER=anthropic but pasted a Bedrock key, override and tell them.
-  if (provider === 'anthropic' && isBedrockApiKey(process.env.ANTHROPIC_API_KEY)) {
-    provider = 'bedrock';
+  if (provider === 'anthropic' && !directAnthropicAllowed) {
+    return {
+      provider,
+      client: null,
+      model: process.env.AGENT_MODEL ?? DEFAULT_MODELS.anthropic,
+      reason:
+        'Direct Anthropic is disabled by governance policy. Use LLM_PROVIDER=bedrock, ' +
+        'or explicitly opt in for local development with ALLOW_DIRECT_ANTHROPIC=true.',
+    };
   }
 
   const model = process.env.AGENT_MODEL ?? DEFAULT_MODELS[provider];
 
   if (provider === 'bedrock') {
+    const approvedModels = (process.env.BEDROCK_APPROVED_MODELS ?? DEFAULT_MODELS.bedrock)
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
+    if (!approvedModels.includes(model)) {
+      return {
+        provider,
+        client: null,
+        model,
+        reason: `Model ${model} is not in BEDROCK_APPROVED_MODELS.`,
+      };
+    }
     const region = process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION ?? 'us-east-1';
 
     // ── Bearer token auth (newer: Bedrock API keys) ──

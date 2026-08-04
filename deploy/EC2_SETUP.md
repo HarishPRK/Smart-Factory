@@ -65,7 +65,16 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-## Step 4: Run the Deploy Script
+## Step 4: Attach AWS IoT Permissions
+
+Attach an instance profile to the EC2 instance that permits the IoT actions
+used by the integration API (`iot:Connect`, `iot:Subscribe`, `iot:Receive`, and
+`iot:Publish`) for the configured endpoint and topics. The API service uses the
+instance profile by default, so long-lived access keys are not required.
+The least-privilege policy used by the Smart Factory instance is checked in as
+[`smart-factory-ec2-policy.json`](smart-factory-ec2-policy.json).
+
+## Step 5: Run the Deploy Script
 
 Back on your **local machine** (Git Bash or WSL on Windows):
 
@@ -74,7 +83,11 @@ chmod +x deploy.sh
 ./deploy.sh ec2-user@<EC2-PUBLIC-IP> ~/.ssh/your-key.pem
 ```
 
-## Step 5: Verify
+The script deploys the static site, installs the integration API under
+`/opt/smart-factory`, starts `smart-factory-server.service`, installs the nginx
+proxy configuration, and verifies `/api/health` before reloading nginx.
+
+## Step 6: Verify
 
 Open `http://<EC2-PUBLIC-IP>` in your browser. The Smart Factory dashboard should load.
 
@@ -86,4 +99,6 @@ Open `http://<EC2-PUBLIC-IP>` in your browser. The Smart Factory dashboard shoul
 | 403 Forbidden | Check file ownership: `sudo chown -R nginx:nginx /var/www/smart-factory/` |
 | Blank page | Check browser console; verify assets load from `/assets/` |
 | Nginx config error | Run `sudo nginx -t` for details |
+| Dynamic Failover reports backend unavailable | Run `sudo systemctl status smart-factory-server` and `sudo journalctl -u smart-factory-server -n 100` |
+| API is healthy but no IPsec payload appears | Verify the EC2 instance role and look for `[ipsec] connected` in the service journal |
 | `npm run build` fails locally | Ensure Node.js >= 18 is installed |

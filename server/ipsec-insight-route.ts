@@ -17,12 +17,30 @@
 import type { Express } from 'express';
 import { ipsecSource } from './ipsecSource.js';
 import { makeLLM } from './llm.js';
+import {
+  logAIAudit,
+  newAIRequestId,
+  sanitizeIpsecSnapshot,
+} from './ai-governance.js';
 
 const llm = makeLLM();
 
 export function registerIpsecInsightRoute(app: Express): void {
   app.post('/api/ipsec/insight', async (_req, res) => {
-    if (!llm.client) {
+    const startedAt = Date.now();
+    const requestId = newAIRequestId();
+    res.setHeader('X-AI-Request-ID', requestId);
+    if (!llm.client || llm.provider !== 'bedrock') {
+      logAIAudit({
+        requestId,
+        route: '/api/ipsec/insight',
+        useCase: 'ipsec-health',
+        provider: llm.provider,
+        model: llm.model,
+        outcome: 'blocked',
+        startedAt,
+        reason: llm.reason ?? 'Bedrock client unavailable',
+      });
       res.status(503).json({
         error: `LLM not configured (${llm.provider}): ${llm.reason ?? 'unknown'}.`,
       });
@@ -62,10 +80,11 @@ Style — be ruthlessly brief:
 
 Priority: active path health → underlay availability → concerning signs (latency >150ms, loss >3%, unreachable tunnels).`;
 
-    const userMessage = `Latest IPsec gateway telemetry (decoded from the live protobuf feed). Server received it ${Math.round((Date.now() - snap.receivedAt) / 1000)} s ago.
+    const sanitized = sanitizeIpsecSnapshot(snap);
+    const userMessage = `Latest minimized IPsec gateway telemetry (decoded from the live protobuf feed). Server received it ${Math.round((Date.now() - snap.receivedAt) / 1000)} s ago.
 
 \`\`\`json
-${JSON.stringify(snap, null, 2)}
+${JSON.stringify(sanitized.value, null, 2)}
 \`\`\`
 
 Analyze the current state.`;
@@ -77,15 +96,46 @@ Analyze the current state.`;
         system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
         messages: [{ role: 'user', content: [{ type: 'text', text: userMessage }] }],
       });
+      let outputChars = 0;
       for (const block of response.content) {
         if (block.type === 'text' && block.text.trim()) {
+          outputChars += block.text.length;
           emit('chunk', { text: block.text });
         }
       }
-      emit('done', { usage: response.usage });
+      logAIAudit({
+        requestId,
+        route: '/api/ipsec/insight',
+        useCase: 'ipsec-health',
+        provider: llm.provider,
+        model: llm.model,
+        outcome: 'success',
+        startedAt,
+        sourceTimestamp: snap.receivedAt,
+        removedFields: sanitized.removedFields,
+        inputChars: userMessage.length,
+        outputChars,
+        usage: response.usage,
+      });
+      emit('done', {
+        usage: response.usage,
+        governance: { advisoryOnly: true, provider: llm.provider, requestId },
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      emit('error', { message: msg });
+      logAIAudit({
+        requestId,
+        route: '/api/ipsec/insight',
+        useCase: 'ipsec-health',
+        provider: llm.provider,
+        model: llm.model,
+        outcome: 'error',
+        startedAt,
+        sourceTimestamp: snap.receivedAt,
+        removedFields: sanitized.removedFields,
+        reason: msg,
+      });
+      emit('error', { message: msg, requestId });
     } finally {
       clearInterval(hb);
       if (!res.writableEnded) res.end();

@@ -12,7 +12,7 @@ interface Message {
   content: string;
 }
 
-const AI_PROXY_URL = "http://localhost:9002/chat";
+const AI_PROXY_URL = "/api/factory-ai/chat";
 
 const ANALOG_PROPS: { id: SiteWiseProperty; label: string; unit: string }[] = [
   { id: "voltage", label: "Voltage", unit: "V" },
@@ -194,7 +194,7 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({ open, onClose }) => {
         {
           role: "assistant",
           content:
-            "Connection to AI proxy failed. Make sure `npm run ai-proxy` is running.",
+            "Governed Bedrock AI is currently unavailable.",
         },
       ]);
     } finally {
@@ -243,7 +243,7 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({ open, onClose }) => {
                   Factory AI Assistant
                 </div>
                 <div className="text-[10px] text-cyan-300/50">
-                  Powered by Claude · Live PLC Context
+                  AWS Bedrock · Advisory only · Live PLC context
                 </div>
               </div>
             </div>
@@ -391,7 +391,7 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({ open, onClose }) => {
               </button>
             </div>
             <div className="text-[9px] text-blue-300/20 text-center mt-2">
-              AI reads live PLC data with each message
+              Advisory only · A minimized PLC/SiteWise snapshot is sent with each message
             </div>
           </div>
         </div>

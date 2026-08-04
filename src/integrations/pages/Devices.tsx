@@ -75,7 +75,7 @@ export function DevicesPage({ domain, branchId }: { domain: 'IT' | 'OT'; branchI
   const [refreshing, setRefreshing] = useState(false);
   const [powerOverrides, setPowerOverrides] = useState<Record<string, boolean>>({});
   const [fallbackDomains, setFallbackDomains] = useState<Record<string, 'IT' | 'OT'>>({});
-  const { devices: liveDevices, loaded, source, connected } = useDevices();
+  const { devices: liveDevices, loaded, source, connected, lastInventoryAt } = useDevices();
   const branchSource = BRANCH_TO_IPSEC_SOURCE[branchId];
 
   useEffect(() => {
@@ -156,6 +156,8 @@ export function DevicesPage({ domain, branchId }: { domain: 'IT' | 'OT'; branchI
       <AiInsightCard
         topic={domain === 'IT' ? 'it-devices' : 'ot-devices'}
         subtitle={`Bedrock analysis of the current ${domain} inventory`}
+        sourceLabel={source === 'gateway' ? 'live gateway inventory' : 'simulated inventory'}
+        sourceTimestamp={lastInventoryAt}
         data={{
           domain,
           total: list.length,

@@ -1,0 +1,21 @@
+[Unit]
+Description=Smart Factory integration API and AWS IoT telemetry subscriber
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/smart-factory
+ExecStart=/usr/bin/npm run start:server
+Restart=always
+RestartSec=3
+Environment=NODE_ENV=production
+Environment=PORT=3001
+Environment=AWS_REGION=us-east-1
+Environment=AWS_USE_INSTANCE_ROLE=1
+Environment=IOT_IPSEC_TOPICS=rdk/ipsec/metrics,prpl/ipsec/metrics
+EnvironmentFile=-/opt/smart-factory/.env
+User=ec2-user
+
+[Install]
+WantedBy=multi-user.target

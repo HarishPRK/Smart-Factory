@@ -34,6 +34,7 @@ import { registerIpsecInsightRoute } from './ipsec-insight-route.js';
 import { registerAppRouteRoutes } from './app-route-routes.js';
 import { registerDeviceRoutes } from './device-routes.js';
 import { registerGenericInsightRoute } from './generic-insight-route.js';
+import { registerFactoryAIRoute } from './factory-ai-route.js';
 import { registerVideoRoutes } from './video-routes.js';
 import { ipsecSource } from './ipsecSource.js';
 
@@ -48,6 +49,7 @@ registerIpsecInsightRoute(app);
 registerAppRouteRoutes(app);
 registerDeviceRoutes(app);
 registerGenericInsightRoute(app);
+registerFactoryAIRoute(app);
 registerVideoRoutes(app);
 
 const PORT = Number(process.env.PORT ?? 3001);

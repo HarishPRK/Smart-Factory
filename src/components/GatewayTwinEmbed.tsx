@@ -69,6 +69,10 @@ export interface GatewayTwinEmbedProps {
 }
 
 const DEFAULT_SRC = '/widgets/gw-twin/app/index.html'
+// The widget entry document is intentionally versioned so an already-open
+// Smart Factory session cannot resurrect an older cached iframe bundle after
+// a Twin deployment. Hashed JS/CSS assets remain immutable once selected.
+const TWIN_EMBED_BUILD = 'live-20260804-rails'
 
 export const GatewayTwinEmbed = forwardRef<GatewayTwinHandle, GatewayTwinEmbedProps>(
   function GatewayTwinEmbed(props, ref) {
@@ -84,6 +88,7 @@ export const GatewayTwinEmbed = forwardRef<GatewayTwinHandle, GatewayTwinEmbedPr
     // initial state travels in the URL; runtime changes go over postMessage
     const url = useMemo(() => {
       const q = new URLSearchParams({ embed: '1' })
+      q.set('v', TWIN_EMBED_BUILD)
       if (scenario) q.set('scenario', scenario)
       if (explode !== undefined) q.set('explode', String(explode))
       if (xray) q.set('mode', 'xray')
@@ -108,6 +113,22 @@ export const GatewayTwinEmbed = forwardRef<GatewayTwinHandle, GatewayTwinEmbedPr
       }
       window.addEventListener('message', onMessage)
       return () => window.removeEventListener('message', onMessage)
+    }, [])
+
+    // Fullscreen is requested on the host wrapper, not the iframe document.
+    // Forward that presentation state so the Twin can pull its camera back
+    // without disturbing its live telemetry stream or reloading the bundle.
+    useEffect(() => {
+      const syncPresentation = () => {
+        iframeRef.current?.contentWindow?.postMessage({
+          target: 'gw-twin',
+          type: 'set-presentation',
+          payload: { active: Boolean(document.fullscreenElement) },
+        }, '*')
+      }
+      document.addEventListener('fullscreenchange', syncPresentation)
+      syncPresentation()
+      return () => document.removeEventListener('fullscreenchange', syncPresentation)
     }, [])
 
     useImperativeHandle(ref, () => {

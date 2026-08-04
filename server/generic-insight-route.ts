@@ -1,5 +1,10 @@
 import type { Express } from 'express';
 import { makeLLM } from './llm.js';
+import {
+  logAIAudit,
+  newAIRequestId,
+  sanitizeInsightPayload,
+} from './ai-governance.js';
 
 const llm = makeLLM();
 
@@ -41,7 +46,20 @@ ${INSIGHT_STYLE}`,
 
 export function registerGenericInsightRoute(app: Express): void {
   app.post('/api/insight', async (req, res) => {
-    if (!llm.client) {
+    const startedAt = Date.now();
+    const requestId = newAIRequestId();
+    res.setHeader('X-AI-Request-ID', requestId);
+    if (!llm.client || llm.provider !== 'bedrock') {
+      logAIAudit({
+        requestId,
+        route: '/api/insight',
+        useCase: String(req.body?.topic ?? 'unknown'),
+        provider: llm.provider,
+        model: llm.model,
+        outcome: 'blocked',
+        startedAt,
+        reason: llm.reason ?? 'Bedrock client unavailable',
+      });
       res.status(503).json({ error: `LLM not configured (${llm.provider}): ${llm.reason ?? 'unknown'}.` });
       return;
     }
@@ -76,8 +94,10 @@ export function registerGenericInsightRoute(app: Express): void {
     }, 15_000);
     res.on('close', () => clearInterval(hb));
 
-    // Keep the JSON we send to the model small — truncate if huge.
-    const dataJson = JSON.stringify(data, null, 2);
+    // Minimize and redact before serialization. The model never receives the
+    // caller's arbitrary object directly.
+    const sanitized = sanitizeInsightPayload(topic, data);
+    const dataJson = JSON.stringify(sanitized.value, null, 2);
     const trimmed = dataJson.length > 16_000
       ? dataJson.slice(0, 16_000) + '\n\n…[truncated for brevity]'
       : dataJson;
@@ -92,18 +112,48 @@ export function registerGenericInsightRoute(app: Express): void {
         system:   [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
         messages: [{ role: 'user', content: [{ type: 'text', text: userBlock }] }],
       });
+      let outputChars = 0;
       for (const block of response.content) {
         if (block.type === 'text' && block.text.trim()) {
+          outputChars += block.text.length;
           emit('chunk', { text: block.text });
         }
       }
-      emit('done', { usage: response.usage, topic });
+      logAIAudit({
+        requestId,
+        route: '/api/insight',
+        useCase: topic,
+        provider: llm.provider,
+        model: llm.model,
+        outcome: 'success',
+        startedAt,
+        removedFields: sanitized.removedFields,
+        inputChars: trimmed.length,
+        outputChars,
+        usage: response.usage,
+      });
+      emit('done', {
+        usage: response.usage,
+        topic,
+        governance: { advisoryOnly: true, provider: llm.provider, requestId },
+      });
     } catch (err) {
-      emit('error', { message: err instanceof Error ? err.message : String(err) });
+      const reason = err instanceof Error ? err.message : String(err);
+      logAIAudit({
+        requestId,
+        route: '/api/insight',
+        useCase: topic,
+        provider: llm.provider,
+        model: llm.model,
+        outcome: 'error',
+        startedAt,
+        removedFields: sanitized.removedFields,
+        reason,
+      });
+      emit('error', { message: reason, requestId });
     } finally {
       clearInterval(hb);
       if (!res.writableEnded) res.end();
     }
   });
 }
-

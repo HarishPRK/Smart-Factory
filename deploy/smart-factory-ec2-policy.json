@@ -1,0 +1,55 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "iot:Connect",
+      "Resource": [
+        "arn:aws:iot:us-east-1:841019700679:client/cloud-bridge-*",
+        "arn:aws:iot:us-east-1:841019700679:client/ce-server-*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": "iot:Subscribe",
+      "Resource": [
+        "arn:aws:iot:us-east-1:841019700679:topicfilter/plc/*",
+        "arn:aws:iot:us-east-1:841019700679:topicfilter/lorawan/*",
+        "arn:aws:iot:us-east-1:841019700679:topicfilter/prplHome/McKinney/lineA/plc1/*",
+        "arn:aws:iot:us-east-1:841019700679:topicfilter/prplos/deviceinfo/*",
+        "arn:aws:iot:us-east-1:841019700679:topicfilter/rdk/ipsec/metrics",
+        "arn:aws:iot:us-east-1:841019700679:topicfilter/prpl/ipsec/metrics",
+        "arn:aws:iot:us-east-1:841019700679:topicfilter/rdk/path/control/result",
+        "arn:aws:iot:us-east-1:841019700679:topicfilter/prpl/path/control/result",
+        "arn:aws:iot:us-east-1:841019700679:topicfilter/rdk/devices/inventory",
+        "arn:aws:iot:us-east-1:841019700679:topicfilter/prpl/devices/inventory",
+        "arn:aws:iot:us-east-1:841019700679:topicfilter/routing/*",
+        "arn:aws:iot:us-east-1:841019700679:topicfilter/rdk/matter/devices/list",
+        "arn:aws:iot:us-east-1:841019700679:topicfilter/rdk/matter/device/control/result",
+        "arn:aws:iot:us-east-1:841019700679:topicfilter/shellyplus1pm-cc7b5c844c18/events/rpc",
+        "arn:aws:iot:us-east-1:841019700679:topicfilter/shellyplus1pm-cc7b5c844c18/online",
+        "arn:aws:iot:us-east-1:841019700679:topicfilter/shellyplus1pm-cc7b5c844c18/status",
+        "arn:aws:iot:us-east-1:841019700679:topicfilter/shellyplus1pm-cc7b5c844c18/status/switch:0",
+        "arn:aws:iot:us-east-1:841019700679:topicfilter/rdk/shelly/ce-server/rpc"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": "iot:Receive",
+      "Resource": "arn:aws:iot:us-east-1:841019700679:topic/*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "iot:Publish",
+      "Resource": [
+        "arn:aws:iot:us-east-1:841019700679:topic/rdk/path/control",
+        "arn:aws:iot:us-east-1:841019700679:topic/prpl/path/control",
+        "arn:aws:iot:us-east-1:841019700679:topic/rdk/approute/control",
+        "arn:aws:iot:us-east-1:841019700679:topic/prpl/approute/control",
+        "arn:aws:iot:us-east-1:841019700679:topic/rdk/matter/devices/refresh",
+        "arn:aws:iot:us-east-1:841019700679:topic/rdk/matter/device/control",
+        "arn:aws:iot:us-east-1:841019700679:topic/shellyplus1pm-cc7b5c844c18/rpc"
+      ]
+    }
+  ]
+}

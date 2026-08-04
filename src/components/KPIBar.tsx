@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Flame,
   Laptop,
+  PackagePlus,
   Route,
   ServerCog,
   Shuffle,
@@ -125,7 +126,7 @@ interface WorkspaceCardDescriptor {
   accentRgb: string;
   ariaLabel: string;
   icon: LucideIcon;
-  id: WorkspaceVisualizationKind;
+  id: string;
   label: string;
   onClick?: () => void;
   status?: React.ReactNode;
@@ -141,6 +142,7 @@ interface KPIBarProps {
   onRoutingClick?: () => void;
   onItDevicesClick?: () => void;
   onOtDevicesClick?: () => void;
+  onOnboardingClick?: () => void;
   onGatewayTwinClick?: () => void;
   onVideoClick?: () => void;
   predAlertCount?: number;
@@ -154,6 +156,7 @@ const KPIBar: React.FC<KPIBarProps> = ({
   onRoutingClick,
   onItDevicesClick,
   onOtDevicesClick,
+  onOnboardingClick,
   onGatewayTwinClick,
   onVideoClick,
   predAlertCount = 0,
@@ -217,6 +220,7 @@ const KPIBar: React.FC<KPIBarProps> = ({
     onRoutingClick,
     onItDevicesClick,
     onOtDevicesClick,
+    onOnboardingClick,
     onGatewayTwinClick,
     onVideoClick,
   ].filter(Boolean).length + 1;
@@ -294,6 +298,16 @@ const KPIBar: React.FC<KPIBarProps> = ({
       label: "OT devices",
       onClick: onOtDevicesClick,
       visualization: "ot-devices",
+    },
+    {
+      accent: "#fbbf24",
+      accentRgb: "251, 191, 36",
+      ariaLabel: "Open gateway onboarding",
+      icon: PackagePlus,
+      id: "onboarding",
+      label: "Onboarding",
+      onClick: onOnboardingClick,
+      visualization: "gateway",
     },
     {
       accent: "#67e8f9",

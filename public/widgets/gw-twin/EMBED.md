@@ -1,9 +1,10 @@
 # GW Operational Twin — Embeddable Widget
 
 Portable export of the BGW620-700 3D operational digital twin. The widget is
-**fully self-contained**: procedural 3D model, in-browser TR-181 simulator,
-scenarios, LED mirroring, thermal x-ray, exploded view — no backend, no
-external asset fetches, no host-app dependencies. It works in any web app
+**self-contained by default**: procedural 3D model, in-browser TR-181
+simulator, scenarios, LED mirroring, thermal x-ray, exploded view — no
+external asset fetches or host-app dependencies. Hosts can optionally expose a
+same-origin DeviceInfo SSE stream for live overlays. It works in any web app
 (React 18/19, Vite, CRA, Vue, plain HTML) via an iframe plus an optional
 postMessage control API.
 
@@ -96,11 +97,12 @@ Full schema in `twin-manifest.json`. Summary:
 
 ## Notes
 
-- **Telemetry is simulated** (TR-181-shaped, in-browser). The AWS IoT live-log
-  bridge is disabled in this build (`VITE_GATEWAY_LOG_STREAM_URL=off`), so the
-  widget never calls `/api/gateway-logs` inside a host app.
+- **Telemetry has a resilient live/simulated mix**. The widget starts with the
+  in-browser TR-181-shaped simulator, then overlays validated AWS IoT DeviceInfo
+  samples from the host's same-origin `/api/gateway-logs/stream` route when it
+  is available. The simulator continues to provide non-DeviceInfo demo values.
 - Needs WebGL2. On weak/software GL hosts add `lite: true` (`?lite=1`).
-- postMessage uses `targetOrigin '*'` — fine for simulated demo data; tighten
-  before carrying real customer telemetry.
+- postMessage currently uses `targetOrigin '*'`; tighten the origin check before
+  carrying live customer telemetry outside a controlled same-origin host.
 - Trademarks: device branding derives from public FCC exhibits; genericize
   before wider distribution (see the twin repo's README).

@@ -283,7 +283,7 @@ const AIAnalysisTab: React.FC = () => {
         >
           {loading ? "Analyzing..." : "Request AI Analysis"}
         </button>
-        <div className="text-[8px] text-sky-200/30 mt-1">Powered by Claude AI</div>
+        <div className="text-[8px] text-sky-200/30 mt-1">AWS Bedrock · Advisory only · Derived prediction summary</div>
       </div>
 
       {aiAnalysis && (

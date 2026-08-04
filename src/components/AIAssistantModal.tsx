@@ -14,7 +14,7 @@ interface Message {
   timestamp: Date;
 }
 type Tab = "chat" | "insights" | "analytics" | "prompts";
-const AI_PROXY_URL = "http://localhost:9002/chat";
+const AI_PROXY_URL = "/api/factory-ai/chat";
 
 /* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ PLC context builder ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */
 function buildPLCContext(
@@ -232,7 +232,7 @@ const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
           ...prev,
           {
             role: "assistant",
-            content: "Connection failed. Ensure `npm run ai-proxy` is running.",
+            content: "Governed Bedrock AI is currently unavailable.",
             timestamp: new Date(),
           },
         ]);
@@ -965,7 +965,7 @@ const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
                       </div>
                       <div className="flex items-center justify-center gap-3 mt-2.5">
                         <span className="text-[8px] text-blue-300/12">
-                          AI reads live PLC data with each message
+                          Advisory only · Minimized PLC context is sent to AWS Bedrock
                         </span>
                         <span className="text-[8px] text-blue-300/8">
                           &middot;
@@ -1613,7 +1613,7 @@ const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
                 </span>
               </div>
               <div className="text-[8px] text-blue-300/12">
-                Powered by Claude &middot; Real-time factory intelligence
+                Governed by AWS Bedrock &middot; Advisory only
               </div>
             </div>
           </div>

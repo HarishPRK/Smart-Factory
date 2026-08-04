@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy } from "react";
+import React, { useRef, useState, useEffect, Suspense, lazy } from "react";
 import KPIBar from "./KPIBar";
 import ZoneTabs from "./ZoneTabs";
 import workerIcon from "../assets/icons/worker.svg";
@@ -96,6 +96,7 @@ const Dashboard: React.FC = () => {
   const [networkBranchId, setNetworkBranchId] = useState<NetworkBranchId>("b-mck-03");
   const [videoOpen, setVideoOpen] = useState(false);
   const [gwTwinOpen, setGwTwinOpen] = useState(false);
+  const gwTwinFullscreenRef = useRef<HTMLDivElement>(null);
   const [unsOpen, setUnsOpen] = useState(false);
   const predAlertCount = usePredictionStore((s) => s.anomalyAlerts.length);
   const { filteredAlerts } = useFilters();
@@ -468,8 +469,11 @@ const Dashboard: React.FC = () => {
           open={gwTwinOpen}
           onClose={() => setGwTwinOpen(false)}
           title="Gateway Digital Twin"
+          layout="immersive"
+          enableFullscreen
+          fullscreenTargetRef={gwTwinFullscreenRef}
         >
-          <div style={{ height: "78vh", minHeight: 480, borderRadius: 12, overflow: "hidden" }}>
+          <div ref={gwTwinFullscreenRef} style={{ height: "78vh", minHeight: 480, borderRadius: 12, overflow: "hidden" }}>
             <GatewayTwinEmbed />
           </div>
         </IntegrationModal>

@@ -82,6 +82,7 @@ export function ApplicationAwareRoutingPage({ branchId }: { branchId: string }) 
           <AiInsightCard
             topic="app-routing"
             subtitle="Bedrock review of routing policies vs SLA classes"
+            sourceLabel="simulated routing policy dataset"
             data={{
               totals,
               categories: appCategories.map((c) => ({
@@ -545,4 +546,3 @@ function AppFlowDiagram() {
     </svg>
   );
 }
-

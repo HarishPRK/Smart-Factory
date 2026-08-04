@@ -461,7 +461,7 @@ const Drawer: React.FC<DrawerProps> = ({ chat, onClose }) => {
                   boxShadow: "0 0 8px #34d399",
                 }}
               />
-              Live plant data
+              External agent · advisory
             </div>
             <div style={{ display: "flex", gap: "6px" }}>
               <IconButton
@@ -1015,7 +1015,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({
         textTransform: "uppercase",
       }}
     >
-      Ask with live plant context · verify before operational action
+      Prompt sent to the external LangGraph service · verify before operational action
     </div>
 
     <AssistantComposer

@@ -17,13 +17,17 @@ export function AiInsightCard({
   data,
   title = 'AI Insight',
   subtitle = 'Bedrock-powered analysis of this page',
-  autoRun = true,
+  autoRun = false,
+  sourceLabel = 'current page state',
+  sourceTimestamp,
 }: {
   topic: Topic;
   data: unknown;
   title?: string;
   subtitle?: string;
   autoRun?: boolean;
+  sourceLabel?: string;
+  sourceTimestamp?: number;
 }) {
   const c = useThemeColors();
   const [text, setText]           = useState('');
@@ -77,6 +81,9 @@ export function AiInsightCard({
     if (min < 60)   return `${min}m ago`;
     return `${Math.round(min / 60)}h ago`;
   })();
+  const sourceAge = sourceTimestamp
+    ? `${Math.max(0, Math.round((Date.now() - sourceTimestamp) / 1000))}s old`
+    : 'timestamp unavailable';
 
   return (
     <Card
@@ -102,7 +109,7 @@ export function AiInsightCard({
                 <Loader2 size={13} className="spin" />Analyzing…
               </span>
             : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <Sparkles size={13} />Regenerate
+                <Sparkles size={13} />{lastRunAt ? 'Regenerate' : 'Analyze'}
               </span>}
         </button>
       }
@@ -130,9 +137,18 @@ export function AiInsightCard({
           </div>
         ) : (
           <div style={{ color: 'var(--text-muted)' }}>
-            Click <strong style={{ color: 'var(--text)' }}>Regenerate</strong> to analyse the data on this page.
+            Click <strong style={{ color: 'var(--text)' }}>Analyze</strong> to send a minimized snapshot to governed Bedrock AI.
           </div>
         )}
+        <div style={{
+          marginTop: 12,
+          paddingTop: 9,
+          borderTop: '1px solid var(--border)',
+          color: 'var(--text-muted)',
+          fontSize: 10.5,
+        }}>
+          Advisory only · AWS Bedrock · source: {sourceLabel} ({sourceAge})
+        </div>
       </div>
     </Card>
   );

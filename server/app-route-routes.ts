@@ -2,6 +2,7 @@ import express, { type Express } from 'express';
 import { decodeAppRouteCommand, type AppRouteCommand } from './appRouteProto.js';
 import { ipsecSource } from './ipsecSource.js';
 import { makeLLM } from './llm.js';
+import { logAIAudit, newAIRequestId } from './ai-governance.js';
 
 const llm = makeLLM();
 
@@ -75,6 +76,9 @@ export function registerAppRouteRoutes(app: Express): void {
    *  Suggestions are re-validated against the submitted board and gains are
    *  recomputed from the data, so a hallucinated tunnel can't reach the UI. */
   app.post('/api/approute/suggest', async (req, res) => {
+    const startedAt = Date.now();
+    const requestId = newAIRequestId();
+    res.setHeader('X-AI-Request-ID', requestId);
     interface SClient { id: string; name: string; app: string; tunnel: string; weight?: number }
     interface STunnel { ifname: string; family: string; latency_ms: number; loss_percent: number; reachable: boolean; apps: number; load?: number }
     interface OutSuggestion {
@@ -189,12 +193,35 @@ export function registerAppRouteRoutes(app: Express): void {
       return out;
     };
 
-    if (!llm.client) {
+    if (!llm.client || llm.provider !== 'bedrock') {
+      logAIAudit({
+        requestId,
+        route: '/api/approute/suggest',
+        useCase: 'application-route-advisor',
+        provider: llm.provider,
+        model: llm.model,
+        outcome: 'fallback',
+        startedAt,
+        removedFields: ['clients[].id', 'clients[].name'],
+        reason: llm.reason ?? 'Governed Bedrock client unavailable',
+      });
       res.json({ mode: 'heuristic', note: `LLM not configured (${llm.reason ?? 'unknown'})`, suggestions: heuristic() });
       return;
     }
 
     try {
+      // The model receives request-local pseudonyms, never stable client IDs or names.
+      const modelClientMap = new Map<string, SClient>();
+      const modelClients = clients.map((client, index) => {
+        const pseudonym = `client-${index + 1}`;
+        modelClientMap.set(pseudonym, client);
+        return {
+          id: pseudonym,
+          app: client.app,
+          tunnel: client.tunnel,
+          weight: wOf(client),
+        };
+      });
       const prompt =
         'You are the route advisor for an SD-WAN application steering board. Each client runs ONE application ' +
         'pinned to ONE IPsec tunnel. Recommend up to 3 moves that measurably improve application performance. ' +
@@ -206,7 +233,7 @@ export function registerAppRouteRoutes(app: Express): void {
         'Rules: never target an unreachable tunnel; realtime apps (voice/video/Teams/VoIP) care most about latency; ' +
         'bulk/telemetry tolerates 5G; prefer balanced placements over dogpiling; only suggest a move when the NET ' +
         'effective gain is meaningful (>=2ms and roughly >=15%), or the current tunnel is unreachable or clearly lossy. ' +
-        `TUNNELS: ${JSON.stringify(tunnels)} CLIENTS: ${JSON.stringify(clients)} ` +
+        `TUNNELS: ${JSON.stringify(tunnels)} CLIENTS: ${JSON.stringify(modelClients)} ` +
         'Reply with ONLY minified JSON, no prose, no code fences: ' +
         '{"suggestions":[{"client_id":"<id>","to_tunnel":"<ifname>","reason":"<max 160 chars, cite latency AND load numbers>"}]} ' +
         '(empty array if routing is already optimal).';
@@ -224,13 +251,49 @@ export function registerAppRouteRoutes(app: Express): void {
       const text = (msg.content ?? []).map((b) => (b.type === 'text' ? b.text ?? '' : '')).join('');
       const stripped = text.replace(/^[\s\S]*?(\{)/, '$1').replace(/\}[^}]*$/, '}');
       const parsed = JSON.parse(stripped) as { suggestions?: unknown };
-      const suggestions = validate(Array.isArray(parsed.suggestions) ? parsed.suggestions as Record<string, unknown>[] : []);
-      res.json({ mode: 'ai', model: llm.model, suggestions });
+      const rawSuggestions = Array.isArray(parsed.suggestions)
+        ? parsed.suggestions as Record<string, unknown>[]
+        : [];
+      const mappedSuggestions = rawSuggestions.map((suggestion) => {
+        const sourceClient = typeof suggestion.client_id === 'string'
+          ? modelClientMap.get(suggestion.client_id)
+          : undefined;
+        return { ...suggestion, client_id: sourceClient?.id };
+      });
+      const suggestions = validate(mappedSuggestions);
+      logAIAudit({
+        requestId,
+        route: '/api/approute/suggest',
+        useCase: 'application-route-advisor',
+        provider: llm.provider,
+        model: llm.model,
+        outcome: 'success',
+        startedAt,
+        removedFields: ['clients[].id', 'clients[].name'],
+        inputChars: prompt.length,
+        outputChars: text.length,
+      });
+      res.json({
+        mode: 'ai',
+        model: llm.model,
+        suggestions,
+        governance: { advisoryOnly: true, provider: llm.provider, requestId },
+      });
     } catch (err) {
       // eslint-disable-next-line no-console
       console.warn('[approute-suggest] LLM path failed, serving heuristic:', err instanceof Error ? err.message : err);
+      logAIAudit({
+        requestId,
+        route: '/api/approute/suggest',
+        useCase: 'application-route-advisor',
+        provider: llm.provider,
+        model: llm.model,
+        outcome: 'fallback',
+        startedAt,
+        removedFields: ['clients[].id', 'clients[].name'],
+        reason: err instanceof Error ? err.message : String(err),
+      });
       res.json({ mode: 'heuristic', note: 'AI unavailable — deterministic comparison shown', suggestions: heuristic() });
     }
   });
 }
-
