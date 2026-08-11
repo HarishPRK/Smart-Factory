@@ -159,15 +159,30 @@ function StreamTile({ stream }: { stream: VideoStream }) {
   }
 
   async function stopStream() {
-    if (!stream.stopUrl || isStopping) return;
+    if (isStopping) return;
     setIsStopping(true);
+
+    // Tear down the browser's MJPEG request before waiting for the optional
+    // upstream stop API. This keeps a feed that is stuck before its first
+    // frame from continuing to consume a proxy/upstream connection.
+    closeStream();
+
+    if (!stream.stopUrl) {
+      push({
+        kind: 'info',
+        title: `${stream.name} stopped`,
+        detail: 'The video connection was closed. No upstream stop API is configured for this feed.',
+      });
+      setIsStopping(false);
+      return;
+    }
+
     try {
       const response = await fetch(stream.stopUrl, { method: 'POST' });
       if (!response.ok) {
         const detail = await response.text();
         throw new Error(detail || `Stop API returned ${response.status}`);
       }
-      closeStream();
       push({
         kind: 'success',
         title: `${stream.name} stopped`,
@@ -176,8 +191,10 @@ function StreamTile({ stream }: { stream: VideoStream }) {
     } catch (error) {
       push({
         kind: 'error',
-        title: `Could not stop ${stream.name}`,
-        detail: error instanceof Error ? error.message : String(error),
+        title: `${stream.name} disconnected`,
+        detail: `The video connection was closed, but the upstream pipeline did not confirm the stop: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       });
     } finally {
       setIsStopping(false);
@@ -256,36 +273,26 @@ function StreamTile({ stream }: { stream: VideoStream }) {
             LIVE
           </div>
         )}
-        {isLive && loaded && (stream.stopUrl || isFullscreen) && (
-          <div className="va-stream-actions">
-            {stream.stopUrl && (
-              <button
-                className="va-stream-action va-stop-feed"
-                onClick={stopStream}
-                disabled={isStopping}
-                title={`Stop ${stream.name} at the inference node`}
-              >
-                {isStopping ? <Loader2 size={16} className="spin" /> : <Square size={14} fill="currentColor" />}
-                {isStopping ? 'Stopping…' : 'Stop feed'}
-              </button>
-            )}
-            {isFullscreen && (
-              <button
-                className="va-stream-action"
-                onClick={closeStream}
-                title="Exit fullscreen (ESC)"
-                aria-label="Exit fullscreen"
-              >
-                <Minimize2 size={16} />
-                Exit fullscreen
-              </button>
-            )}
-          </div>
-        )}
       </div>
 
-      {!isLive && (
+      {isLive || isStopping ? (
         <button
+          type="button"
+          className="va-stop-btn"
+          onClick={stopStream}
+          disabled={isStopping}
+          aria-busy={isStopping}
+          aria-label={isStopping ? `Stopping ${stream.name} feed` : `Stop ${stream.name} feed`}
+          title={stream.stopUrl
+            ? `Disconnect ${stream.name} and stop its upstream pipeline`
+            : `Disconnect ${stream.name}`}
+        >
+          {isStopping ? <Loader2 size={16} className="spin" /> : <Square size={14} fill="currentColor" />}
+          {isStopping ? 'Stopping…' : 'Stop feed'}
+        </button>
+      ) : (
+        <button
+          type="button"
           className="va-open-btn"
           onClick={openStream}
           title={`Loads ${stream.url} and goes fullscreen`}

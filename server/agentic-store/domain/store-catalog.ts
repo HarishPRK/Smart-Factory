@@ -1,0 +1,286 @@
+import {
+  AGENTIC_STORE_SCHEMA_VERSION,
+  type SensorBinding,
+  type StoreManifest,
+  type TwinEntityDefinition,
+} from "../../../packages/agentic-store-contracts/src/index.js";
+
+const numberProperty = (
+  key: string,
+  label: string,
+  unit?: string,
+  min?: number,
+  max?: number,
+) => ({ key, label, valueType: "number" as const, unit, min, max });
+
+const booleanProperty = (key: string, label: string) => ({
+  key,
+  label,
+  valueType: "boolean" as const,
+});
+
+const stringProperty = (key: string, label: string) => ({
+  key,
+  label,
+  valueType: "string" as const,
+});
+
+export function createStoreManifest(storeId = "store-001"): StoreManifest {
+  const entities: TwinEntityDefinition[] = [
+    {
+      id: storeId,
+      storeId,
+      kind: "STORE",
+      name: "Agentic Market One",
+      description: "A local-first, continuously orchestrated retail store.",
+      sceneNodeId: "store-root",
+      capabilities: ["occupancy", "traffic", "energy", "orchestration"],
+      properties: [
+        numberProperty("occupancy.count", "Current shoppers", "people", 0),
+        numberProperty("traffic.entriesPerMinute", "Entry rate", "people/min", 0),
+        numberProperty("energy.totalKw", "Store demand", "kW", 0),
+        stringProperty("operations.mode", "Operating mode"),
+      ],
+    },
+    ...zoneEntities(storeId),
+    {
+      id: "entry-counter-01",
+      storeId,
+      parentId: "zone-entrance",
+      zoneId: "zone-entrance",
+      kind: "ENTRY",
+      name: "Main entrance",
+      sceneNodeId: "entry-main",
+      spatial: { x: 0, y: 0, z: 10.5, width: 4, depth: 1 },
+      capabilities: ["footfall", "presence"],
+      properties: [
+        numberProperty("traffic.entriesPerMinute", "Entry rate", "people/min", 0),
+        numberProperty("traffic.exitsPerMinute", "Exit rate", "people/min", 0),
+      ],
+    },
+    {
+      id: "shelf-produce-01",
+      storeId,
+      parentId: "zone-produce",
+      zoneId: "zone-produce",
+      kind: "SHELF",
+      name: "Fresh produce island",
+      sceneNodeId: "shelf-produce-island",
+      spatial: { x: -6, y: 0.7, z: 4.5, width: 3.4, depth: 2.2, height: 1.4 },
+      capabilities: ["inventory", "restock", "availability"],
+      properties: [
+        numberProperty("inventory.fillRatio", "Shelf fill", "ratio", 0, 1),
+        numberProperty("inventory.unitsOnShelf", "Units on shelf", "items", 0),
+        numberProperty("inventory.backroomUnits", "Backroom units", "items", 0),
+        booleanProperty("commerce.available", "Available for sale"),
+      ],
+      metadata: { productFamily: "fresh-produce", planogramId: "produce-island-v1" },
+    },
+    {
+      id: "shelf-beverage-01",
+      storeId,
+      parentId: "zone-grocery",
+      zoneId: "zone-grocery",
+      kind: "SHELF",
+      name: "Beverage aisle",
+      sceneNodeId: "shelf-beverage-01",
+      spatial: { x: -1, y: 0.9, z: 1.8, width: 5, depth: 0.8, height: 1.8 },
+      capabilities: ["inventory", "restock", "availability"],
+      properties: [
+        numberProperty("inventory.fillRatio", "Shelf fill", "ratio", 0, 1),
+        numberProperty("inventory.unitsOnShelf", "Units on shelf", "items", 0),
+        numberProperty("inventory.backroomUnits", "Backroom units", "items", 0),
+        booleanProperty("commerce.available", "Available for sale"),
+      ],
+      metadata: { productFamily: "beverages", planogramId: "beverage-wall-v2" },
+    },
+    {
+      id: "cooler-dairy-01",
+      storeId,
+      parentId: "zone-chilled",
+      zoneId: "zone-chilled",
+      kind: "EQUIPMENT",
+      name: "Dairy cooler",
+      sceneNodeId: "cooler-dairy-01",
+      spatial: { x: 6.7, y: 1.3, z: 3, rotationY: -1.57, width: 5, depth: 1.2, height: 2.6 },
+      capabilities: ["cold-chain", "maintenance", "availability"],
+      properties: [
+        numberProperty("thermal.airTemperatureC", "Air temperature", "°C", -10, 20),
+        booleanProperty("access.doorOpen", "Door open"),
+        numberProperty("electrical.powerKw", "Power", "kW", 0),
+        stringProperty("operations.mode", "Operating mode"),
+        booleanProperty("commerce.available", "Contents available"),
+      ],
+      metadata: { equipmentClass: "refrigerated-display-case" },
+    },
+    {
+      id: "freezer-frozen-01",
+      storeId,
+      parentId: "zone-chilled",
+      zoneId: "zone-chilled",
+      kind: "EQUIPMENT",
+      name: "Frozen foods freezer",
+      sceneNodeId: "freezer-frozen-01",
+      spatial: { x: 6.7, y: 1.1, z: -1.5, rotationY: -1.57, width: 4, depth: 1.2, height: 2.2 },
+      capabilities: ["cold-chain", "maintenance"],
+      properties: [
+        numberProperty("thermal.airTemperatureC", "Air temperature", "°C", -30, 5),
+        booleanProperty("access.doorOpen", "Door open"),
+        numberProperty("electrical.powerKw", "Power", "kW", 0),
+        stringProperty("operations.mode", "Operating mode"),
+      ],
+    },
+    {
+      id: "checkout-cluster-01",
+      storeId,
+      parentId: "zone-checkout",
+      zoneId: "zone-checkout",
+      kind: "CHECKOUT",
+      name: "Checkout cluster",
+      sceneNodeId: "checkout-cluster-01",
+      spatial: { x: -3.8, y: 0, z: -7.2, width: 6, depth: 3 },
+      capabilities: ["queue", "staffing", "lane-control"],
+      properties: [
+        numberProperty("queue.length", "Queue length", "people", 0),
+        numberProperty("queue.waitSeconds", "Estimated wait", "s", 0),
+        numberProperty("operations.lanesOpen", "Open lanes", "lanes", 0, 6),
+        numberProperty("throughput.transactionsPerMinute", "Checkout throughput", "transactions/min", 0),
+      ],
+    },
+    {
+      id: "aisle-03",
+      storeId,
+      parentId: "zone-grocery",
+      zoneId: "zone-grocery",
+      kind: "ZONE",
+      name: "Aisle 3 accessible route",
+      sceneNodeId: "aisle-03",
+      spatial: { x: 1.5, y: 0, z: -1, width: 2, depth: 7 },
+      capabilities: ["accessibility", "routing"],
+      properties: [
+        numberProperty("accessibility.clearanceM", "Clear aisle width", "m", 0, 2),
+        booleanProperty("accessibility.routeAvailable", "Accessible route available"),
+      ],
+    },
+    {
+      id: "energy-panel-01",
+      storeId,
+      parentId: "zone-backroom",
+      zoneId: "zone-backroom",
+      kind: "EQUIPMENT",
+      name: "Store energy panel",
+      sceneNodeId: "energy-panel-01",
+      spatial: { x: 7.3, y: 1, z: -8, width: 1, depth: 0.4, height: 2 },
+      capabilities: ["energy", "anomaly-detection"],
+      properties: [
+        numberProperty("electrical.totalKw", "Total demand", "kW", 0),
+        numberProperty("electrical.baselineKw", "Expected demand", "kW", 0),
+      ],
+    },
+    {
+      id: "workforce-pool-01",
+      storeId,
+      parentId: storeId,
+      kind: "SERVICE",
+      name: "Store workforce",
+      sceneNodeId: "workforce-service",
+      capabilities: ["task-assignment", "staffing"],
+      properties: [
+        numberProperty("workforce.availableAssociates", "Available associates", "people", 0),
+        numberProperty("workforce.openTasks", "Open tasks", "tasks", 0),
+      ],
+    },
+  ];
+
+  return {
+    schemaVersion: AGENTIC_STORE_SCHEMA_VERSION,
+    storeId,
+    name: "Agentic Market One",
+    timezone: "America/Chicago",
+    entities,
+  };
+}
+
+function zoneEntities(storeId: string): TwinEntityDefinition[] {
+  const zones = [
+    ["zone-entrance", "Entrance", "zone-entrance", 0, 9],
+    ["zone-produce", "Produce", "zone-produce", -6, 4],
+    ["zone-grocery", "Grocery aisles", "zone-grocery", 0, 0],
+    ["zone-chilled", "Chilled and frozen", "zone-chilled", 6, 1],
+    ["zone-checkout", "Checkout", "zone-checkout", -4, -7],
+    ["zone-backroom", "Backroom", "zone-backroom", 7, -8],
+  ] as const;
+  return zones.map(([id, name, sceneNodeId, x, z]) => ({
+    id,
+    storeId,
+    parentId: storeId,
+    kind: "ZONE",
+    name,
+    sceneNodeId,
+    spatial: { x, y: 0, z, width: 5, depth: 5 },
+    capabilities: ["occupancy"],
+    properties: [numberProperty("occupancy.count", "Zone occupancy", "people", 0)],
+  }));
+}
+
+export function createSensorBindings(storeId = "store-001"): SensorBinding[] {
+  const sourceId = `simulator:${storeId}`;
+  const binding = (
+    tag: string,
+    entityId: string,
+    property: string,
+    valueType: SensorBinding["valueType"],
+    unit?: string,
+    min?: number,
+    max?: number,
+  ): SensorBinding => ({
+    id: `${sourceId}:${tag}`,
+    storeId,
+    sourceId,
+    tag,
+    entityId,
+    property,
+    valueType,
+    unit,
+    min,
+    max,
+    staleAfterMs: 5_000,
+    maxSampleAgeMs: 60_000,
+  });
+
+  return [
+    binding("store.occupancy", storeId, "occupancy.count", "number", "people", 0),
+    binding("store.entriesPerMinute", storeId, "traffic.entriesPerMinute", "number", "people/min", 0),
+    binding("store.energyKw", storeId, "energy.totalKw", "number", "kW", 0),
+    binding("store.mode", storeId, "operations.mode", "string"),
+    binding("entry.entriesPerMinute", "entry-counter-01", "traffic.entriesPerMinute", "number", "people/min", 0),
+    binding("entry.exitsPerMinute", "entry-counter-01", "traffic.exitsPerMinute", "number", "people/min", 0),
+    binding("produce.fillRatio", "shelf-produce-01", "inventory.fillRatio", "number", "ratio", 0, 1),
+    binding("produce.unitsOnShelf", "shelf-produce-01", "inventory.unitsOnShelf", "number", "items", 0),
+    binding("produce.backroomUnits", "shelf-produce-01", "inventory.backroomUnits", "number", "items", 0),
+    binding("produce.available", "shelf-produce-01", "commerce.available", "boolean"),
+    binding("beverage.fillRatio", "shelf-beverage-01", "inventory.fillRatio", "number", "ratio", 0, 1),
+    binding("beverage.unitsOnShelf", "shelf-beverage-01", "inventory.unitsOnShelf", "number", "items", 0),
+    binding("beverage.backroomUnits", "shelf-beverage-01", "inventory.backroomUnits", "number", "items", 0),
+    binding("beverage.available", "shelf-beverage-01", "commerce.available", "boolean"),
+    binding("dairy.temperatureC", "cooler-dairy-01", "thermal.airTemperatureC", "number", "°C", -10, 20),
+    binding("dairy.doorOpen", "cooler-dairy-01", "access.doorOpen", "boolean"),
+    binding("dairy.powerKw", "cooler-dairy-01", "electrical.powerKw", "number", "kW", 0),
+    binding("dairy.mode", "cooler-dairy-01", "operations.mode", "string"),
+    binding("dairy.available", "cooler-dairy-01", "commerce.available", "boolean"),
+    binding("freezer.temperatureC", "freezer-frozen-01", "thermal.airTemperatureC", "number", "°C", -30, 5),
+    binding("freezer.doorOpen", "freezer-frozen-01", "access.doorOpen", "boolean"),
+    binding("freezer.powerKw", "freezer-frozen-01", "electrical.powerKw", "number", "kW", 0),
+    binding("freezer.mode", "freezer-frozen-01", "operations.mode", "string"),
+    binding("checkout.queueLength", "checkout-cluster-01", "queue.length", "number", "people", 0),
+    binding("checkout.waitSeconds", "checkout-cluster-01", "queue.waitSeconds", "number", "s", 0),
+    binding("checkout.lanesOpen", "checkout-cluster-01", "operations.lanesOpen", "number", "lanes", 0, 6),
+    binding("checkout.transactionsPerMinute", "checkout-cluster-01", "throughput.transactionsPerMinute", "number", "transactions/min", 0),
+    binding("aisle03.clearanceM", "aisle-03", "accessibility.clearanceM", "number", "m", 0, 2),
+    binding("aisle03.routeAvailable", "aisle-03", "accessibility.routeAvailable", "boolean"),
+    binding("energy.totalKw", "energy-panel-01", "electrical.totalKw", "number", "kW", 0),
+    binding("energy.baselineKw", "energy-panel-01", "electrical.baselineKw", "number", "kW", 0),
+    binding("workforce.available", "workforce-pool-01", "workforce.availableAssociates", "number", "people", 0),
+    binding("workforce.openTasks", "workforce-pool-01", "workforce.openTasks", "number", "tasks", 0),
+  ];
+}

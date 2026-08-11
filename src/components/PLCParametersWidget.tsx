@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from "react";
 import type { PLCParameter } from "../types";
 import { usePLCContext } from "../context/PLCContext";
 import { usePLCStore } from "../stores/plcStore";
-import { useTweenedNumber } from "../hooks/useTweenedNumber";
 import ThreePhaseMotorWidget from "./ThreePhaseMotorWidget";
 
 /**
@@ -30,13 +29,18 @@ function useChangeFlash(value: number, range: number, threshold = 0.03): FlashDi
     if (significant) {
       const dir: FlashDir = delta > 0 ? "up" : "down";
       prevRef.current = value;
-      setFlash(null);
-      // rAF so removing → re-adding the class restarts the CSS animation even
-      // on rapid successive changes.
-      const raf = requestAnimationFrame(() => setFlash(dir));
+      // Remove and re-add the class across paint frames so repeated changes in
+      // the same direction restart the flash without a synchronous effect
+      // state update (which would add an avoidable render pass).
+      let applyRaf: number | null = null;
+      const resetRaf = requestAnimationFrame(() => {
+        setFlash(null);
+        applyRaf = requestAnimationFrame(() => setFlash(dir));
+      });
       const t = setTimeout(() => setFlash(null), 850);
       return () => {
-        cancelAnimationFrame(raf);
+        cancelAnimationFrame(resetRaf);
+        if (applyRaf !== null) cancelAnimationFrame(applyRaf);
         clearTimeout(t);
       };
     }
@@ -125,7 +129,10 @@ const AnalogCard: React.FC<{ param: PLCParameter }> = ({ param }) => {
   const rawValue = param.value ?? 0;
   const min = param.min ?? 0;
   const max = param.max ?? 100;
-  const value = useTweenedNumber(rawValue, 280);
+  // Operator telemetry must show the newest PLC sample, not an interpolated
+  // value from an older sample. Board A publishes faster than the old 280 ms
+  // tween could settle, which made continuously tuned sensors visibly trail.
+  const value = rawValue;
   const pct = Math.max(0, Math.min(1, (value - min) / (max - min)));
   const flash = useChangeFlash(rawValue, max - min);
   const glowClass =

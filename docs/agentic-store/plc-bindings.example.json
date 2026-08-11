@@ -1,0 +1,43 @@
+[
+  {
+    "id": "plc-dairy-temperature",
+    "storeId": "store-001",
+    "sourceId": "plc:store-001",
+    "tag": "DB_RETAIL.DAIRY_TEMP_DECI_C",
+    "entityId": "cooler-dairy-01",
+    "property": "thermal.airTemperatureC",
+    "valueType": "number",
+    "unit": "°C",
+    "scale": 0.1,
+    "min": -10,
+    "max": 20,
+    "staleAfterMs": 10000,
+    "maxSampleAgeMs": 60000
+  },
+  {
+    "id": "plc-dairy-door",
+    "storeId": "store-001",
+    "sourceId": "plc:store-001",
+    "tag": "DB_RETAIL.DAIRY_DOOR_OPEN",
+    "entityId": "cooler-dairy-01",
+    "property": "access.doorOpen",
+    "valueType": "boolean",
+    "staleAfterMs": 10000,
+    "maxSampleAgeMs": 60000
+  },
+  {
+    "id": "plc-produce-fill",
+    "storeId": "store-001",
+    "sourceId": "plc:store-001",
+    "tag": "DB_RETAIL.PRODUCE_FILL_PERCENT",
+    "entityId": "shelf-produce-01",
+    "property": "inventory.fillRatio",
+    "valueType": "number",
+    "unit": "ratio",
+    "scale": 0.01,
+    "min": 0,
+    "max": 1,
+    "staleAfterMs": 10000,
+    "maxSampleAgeMs": 60000
+  }
+]

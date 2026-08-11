@@ -9,6 +9,7 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',  // Listen on all interfaces — allows access from Meta Quest / other LAN devices
     port: 5173,
+    strictPort: true,
     proxy: {
       // Dynamic Path Selection + Video Analytics Express server (run via `npm run dev:server`).
       // Forwards /api/* (incl. SSE for /api/ipsec/stream and MJPEG for /api/video/:id) so the

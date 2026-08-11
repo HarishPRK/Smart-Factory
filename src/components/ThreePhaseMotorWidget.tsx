@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { subscribeRawPLCPayload, type RawPLCPayload } from "../services/plcService";
-import { useTweenedNumber } from "../hooks/useTweenedNumber";
 import MotorSpinner3D from "./MotorSpinner3D";
 
 /* ── Live snapshot of the Shelly proEM 3-phase meter ──────
@@ -94,17 +93,16 @@ function fmt(value: number | null, decimals: number, dash = "—"): string {
   return value.toFixed(decimals);
 }
 
-// Tweens a nullable number — renders the dash until a real value arrives,
-// then animates between successive samples. Used for the proEM totals on
-// the always-visible compact strip and the per-tile readouts in the drawer.
-const TweenedAmount: React.FC<{
+// Live meter values render the newest sample immediately. Presentation-style
+// number tweens are useful for KPIs, but they make operator telemetry lag the
+// source whenever samples arrive faster than the animation can settle.
+const LiveAmount: React.FC<{
   value: number | null;
   decimals: number;
   dash?: string;
 }> = ({ value, decimals, dash = "—" }) => {
-  const tweened = useTweenedNumber(value ?? 0, 280);
   if (value === null) return <>{dash}</>;
-  return <>{tweened.toFixed(decimals)}</>;
+  return <>{value.toFixed(decimals)}</>;
 };
 
 const VOLTAGE_LIVE_THRESHOLD = 50;
@@ -122,10 +120,6 @@ function classifyMotor(meter: MeterReading): MotorState {
   const totalA = Math.abs(meter.totalCurrent ?? 0);
   const phaseA = phases.some((p) => Math.abs(p.current ?? 0) > CURRENT_LIVE_THRESHOLD);
   return totalA > CURRENT_LIVE_THRESHOLD || phaseA ? "running" : "energized";
-}
-
-function isRunning(meter: MeterReading): boolean {
-  return classifyMotor(meter) === "running";
 }
 
 const PHASE_COLORS: Record<"a" | "b" | "c", string> = {
@@ -297,7 +291,7 @@ const DetailDrawer: React.FC<{
               Σ Active P
             </div>
             <div className="text-amber-100/95 mt-0.5">
-              <TweenedAmount value={meter.totalActPower} decimals={2} /> W
+              <LiveAmount value={meter.totalActPower} decimals={2} /> W
             </div>
           </div>
           <div className="rounded border border-amber-500/15 bg-amber-500/[0.04] px-2 py-1.5">
@@ -305,7 +299,7 @@ const DetailDrawer: React.FC<{
               Σ Apparent S
             </div>
             <div className="text-amber-100/95 mt-0.5">
-              <TweenedAmount value={meter.totalAprtPower} decimals={2} /> VA
+              <LiveAmount value={meter.totalAprtPower} decimals={2} /> VA
             </div>
           </div>
           <div className="rounded border border-amber-500/15 bg-amber-500/[0.04] px-2 py-1.5">
@@ -313,7 +307,7 @@ const DetailDrawer: React.FC<{
               Σ Current I
             </div>
             <div className="text-amber-100/95 mt-0.5">
-              <TweenedAmount value={meter.totalCurrent} decimals={3} /> A
+              <LiveAmount value={meter.totalCurrent} decimals={3} /> A
             </div>
           </div>
         </div>
@@ -406,11 +400,11 @@ const ThreePhaseMotorWidget: React.FC<ThreePhaseMotorWidgetProps> = ({
         <div className="flex justify-between items-center relative z-10 font-mono text-cyan-100/80" style={{ fontSize: "9.5px" }}>
           <span className="flex items-baseline gap-0.5">
             <span className="text-amber-200/55 mr-0.5">Σ</span>
-            <TweenedAmount value={meter.totalActPower} decimals={1} />
+            <LiveAmount value={meter.totalActPower} decimals={1} />
             <span className="text-blue-300/45 ml-0.5">W</span>
           </span>
           <span className="flex items-baseline gap-0.5">
-            <TweenedAmount value={meter.totalCurrent} decimals={2} />
+            <LiveAmount value={meter.totalCurrent} decimals={2} />
             <span className="text-blue-300/45 ml-0.5">A</span>
           </span>
         </div>

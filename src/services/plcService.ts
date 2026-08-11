@@ -957,7 +957,9 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
       min: 0,
       max: 12,
       nominal: 5.0,
-      decimals: 1,
+      // Preserve the physical pot's hundredths in the operator readout. One
+      // decimal hid real changes smaller than 0.05 V and looked like latency.
+      decimals: 2,
       accentHex: "#f59e0b",
     }),
     analogParam({
@@ -969,7 +971,9 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
       min: 0,
       max: 10,
       nominal: 6.0,
-      decimals: 1,
+      // Current arrives with sub-tenth precision; show hundredths so tuning is
+      // visible on the first received sample instead of after a larger step.
+      decimals: 2,
       accentHex: "#06b6d4",
     }),
     {
@@ -1907,13 +1911,13 @@ export class MosquittoPLCService implements PLCService {
         // route — they're consumed by the dispenser widget, not the PLC
         // sensor parser. Match `kos/...` and `KOS/...` (case-insensitive,
         // also tolerant of dot-separated topic styles).
-        if (msg.topic && /^kos[\/.]/i.test(msg.topic)) {
+        if (msg.topic && /^kos[/.]/i.test(msg.topic)) {
           emitKOSMessage(msg.topic, msg.payload);
           return;
         }
 
         // LoRaWAN soil/irrigation telemetry (lorawan/data + any subtopic).
-        if (msg.topic && /^lorawan[\/.]/i.test(msg.topic)) {
+        if (msg.topic && /^lorawan[/.]/i.test(msg.topic)) {
           emitLorawanMessage(msg.topic, msg.payload);
           return;
         }

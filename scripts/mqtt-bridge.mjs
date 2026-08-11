@@ -76,14 +76,12 @@ const localClient = mqtt.connect(mqttUrl, {
   reconnectPeriod: 5000,
 });
 
-// PLC telemetry now publishes on the UNS per-source subtopics; each carries
-// only that source's keys (the frontend merges them back into one frame).
-// The legacy plc/# filter is kept for plc/cmd echoes and the transition period.
+// Subscribe to the complete PLC data subtree so new sensor slices and a bare
+// data-topic publish cannot reach IoT Core while silently missing the local UI.
+// Each source message carries only that source's keys; the frontend merges the
+// slices back into one frame. Keep plc/# for legacy data and command echoes.
 const PLC_TOPICS = [
-  "prplHome/McKinney/lineA/plc1/data/boardA",
-  "prplHome/McKinney/lineA/plc1/data/boardB",
-  "prplHome/McKinney/lineA/plc1/data/esp32",
-  "prplHome/McKinney/lineA/plc1/data/system_metrics",
+  "prplHome/McKinney/lineA/plc1/data/#",
   "plc/#",
 ];
 

@@ -873,73 +873,51 @@
 }
 .integration-scope .va-live-badge .dot { width: 6px; height: 6px; background: #f87171; box-shadow: 0 0 6px #ef4444; }
 
-/* Stream controls — stop is shown only for feeds with an upstream stop API. */
-.integration-scope .va-stream-actions {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.integration-scope .va-stream-action {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: #f3f1ff;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  backdrop-filter: blur(8px);
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-.integration-scope .va-stream-action:hover {
-  background: rgba(0, 0, 0, 0.75);
-  border-color: rgba(255, 255, 255, 0.34);
-}
-.integration-scope .va-stream-action:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-.integration-scope .va-stream-action:disabled {
-  cursor: wait;
-  opacity: 0.72;
-}
-.integration-scope .va-stream-action.va-stop-feed {
-  background: rgba(127, 29, 29, 0.82);
-  border-color: rgba(248, 113, 113, 0.72);
-  color: #fee2e2;
-}
-.integration-scope .va-stream-action.va-stop-feed:hover:not(:disabled) {
-  background: rgba(153, 27, 27, 0.94);
-  border-color: #f87171;
-}
-
-/* Open-feed button below idle thumbnails */
-.integration-scope .va-open-btn {
+/* Stable feed action below every tile, including loading and error states. */
+.integration-scope .va-open-btn,
+.integration-scope .va-stop-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   margin: 0 12px 12px 12px;
+  min-height: 44px;
   padding: 9px 14px;
   border-radius: 10px;
   border: 1px solid var(--border);
-  background: linear-gradient(180deg, rgba(var(--accent-rgb) / 0.10), rgba(var(--accent-rgb) / 0.02));
-  color: var(--text);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.18s, border-color 0.18s, transform 0.18s;
 }
-.integration-scope .va-open-btn:hover {
+.integration-scope .va-open-btn {
+  background: linear-gradient(180deg, rgba(var(--accent-rgb) / 0.10), rgba(var(--accent-rgb) / 0.02));
+  color: var(--text);
+}
+.integration-scope .va-stop-btn {
+  background: rgba(127, 29, 29, 0.82);
+  border-color: rgba(248, 113, 113, 0.72);
+  color: #fee2e2;
+}
+.integration-scope .va-open-btn:hover:not(:disabled) {
   background: linear-gradient(180deg, rgba(var(--accent-rgb) / 0.20), rgba(var(--accent-rgb) / 0.06));
   border-color: var(--accent);
   transform: translate3d(0, -1px, 0);
+}
+.integration-scope .va-stop-btn:hover:not(:disabled) {
+  background: rgba(153, 27, 27, 0.94);
+  border-color: #f87171;
+  transform: translate3d(0, -1px, 0);
+}
+.integration-scope .va-open-btn:focus-visible,
+.integration-scope .va-stop-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.integration-scope .va-open-btn:disabled,
+.integration-scope .va-stop-btn:disabled {
+  cursor: wait;
+  opacity: 0.72;
 }
 
 /* Loading state */
