@@ -29,7 +29,7 @@ import { EventEmitter } from 'node:events';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { Device, DeviceTelemetry, Status } from '../src/integrations/types.js';
+import type { Device, DeviceInventorySource, DeviceTelemetry, Status } from '../src/integrations/types.js';
 import { ipsecSource } from './ipsecSource.js';
 import { currentRates, recordTelemetry } from './telemetryHistory.js';
 
@@ -48,6 +48,8 @@ export interface DeviceView extends Device {
   /** Which gateway location this device was discovered from ('rdk' for Plano,
    *  'prpl' for McKinney). Undefined for seed devices (pre-live-discovery). */
   locationSource?: 'rdk' | 'prpl';
+  /** Which live inventory feed supplied this device. */
+  inventorySource?: DeviceInventorySource;
 }
 
 export interface DeviceSnapshot {
@@ -59,6 +61,11 @@ export interface DeviceSnapshot {
   connected: boolean;
   /** When the last live inventory was ingested (undefined while on seed). */
   lastInventoryAt?: number;
+  /** Inventory feeds observed during this server session, including feeds that
+   *  most recently reported an empty device list. */
+  inventorySourcesSeen: DeviceInventorySource[];
+  /** Per-feed freshness used by branch-scoped UI (for example McKinney RSSI). */
+  lastInventoryAtBySource: Partial<Record<DeviceInventorySource, number>>;
   /** Current operator overrides, keyed by normalized MAC. */
   overrides: Record<string, Domain>;
 }
@@ -88,6 +95,7 @@ interface RawDevice {
   power?: boolean;            // relay/switch state for controllable kinds
   telemetry?: DeviceTelemetry; // live electrical readings from the device
   statusHint?: Status;        // explicit status (e.g. from the gateway's wifi health)
+  inventorySource?: DeviceInventorySource;
 }
 interface InventoryPayload {
   gateway?: string;
@@ -335,6 +343,20 @@ function seedToRaw(d: Device): RawDevice {
   };
 }
 
+/** Convert an inventory event tag into the feed provenance exposed to the UI. */
+function inventorySourceForTag(source: string): DeviceInventorySource | undefined {
+  if (source.startsWith('prplhome')) return 'prplhome';
+  if (source.startsWith('rdk')) return 'rdk';
+  if (source.startsWith('prpl')) return 'prpl';
+  return undefined;
+}
+
+/** Prefer the explicit prplhome device feed when a MAC appears in more than
+ * one inventory stream, while retaining the existing telemetry merge. */
+function inventorySourceRank(source?: DeviceInventorySource): number {
+  return source === 'prplhome' ? 3 : source === 'rdk' ? 2 : source === 'prpl' ? 1 : 0;
+}
+
 /**
  * Merge two raw records for the same MAC seen across sources — e.g. the Shelly
  * reported both via its MQTT power telemetry and the gateway's Wi-Fi block.
@@ -344,6 +366,18 @@ function seedToRaw(d: Device): RawDevice {
  */
 function mergeRaw(a: RawDevice, b: RawDevice): RawDevice {
   const [p, s] = isWifiId(a.id) && !isWifiId(b.id) ? [b, a] : [a, b];
+  const inventorySource = inventorySourceRank(a.inventorySource) >= inventorySourceRank(b.inventorySource)
+    ? a.inventorySource : b.inventorySource;
+  // Identity/control fields still prefer the non-Wi-Fi record, but link
+  // telemetry must prefer the explicitly selected inventory feed. Otherwise a
+  // MAC seen on both prpl and prplhome can be labelled prplhome while retaining
+  // the older prpl RSSI values simply because that source arrived first.
+  const telemetryPrimary = inventorySourceRank(a.inventorySource) > inventorySourceRank(b.inventorySource)
+    ? a
+    : inventorySourceRank(b.inventorySource) > inventorySourceRank(a.inventorySource)
+      ? b
+      : p;
+  const telemetrySecondary = telemetryPrimary === a ? b : a;
   return {
     mac: p.mac,
     id: p.id ?? s.id,
@@ -361,7 +395,8 @@ function mergeRaw(a: RawDevice, b: RawDevice): RawDevice {
     connectedForHours: nonZero(Math.max(p.connectedForHours ?? 0, s.connectedForHours ?? 0)),
     services: [...(p.services ?? []), ...(s.services ?? [])],
     power: typeof p.power === 'boolean' ? p.power : s.power,
-    telemetry: { ...(s.telemetry ?? {}), ...(p.telemetry ?? {}) },
+    telemetry: { ...(telemetrySecondary.telemetry ?? {}), ...(telemetryPrimary.telemetry ?? {}) },
+    inventorySource,
   };
 }
 
@@ -413,6 +448,7 @@ class DeviceSource extends EventEmitter {
   /** True once ANY live inventory has been ingested (even an empty list). */
   private receivedInventory = false;
   private lastInventoryAt?: number;
+  private lastInventoryAtBySource = new Map<DeviceInventorySource, number>();
 
   constructor() {
     super();
@@ -460,12 +496,17 @@ class DeviceSource extends EventEmitter {
     // hub reply must not un-mark a source whose last good list is still live.
     if (matter || (payload as InventoryPayload).partial === true) this.partialSources.add(source);
     else this.partialSources.delete(source);
-    const valid = devices.filter((d) => d && typeof d.mac === 'string' && d.mac.trim());
+    const inventorySource = inventorySourceForTag(source);
+    const valid = devices
+      .filter((d) => d && typeof d.mac === 'string' && d.mac.trim())
+      .map((d) => inventorySource ? { ...d, inventorySource } : d);
     // Feed the rolling telemetry history (throughput/RSSI/power charts).
     for (const d of valid) recordTelemetry(normalizeMac(d.mac), d.telemetry);
     this.liveBySource.set(source, valid);
     this.receivedInventory = true;
-    this.lastInventoryAt = Date.now();
+    const receivedAt = Date.now();
+    this.lastInventoryAt = receivedAt;
+    if (inventorySource) this.lastInventoryAtBySource.set(inventorySource, receivedAt);
     // eslint-disable-next-line no-console
     console.log(`[devices] ingested ${valid.length} device(s) from "${source}"`);
     this.emit('update', this.getSnapshot());
@@ -474,16 +515,18 @@ class DeviceSource extends EventEmitter {
   /** The active base inventory (live once received, else seed), each paired with
    *  its auto domain and the location source it was discovered from. Live
    *  devices are de-duped by MAC across sources. */
-  private activeBase(): { device: Device; autoDomain: Domain; locationSource?: 'rdk' | 'prpl' }[] {
+  private activeBase(): { device: Device; autoDomain: Domain; locationSource?: 'rdk' | 'prpl'; inventorySource?: DeviceInventorySource }[] {
     if (!this.receivedInventory) {
-      return SEED.map((d) => ({ device: d, autoDomain: d.domain, locationSource: undefined }));
+      return SEED.map((d) => ({ device: d, autoDomain: d.domain, locationSource: undefined, inventorySource: undefined }));
     }
     // Merge raw records by MAC across sources, THEN map — so a device seen by
     // more than one source (e.g. the Shelly via MQTT power + the gateway's
     // Wi-Fi block) becomes one row carrying both sets of telemetry.
     const rawByMac = new Map<string, RawDevice>();
-    // Track which location (rdk/prpl) each MAC belongs to. A device source like
-    // "rdk:wifi" or "rdk:matter" or "rdk:shelly" → location 'rdk'; "prpl:wifi" → 'prpl'.
+    // Track which gateway location (rdk/prpl) each MAC belongs to. A device
+    // source like "rdk:wifi" or "rdk:matter" → 'rdk'; "prpl:wifi" and
+    // "prplhome/ipsec/metrics:wifi" → 'prpl'. Feed provenance is retained
+    // separately on raw.inventorySource for the branch-scoped UI filters.
     const macLocation = new Map<string, 'rdk' | 'prpl'>();
     // While the only live data is partial (Matter lists are OT-only), keep the
     // seed's IT side so the IT page stays populated until real LAN discovery.
@@ -505,15 +548,15 @@ class DeviceSource extends EventEmitter {
     }
     return [...rawByMac.entries()].map(([mac, raw]) => {
       const { device, autoDomain } = toDevice(raw);
-      return { device, autoDomain, locationSource: macLocation.get(mac) };
+      return { device, autoDomain, locationSource: macLocation.get(mac), inventorySource: raw.inventorySource };
     });
   }
 
   getSnapshot(): DeviceSnapshot {
-    const devices: DeviceView[] = this.activeBase().map(({ device, autoDomain, locationSource }) => {
+    const devices: DeviceView[] = this.activeBase().map(({ device, autoDomain, locationSource, inventorySource }) => {
       const override = this.overrides.get(device.mac);
       const domain = override ?? autoDomain;
-      return { ...device, domain, autoDomain, overridden: override != null && override !== autoDomain, locationSource };
+      return { ...device, domain, autoDomain, overridden: override != null && override !== autoDomain, locationSource, inventorySource };
     });
     return {
       devices,
@@ -521,6 +564,8 @@ class DeviceSource extends EventEmitter {
       source: this.receivedInventory ? 'gateway' : 'seed',
       connected: this.receivedInventory ? ipsecSource.isConnected() : true,
       lastInventoryAt: this.lastInventoryAt,
+      inventorySourcesSeen: [...this.lastInventoryAtBySource.keys()],
+      lastInventoryAtBySource: Object.fromEntries(this.lastInventoryAtBySource.entries()),
       overrides: Object.fromEntries(this.overrides.entries()),
     };
   }
@@ -558,4 +603,3 @@ class DeviceSource extends EventEmitter {
 }
 
 export const deviceSource = new DeviceSource();
-

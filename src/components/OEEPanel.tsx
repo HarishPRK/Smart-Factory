@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import OEEGauge from "./OEEGauge";
 import { useOEE } from "../hooks/useOEE";
 import { useTweenedNumber } from "../hooks/useTweenedNumber";
@@ -153,15 +153,6 @@ const StatCard: React.FC<{
 const OEEPanel: React.FC<OEEPanelProps> = ({ open, onClose }) => {
   const { oee, trend, loading, trendTimeRange, setTrendTimeRange } = useOEE();
 
-  // Reveal gating: start everything at 0 on the first paint, then flip to the
-  // real values one frame later so the gauges, bars and numbers all sweep up
-  // from zero when the panel opens.
-  const [revealed, setRevealed] = useState(false);
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setRevealed(true));
-    return () => cancelAnimationFrame(id);
-  }, []);
-
   if (!open) return null;
 
   const formatTime = (sec: number) => {
@@ -170,7 +161,7 @@ const OEEPanel: React.FC<OEEPanelProps> = ({ open, onClose }) => {
     return h > 0 ? `${h}h ${m}m` : `${m}m`;
   };
 
-  const r = (v: number) => (revealed ? v : 0);
+  const r = (v: number) => v;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">

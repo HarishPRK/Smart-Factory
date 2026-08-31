@@ -207,13 +207,12 @@ function StreamTile({ stream }: { stream: VideoStream }) {
     setVersion((v) => v + 1);
   }
 
-  // Cache-buster on retry forces the browser to refetch the stream.
-  const src = version === 0
-    ? stream.url
-    : `${stream.url}${stream.url.includes('?') ? '&' : '?'}r=${version}`;
-
   return (
-    <div ref={containerRef} className={`va-tile ${isFullscreen ? 'is-fullscreen' : ''}`}>
+    <div
+      ref={containerRef}
+      className={`va-tile ${isFullscreen ? 'is-fullscreen' : ''}`}
+      data-stream-state={isLive ? (errored ? 'error' : 'requested') : 'idle'}
+    >
       <div className="va-tile-head">
         <span className={`dot ${isLive && !errored ? 'ok' : 'warn'}`} />
         <div className="va-tile-name">
@@ -251,18 +250,12 @@ function StreamTile({ stream }: { stream: VideoStream }) {
           <OfflinePlaceholder url={stream.url} onRetry={retry} />
         ) : (
           <>
-            {/* The <img> is mounted as soon as `isLive` flips on so the network
-                request starts; `onLoad` fires when the first MJPEG frame arrives,
-                at which point we hide the loading placeholder. */}
-            <img
-              key={version}
-              src={src}
-              alt={stream.name}
-              className="va-tile-stream"
-              style={loaded ? undefined : { visibility: 'hidden' }}
+            <ActiveMjpegStream
+              stream={stream}
+              version={version}
+              visible={loaded}
               onLoad={() => setLoaded(true)}
               onError={() => setErrored(true)}
-              draggable={false}
             />
             {!loaded && <LoadingPlaceholder name={stream.name} url={stream.url} />}
           </>
@@ -303,6 +296,60 @@ function StreamTile({ stream }: { stream: VideoStream }) {
         </button>
       )}
     </div>
+  );
+}
+
+/**
+ * The browser starts an MJPEG request as soon as an image receives a `src`.
+ * Keep that side effect inside a component that is mounted only after the user
+ * explicitly opens one feed. Do not render this component hidden for previews:
+ * a hidden image would still consume the stream.
+ */
+function ActiveMjpegStream({
+  stream,
+  version,
+  visible,
+  onLoad,
+  onError,
+}: {
+  stream: VideoStream;
+  version: number;
+  visible: boolean;
+  onLoad: () => void;
+  onError: () => void;
+}) {
+  const imageRef = useRef<HTMLImageElement>(null);
+
+  useEffect(() => {
+    const image = imageRef.current;
+    if (!image) return undefined;
+
+    const requestUrl = version === 0
+      ? stream.url
+      : `${stream.url}${stream.url.includes('?') ? '&' : '?'}r=${version}`;
+
+    // Assigning `src` here makes activation an explicit post-click effect. On
+    // initial page/modal render there is no media element and no stream URL in
+    // the DOM for the browser to preload or speculatively fetch.
+    image.src = requestUrl;
+
+    return () => {
+      // Removing the source explicitly aborts an in-flight MJPEG response before
+      // React removes the element (close, Stop, modal close, or retry).
+      image.removeAttribute('src');
+    };
+  }, [stream.url, version]);
+
+  return (
+    <img
+      ref={imageRef}
+      alt={stream.name}
+      className="va-tile-stream"
+      style={visible ? undefined : { visibility: 'hidden' }}
+      onLoad={onLoad}
+      onError={onError}
+      draggable={false}
+    />
   );
 }
 

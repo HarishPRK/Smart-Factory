@@ -1,5 +1,8 @@
 export type Status = 'ok' | 'warn' | 'err' | 'off';
 
+/** Provenance of the live device inventory that supplied a device record. */
+export type DeviceInventorySource = 'rdk' | 'prpl' | 'prplhome';
+
 export interface Branch {
   id: string;
   name: string;

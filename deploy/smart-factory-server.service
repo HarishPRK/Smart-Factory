@@ -13,7 +13,7 @@ Environment=NODE_ENV=production
 Environment=PORT=3001
 Environment=AWS_REGION=us-east-1
 Environment=AWS_USE_INSTANCE_ROLE=1
-Environment=IOT_IPSEC_TOPICS=rdk/ipsec/metrics,prpl/ipsec/metrics
+Environment=IOT_IPSEC_TOPICS=rdk/ipsec/metrics,prpl/ipsec/metrics,prplhome/ipsec/metrics
 EnvironmentFile=-/opt/smart-factory/.env
 User=ec2-user
 

@@ -4,7 +4,7 @@
  * Connects to AWS IoT Core over MQTT-WebSocket with SigV4 auth (uses
  * AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN from the
  * environment, same as the rest of our AWS plumbing). Subscribes to the
- * gateway's raw `rdk/ipsec/metrics` topic and decodes the protobuf payload
+ * gateway's raw `<prefix>/ipsec/metrics` topics and decodes the protobuf payload
  * in-process — no IoT Rule needed. JSON payloads are also accepted as a
  * fallback in case an upstream rule starts publishing decoded JSON later.
  *
@@ -27,14 +27,15 @@ const ENDPOINT  = process.env.IOT_ENDPOINT ?? process.env.AWS_IOT_ENDPOINT ?? 'a
 const REGION    = process.env.IOT_REGION   ?? process.env.AWS_REGION ?? 'us-east-1';
 const CLIENT_ID = process.env.IOT_CLIENT_ID ?? `ce-server-${Math.random().toString(36).slice(2, 10)}`;
 
-// We subscribe to one topic per gateway family. Defaults cover Plano (rdk)
-// and McKinney (prpl). Override the whole list with `IOT_IPSEC_TOPICS` as a
+// We subscribe to one topic per gateway family. Defaults cover Plano (rdk),
+// McKinney (prpl), and the IT/OT device metrics feed (prplhome). Override the
+// whole list with `IOT_IPSEC_TOPICS` as a
 // comma-separated string. `IOT_IPSEC_TOPIC` (singular) is honoured for
 // backwards-compat with older deploys.
 const SUBSCRIBE_TOPICS: string[] = (() => {
   const single = process.env.IOT_IPSEC_TOPIC;
   const list   = process.env.IOT_IPSEC_TOPICS;
-  const raw = list ?? single ?? 'rdk/ipsec/metrics,prpl/ipsec/metrics';
+  const raw = list ?? single ?? 'rdk/ipsec/metrics,prpl/ipsec/metrics,prplhome/ipsec/metrics';
   return raw.split(',').map((s) => s.trim()).filter(Boolean);
 })();
 
@@ -45,10 +46,11 @@ const AAR_TOPICS: string[] = (
 ).split(',').map((s) => s.trim()).filter(Boolean);
 
 /** Map the MQTT topic to the gateway-source tag exposed in IpsecGatewayState.
- *  Anything starting with `rdk/` → 'rdk', `prpl/` → 'prpl', else 'other'. */
+ *  `prplhome` is the IT/OT device metrics feed for the prpl/McKinney branch,
+ *  so it must share the `prpl` location tag for DPS device scoping. */
 function topicToSource(topic: string): 'rdk' | 'prpl' | 'other' {
   if (topic.startsWith('rdk/'))  return 'rdk';
-  if (topic.startsWith('prpl/')) return 'prpl';
+  if (topic.startsWith('prpl/') || topic.startsWith('prplhome/')) return 'prpl';
   return 'other';
 }
 
@@ -431,7 +433,8 @@ class IpsecSource extends EventEmitter {
     try {
       const bytes = new Uint8Array(payload);
 
-      // The gateway publishes raw protobuf bytes on `rdk/ipsec/metrics`.
+      // Gateways publish raw protobuf bytes on their `<prefix>/ipsec/metrics`
+      // topic, including the prplhome IT/OT device feed.
       // If an upstream IoT Rule ever starts producing JSON instead (e.g. by
       // running `decode(*, 'proto', …)` first), accept that shape too.
       const looksLikeJson = bytes.length > 0 && (bytes[0] === 0x7b /* { */ || bytes[0] === 0x5b /* [ */);
@@ -448,6 +451,7 @@ class IpsecSource extends EventEmitter {
       }
 
       const source = topicToSource(topic);
+      const deviceFeed = topic.startsWith('prplhome/');
 
       // ── Identity ────────────────────────────────────────────────────────
       // proto3 omits empty strings, so `?? 'unknown'` never fires for a field
@@ -537,22 +541,34 @@ class IpsecSource extends EventEmitter {
         cellular: metrics.cellular ?? prevM?.cellular,
       };
 
-      const state: IpsecGatewayState = { metrics: normalised, receivedAt: Date.now(), source };
-      this.gateways.set(gatewayKey, state);
-      this.emit('update', { gatewayKey, state });
+      // prplhome/ipsec/metrics is the McKinney IT/OT device feed. It shares
+      // the prpl location, but it is not a second gateway state: keeping it
+      // out of the gateway map prevents device-only payloads from clobbering
+      // the prpl tunnel/WAN telemetry.
+      if (!deviceFeed) {
+        const state: IpsecGatewayState = { metrics: normalised, receivedAt: Date.now(), source };
+        this.gateways.set(gatewayKey, state);
+        this.emit('update', { gatewayKey, state });
+      }
 
       // The per-client Wi-Fi block is a live LAN inventory + link telemetry —
       // forward it to deviceSource as a full source so real clients (laptops,
       // the Shelly, …) populate the Devices pages with measured RSSI/health.
-      if (normalised.wifi && normalised.wifi.clients.length > 0) {
+      // For prplhome, use the topic's own Wi-Fi block (including an empty list,
+      // which is meaningful and clears departed devices) rather than the
+      // previous prpl gateway state's carried-forward clients.
+      const inventoryWifi = deviceFeed ? metrics.wifi : normalised.wifi;
+      if (inventoryWifi) {
         // eslint-disable-next-line no-console
-        console.log('[wifi] ' + normalised.wifi.clients.map((c) =>
+        console.log('[wifi] ' + inventoryWifi.clients.map((c) =>
           `${c.hostname || c.mac}: rssi=${c.rssi}dBm snr=${c.snr}dB health=${c.health || 'ok'}`).join(' | '));
         const now = Date.now();
         this.emit('inventory', {
-          source: `${source}:wifi`,
+          // Keep the prplhome list distinct from legacy prpl Wi-Fi inventory;
+          // the UI uses this provenance for McKinney's DPS/AAR device list.
+          source: deviceFeed ? `${topic}:wifi` : `${source}:wifi`,
           payload: {
-            devices: normalised.wifi.clients.map((c) => {
+            devices: inventoryWifi.clients.map((c) => {
               const key = c.mac.toUpperCase();
               let first = this.wifiFirstSeen.get(key);
               if (first == null) {

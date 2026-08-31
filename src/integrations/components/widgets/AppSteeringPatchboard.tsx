@@ -42,7 +42,7 @@ import { useDevices } from '../../ui/useDevices';
 import { useAarRouting } from '../../ui/useAarRouting';
 import { useTheme, useThemeColors } from '../../ui/Theme';
 import { useToast } from '../../ui/Toast';
-import { BRANCH_TO_IPSEC_SOURCE, appCategories } from '../../data/mock';
+import { BRANCH_TO_DEVICE_SOURCE, BRANCH_TO_IPSEC_SOURCE, appCategories } from '../../data/mock';
 import { encodeAppRouteCommand, toHex, ROUTE_ORIGIN, type AppRouteCommand } from '../../proto/appRoute';
 
 /* The AAR plugin publishes on unprefixed routing/* topics; we associate it with
@@ -331,6 +331,7 @@ export function AppSteeringPatchboard({ branchId }: { branchId: string }) {
   const [guide, setGuide] = useState<{ clientId: string; toIfname: string } | null>(null);
 
   const source = BRANCH_TO_IPSEC_SOURCE[branchId] as 'rdk' | 'prpl' | undefined;
+  const deviceSource = BRANCH_TO_DEVICE_SOURCE[branchId];
   const gw = useMemo(
     () => (source ? ipsec.list.find((g) => g.source === source) : undefined),
     [ipsec.list, source],
@@ -394,7 +395,11 @@ export function AppSteeringPatchboard({ branchId }: { branchId: string }) {
 
   /* ── Clients: AAR decisions → device inventory → sim. ── */
   const { clients, clientSource, extraCount } = useMemo(() => {
-    const mine = source ? allDevices.filter((d) => d.locationSource === source) : [];
+    // AAR's McKinney client list comes from prplhome/ipsec/metrics, while the
+    // gateway/tunnel state remains sourced from the prpl family.
+    const mine = deviceSource
+      ? allDevices.filter((d) => d.inventorySource === deviceSource)
+      : [];
     const place = (rows: Omit<PatchClient, 'y'>[]): PatchClient[] => {
       const n = rows.length;
       return rows.map((r, i) => ({ ...r, y: n <= 1 ? BAND_CY : BAND_TOP + i * ((BAND_BOTTOM - BAND_TOP) / (n - 1)) }));
@@ -441,7 +446,7 @@ export function AppSteeringPatchboard({ branchId }: { branchId: string }) {
       DevIcon: kindIcon[c.kind] ?? HelpCircle, domain: c.domain, appColor: c.app.color, weight: c.app.weight,
     }));
     return { clients: place(rows), clientSource: 'sim' as const, extraCount: 0 };
-  }, [aarLive, aar.decisions, allDevices, source]);
+  }, [aarLive, aar.decisions, allDevices, deviceSource]);
 
   const slotIdxFor = (c: PatchClient): number => {
     const ov = overrides[c.id];
@@ -1444,4 +1449,3 @@ function LegendDot({ color, label }: { color: string; label: string }) {
     </span>
   );
 }
-

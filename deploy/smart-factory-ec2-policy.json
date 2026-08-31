@@ -19,6 +19,7 @@
         "arn:aws:iot:us-east-1:841019700679:topicfilter/prplos/deviceinfo/*",
         "arn:aws:iot:us-east-1:841019700679:topicfilter/rdk/ipsec/metrics",
         "arn:aws:iot:us-east-1:841019700679:topicfilter/prpl/ipsec/metrics",
+        "arn:aws:iot:us-east-1:841019700679:topicfilter/prplhome/ipsec/metrics",
         "arn:aws:iot:us-east-1:841019700679:topicfilter/rdk/path/control/result",
         "arn:aws:iot:us-east-1:841019700679:topicfilter/prpl/path/control/result",
         "arn:aws:iot:us-east-1:841019700679:topicfilter/rdk/devices/inventory",

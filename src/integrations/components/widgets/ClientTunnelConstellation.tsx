@@ -6,8 +6,8 @@
  * comet trail that swings through the core and out along its assigned tunnel
  * corridor (fiber1/fiber2/cell1/cell2, fiber-first) toward the cloud transit.
  *
- * Location scoping is STRICT: only devices with locationSource === this
- * branch's source render — Plano (rdk) and McKinney (prpl) never mix.
+ * Location scoping is STRICT: only devices from this branch's inventory feed
+ * render — Plano uses rdk and McKinney uses prplhome/ipsec/metrics.
  *
  * Client↔tunnel assignment: the gateway's protobuf does not yet carry a
  * per-client tunnel binding, so until it does we derive a stable policy
@@ -26,7 +26,7 @@ import type { Device, IpsecTunnelMetric } from '../../types';
 import { useIpsecMetrics } from '../../ui/useIpsecMetrics';
 import { useDevices, type DeviceView } from '../../ui/useDevices';
 import { useTheme, useThemeColors } from '../../ui/Theme';
-import { BRANCH_TO_IPSEC_SOURCE } from '../../data/mock';
+import { BRANCH_TO_DEVICE_SOURCE, BRANCH_TO_IPSEC_SOURCE } from '../../data/mock';
 
 const kindIcon: Record<Device['kind'], React.ComponentType<{ size?: number }>> = {
   laptop: Laptop, desktop: Monitor, printer: Printer, payment: CreditCard,
@@ -82,6 +82,7 @@ export function ClientTunnelConstellation({ branchId }: { branchId: string }) {
   const surface = theme === 'dark' ? 'rgba(14,12,32,0.96)' : '#ffffff';
 
   const source = BRANCH_TO_IPSEC_SOURCE[branchId] as 'rdk' | 'prpl' | undefined;
+  const deviceSource = BRANCH_TO_DEVICE_SOURCE[branchId];
   const gw = useMemo(
     () => (source ? ipsec.list.find((g) => g.source === source) : ipsec.list[0]),
     [ipsec.list, source],
@@ -89,7 +90,7 @@ export function ClientTunnelConstellation({ branchId }: { branchId: string }) {
 
   // STRICT location filter — this branch's fleet only (see memory: Plano/McKinney never mix).
   const clients = useMemo(() => {
-    const mine = source ? allDevices.filter((d) => d.locationSource === source) : allDevices;
+    const mine = deviceSource ? allDevices.filter((d) => d.inventorySource === deviceSource) : allDevices;
     // Cap per domain so the orbits stay legible; overflow is summarized.
     return {
       it: mine.filter((d) => d.domain === 'IT').slice(0, 6),
@@ -97,7 +98,7 @@ export function ClientTunnelConstellation({ branchId }: { branchId: string }) {
       itTotal: mine.filter((d) => d.domain === 'IT').length,
       otTotal: mine.filter((d) => d.domain === 'OT').length,
     };
-  }, [allDevices, source]);
+  }, [allDevices, deviceSource]);
 
   const reduceMotion = useMemo(
     () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
@@ -412,4 +413,3 @@ function LegendDot({ color, label }: { color: string; label: string }) {
     </span>
   );
 }
-

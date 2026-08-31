@@ -38,6 +38,28 @@ afterEach(() => {
 });
 
 describe('VideoAnalyticsPage stream controls', () => {
+  it('does not mount or request any video stream when the page opens', () => {
+    render(<VideoAnalyticsPage />);
+
+    expect(document.querySelectorAll('img.va-tile-stream')).toHaveLength(0);
+    expect(document.querySelectorAll('[data-stream-state="requested"]')).toHaveLength(0);
+    expect(document.querySelectorAll('[data-stream-state="idle"]')).toHaveLength(13);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('mounts only the feed the user explicitly opens', () => {
+    render(<VideoAnalyticsPage />);
+
+    const tile = openTile('Inventory Management');
+    const mountedStreams = document.querySelectorAll<HTMLImageElement>('img.va-tile-stream');
+
+    expect(mountedStreams).toHaveLength(1);
+    expect(mountedStreams[0]).toBe(within(tile).getByAltText('Inventory Management'));
+    expect(mountedStreams[0].getAttribute('src')).toBe('/api/video/nv-nanoowl');
+    expect(document.querySelectorAll('[data-stream-state="requested"]')).toHaveLength(1);
+    expect(document.querySelectorAll('[data-stream-state="idle"]')).toHaveLength(12);
+  });
+
   it('shows Stop on every feed as soon as its request starts', () => {
     render(<VideoAnalyticsPage />);
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Line,
   LineChart,
@@ -42,12 +42,16 @@ import {
   HelpCircle,
   Radio,
 } from "lucide-react";
-import { pathThresholds, BRANCH_TO_IPSEC_SOURCE } from "../data/mock";
+import {
+  pathThresholds,
+  BRANCH_TO_DEVICE_SOURCE,
+  BRANCH_TO_IPSEC_SOURCE,
+} from "../data/mock";
 import type {
   CellularMetrics,
+  DeviceInventorySource,
   IpsecGatewayState,
   IpsecTunnelMetric,
-  IpsecWifiClient,
 } from "../types";
 import { useThemeColors } from "../ui/Theme";
 import type { ThemeColors } from "../ui/Theme";
@@ -59,6 +63,42 @@ import { useToast } from "../ui/Toast";
 import { Modal } from "../ui/Modal";
 
 type Metric = "latency" | "jitter" | "loss";
+
+/** The RSSI card needs only this subset. IPsec Wi-Fi rows and device-inventory
+ * rows both adapt to it without pretending that prplhome is a gateway state. */
+interface RssiReading {
+  mac: string;
+  ip?: string;
+  hostname?: string;
+  active?: boolean;
+  rssi?: number;
+  snr?: number;
+  standard?: string;
+}
+
+type ValidRssiReading = RssiReading & { rssi: number };
+
+function rssiReadingsFromDevices(
+  devices: DeviceView[],
+  inventorySource?: DeviceInventorySource,
+  locationSource?: "rdk" | "prpl",
+): RssiReading[] {
+  return devices.flatMap((device) => {
+    if (inventorySource && device.inventorySource !== inventorySource) return [];
+    if (locationSource && device.locationSource !== locationSource) return [];
+    if (device.conn !== "wifi") return [];
+    const rssi = device.telemetry?.rssiDbm;
+    return [{
+      mac: device.mac,
+      ip: device.ip,
+      hostname: device.name,
+      active: device.status !== "err",
+      rssi: typeof rssi === "number" && Number.isFinite(rssi) ? rssi : undefined,
+      snr: device.telemetry?.snrDb,
+      standard: device.telemetry?.wifiStandard,
+    }];
+  });
+}
 
 const metricCfg: Record<
   Metric,
@@ -700,20 +740,51 @@ export function DynamicPathSelectionPage({ branchId }: { branchId?: string }) {
   >([]);
   const c = useThemeColors();
   const ipsec = useIpsecMetrics();
+  // One shared device stream for both the RSSI KPI and the topology. McKinney's
+  // device/RSSI feed is prplhome; its path/tunnel feed remains prpl.
+  const deviceInventory = useDevices();
   const { push } = useToast();
 
   // Scope the live list to the current branch's MQTT source — Plano sees
   // `rdk/...` gateways, McKinney sees `prpl/...` gateways. Branches without
   // a mapped source see the unfiltered list (handy during development).
   const branchSource = branchId ? BRANCH_TO_IPSEC_SOURCE[branchId] : undefined;
-  const branchList = branchSource
-    ? ipsec.list.filter((g) => g.source === branchSource)
-    : ipsec.list;
+  const branchDeviceSource = branchId
+    ? BRANCH_TO_DEVICE_SOURCE[branchId]
+    : undefined;
+  // Old gateway keys remain in the server cache, so always put the freshest
+  // state first instead of inheriting useIpsecMetrics' alphabetical name sort.
+  const branchList = [
+    ...(branchSource
+      ? ipsec.list.filter((g) => g.source === branchSource)
+      : ipsec.list),
+  ].sort((a, b) => b.receivedAt - a.receivedAt);
 
   // Effective IPsec data — either the live snapshot, or the captured sample
   // when the user clicks "Load sample" on the ingest card.
   const effectiveList = showSample ? [SAMPLE_IPSEC_GATEWAY] : branchList;
   const liveState = effectiveList[0];
+  const branchRssiClients = useMemo(
+    () => rssiReadingsFromDevices(
+      deviceInventory.devices,
+      branchDeviceSource,
+      branchSource,
+    ),
+    [branchDeviceSource, branchSource, deviceInventory.devices],
+  );
+  const rssiClients: RssiReading[] = showSample
+    ? (liveState?.metrics.wifi?.clients ?? [])
+    : branchDeviceSource
+      ? branchRssiClients
+      : (liveState?.metrics.wifi?.clients ?? []);
+  const rssiTopic = branchDeviceSource
+    ? `${branchDeviceSource}/ipsec/metrics`
+    : branchSource
+      ? `${branchSource}/ipsec/metrics`
+      : "ipsec/metrics";
+  const rssiFeedSeen = showSample || !branchDeviceSource ||
+    deviceInventory.inventorySourcesSeen.includes(branchDeviceSource) ||
+    deviceInventory.devices.some((device) => device.inventorySource === branchDeviceSource);
 
   // ── Rolling SLA series derived from live IPsec payloads ──────────────
   // We buffer the last ~10 minutes of derived per-underlay metrics so the
@@ -866,7 +937,12 @@ export function DynamicPathSelectionPage({ branchId }: { branchId?: string }) {
           series={slaSeries.map((h) => h.fiber_mos)}
           digits={1}
         />
-        <RssiCard clients={liveState?.metrics.wifi?.clients ?? []} />
+        <RssiCard
+          clients={rssiClients}
+          sourceTopic={showSample ? "captured payload" : rssiTopic}
+          feedSeen={rssiFeedSeen}
+          connected={showSample || deviceInventory.connected}
+        />
       </div>
 
       <div className="grid">
@@ -879,6 +955,8 @@ export function DynamicPathSelectionPage({ branchId }: { branchId?: string }) {
             onToggleSample={() => setShowSample((s) => !s)}
             effectiveList={effectiveList}
             branchTopic={branchSource ? `${branchSource}/ipsec/metrics` : null}
+            deviceTopic={rssiTopic}
+            devices={deviceInventory.devices}
           />
         </div>
 
@@ -1843,14 +1921,29 @@ function SlaCard({
 /** KPI card: Wi-Fi RSSI for the devices associated to the gateway. Real values
  *  from the payload's `wifi.clients[].rssi` (dBm). Shows the average signal,
  *  client count, and a per-client signal bar list. */
-function RssiCard({ clients }: { clients: IpsecWifiClient[] }) {
+function RssiCard({
+  clients,
+  sourceTopic,
+  feedSeen,
+  connected,
+}: {
+  clients: RssiReading[];
+  sourceTopic: string;
+  feedSeen: boolean;
+  connected: boolean;
+}) {
   const c = useThemeColors();
   const [open, setOpen] = useState(false);
   // A real association has a negative dBm; 0 means "no reading".
-  const valid = clients.filter((cl) => cl.rssi < 0);
-  const count = valid.length;
-  const avg = count
-    ? Math.round(valid.reduce((s, x) => s + x.rssi, 0) / count)
+  const connectedClients = clients.filter((client) => client.active !== false);
+  const count = connectedClients.length;
+  const valid = connectedClients.filter(
+    (client): client is ValidRssiReading =>
+      typeof client.rssi === "number" && Number.isFinite(client.rssi) && client.rssi < 0,
+  );
+  const readingCount = valid.length;
+  const avg = readingCount
+    ? Math.round(valid.reduce((s, x) => s + x.rssi, 0) / readingCount)
     : 0;
   const qcol = (dbm: number) =>
     dbm >= -55 ? c.ok : dbm >= -67 ? c.warn : c.err;
@@ -1860,7 +1953,7 @@ function RssiCard({ clients }: { clients: IpsecWifiClient[] }) {
   const fair = valid.filter((cl) => cl.rssi < -55 && cl.rssi >= -67).length;
   const weak = valid.filter((cl) => cl.rssi < -67).length;
   // The one client that actually needs attention (lowest signal).
-  const worst = valid.reduce<IpsecWifiClient | null>(
+  const worst = valid.reduce<ValidRssiReading | null>(
     (a, b) => (a && a.rssi <= b.rssi ? a : b),
     null,
   );
@@ -1873,14 +1966,14 @@ function RssiCard({ clients }: { clients: IpsecWifiClient[] }) {
     <>
       <div
         className="kpi-card"
-        onClick={() => count > 0 && setOpen(true)}
-        role="button"
-        tabIndex={0}
+        onClick={() => readingCount > 0 && setOpen(true)}
+        role={readingCount > 0 ? "button" : undefined}
+        tabIndex={readingCount > 0 ? 0 : -1}
         onKeyDown={(e) => {
-          if ((e.key === "Enter" || e.key === " ") && count > 0) setOpen(true);
+          if ((e.key === "Enter" || e.key === " ") && readingCount > 0) setOpen(true);
         }}
-        style={{ cursor: count > 0 ? "pointer" : "default" }}
-        title={count > 0 ? "View all connected devices" : undefined}
+        style={{ cursor: readingCount > 0 ? "pointer" : "default" }}
+        title={readingCount > 0 ? "View all RSSI readings" : undefined}
       >
         <div className="kpi-top">
           <div
@@ -1893,7 +1986,23 @@ function RssiCard({ clients }: { clients: IpsecWifiClient[] }) {
           >
             <Wifi size={16} />
           </div>
-          <div className="kpi-label">Wi-Fi RSSI</div>
+          <div style={{ minWidth: 0 }}>
+            <div className="kpi-label">Wi-Fi RSSI</div>
+            <div
+              className="mono"
+              title={sourceTopic}
+              style={{
+                marginTop: 2,
+                color: c.textMuted,
+                fontSize: 8.5,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {sourceTopic}
+            </div>
+          </div>
         </div>
         <div
           style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}
@@ -1913,11 +2022,11 @@ function RssiCard({ clients }: { clients: IpsecWifiClient[] }) {
               style={{
                 fontSize: 18,
                 fontWeight: 600,
-                color: count ? qcol(avg) : c.textMuted,
+                color: readingCount ? qcol(avg) : c.textMuted,
                 fontVariantNumeric: "tabular-nums",
               }}
             >
-              {count ? `${avg} dBm` : "—"}
+              {readingCount ? `${avg} dBm` : "—"}
             </div>
           </div>
           <div>
@@ -1951,9 +2060,15 @@ function RssiCard({ clients }: { clients: IpsecWifiClient[] }) {
             gap: 6,
           }}
         >
-          {count === 0 ? (
+          {readingCount === 0 ? (
             <div style={{ fontSize: 11, color: c.textMuted }}>
-              No Wi-Fi clients connected
+              {!connected
+                ? "RSSI feed unavailable · showing no readings"
+                : !feedSeen
+                  ? "Waiting for the first RSSI payload"
+                  : count > 0
+                    ? `${count} connected · awaiting valid RSSI readings`
+                    : "No Wi-Fi clients in the latest payload"}
             </div>
           ) : (
             <>
@@ -1977,7 +2092,7 @@ function RssiCard({ clients }: { clients: IpsecWifiClient[] }) {
                     <span
                       key={i}
                       style={{
-                        width: `${(seg.n / count) * 100}%`,
+                        width: `${(seg.n / readingCount) * 100}%`,
                         background: seg.color,
                       }}
                     />
@@ -2033,7 +2148,7 @@ function RssiCard({ clients }: { clients: IpsecWifiClient[] }) {
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title={`Wi-Fi RSSI · ${count} connected ${count === 1 ? "device" : "devices"}`}
+        title={`Wi-Fi RSSI · ${readingCount} readings across ${count} connected ${count === 1 ? "device" : "devices"}`}
         width={480}
       >
         <div
@@ -2087,7 +2202,11 @@ function RssiCard({ clients }: { clients: IpsecWifiClient[] }) {
                       {[
                         cl.mac,
                         cl.ip || null,
-                        cl.standard ? `802.11${cl.standard}` : null,
+                        cl.standard
+                          ? cl.standard.startsWith("802.11")
+                            ? cl.standard
+                            : `802.11${cl.standard}`
+                          : null,
                         cl.snr ? `SNR ${cl.snr} dB` : null,
                       ]
                         .filter(Boolean)
@@ -2233,6 +2352,8 @@ export function LiveIpsecCard({
   onToggleSample,
   effectiveList,
   branchTopic,
+  deviceTopic,
+  devices,
 }: {
   ipsec: ReturnType<typeof useIpsecMetrics>;
   showSample: boolean;
@@ -2242,6 +2363,10 @@ export function LiveIpsecCard({
    *  Plano, `prpl/ipsec/metrics` for McKinney). Falls back to the server's
    *  full subscription list when the branch has no live mapping. */
   branchTopic: string | null;
+  /** Branch-scoped client/RSSI topic (McKinney uses prplhome). */
+  deviceTopic: string;
+  /** Shared device stream lifted from the page to avoid duplicate SSE clients. */
+  devices: DeviceView[];
 }) {
   const c = useThemeColors();
   const empty = effectiveList.length === 0;
@@ -2250,12 +2375,32 @@ export function LiveIpsecCard({
   // multi-subscription list. The server still subscribes to both topics; the
   // UI just hides the irrelevant one for this branch.
   const topicLabel = branchTopic ?? ipsec.subscribedTopic ?? "ipsec/metrics";
+  const freshestState = effectiveList.reduce<IpsecGatewayState | undefined>(
+    (latest, state) => !latest || state.receivedAt > latest.receivedAt ? state : latest,
+    undefined,
+  );
+  const freshestReceivedAt = freshestState?.receivedAt;
+  // Snapshot hydration carries the server's current clock even when every
+  // cached gateway state is old, so it is a render-stable freshness reference.
+  const freshnessReference = ipsec.lastReceivedAt ?? freshestReceivedAt;
+  const stale = !showSample && freshestReceivedAt != null &&
+    freshnessReference != null && freshnessReference - freshestReceivedAt > 60_000;
 
   // Connection state pill — three states: streaming / waiting / disconnected.
   const pill = showSample ? (
     <span className="badge warn">
       <span className="dot warn" />
       Preview · captured payload
+    </span>
+  ) : ipsec.connected && empty ? (
+    <span className="badge warn">
+      <span className="dot warn" />
+      Waiting for branch data
+    </span>
+  ) : ipsec.connected && stale ? (
+    <span className="badge warn" title={`Latest ${topicLabel} payload is stale`}>
+      <span className="dot warn" />
+      Connected · received {fmtAgo(freshestReceivedAt ?? 0)}
     </span>
   ) : ipsec.connected ? (
     <span className="badge ok">
@@ -2291,6 +2436,14 @@ export function LiveIpsecCard({
           >
             (AWS IoT Core)
           </span>
+        </span>
+      }
+      sub={
+        <span>
+          Path SLA · <span className="mono">{topicLabel}</span>
+          {deviceTopic !== topicLabel && (
+            <> · Clients + RSSI · <span className="mono">{deviceTopic}</span></>
+          )}
         </span>
       }
       // sub={ipsec.endpoint
@@ -2349,6 +2502,7 @@ export function LiveIpsecCard({
               g={g}
               c={c}
               sample={showSample}
+              devices={devices}
             />
           ))}
         </div>
@@ -2455,10 +2609,12 @@ async function postGatewayPathMode(
 function GatewayBlock({
   g,
   c,
+  devices,
 }: {
   g: IpsecGatewayState;
   c: ThemeColors;
   sample?: boolean;
+  devices: DeviceView[];
 }) {
   const m = g.metrics;
   const [forceMode, setForceMode] = useState<ForceMode>("auto");
@@ -2907,6 +3063,8 @@ function GatewayBlock({
         tunnelRates={tunnelRates}
         tunnelHist={tunnelHist}
         locationSource={source}
+        inventorySource={source === "prpl" ? "prplhome" : "rdk"}
+        devices={devices}
       />
 
       {/* Failover / SLA event ribbon — flips + breaches over the live session */}
@@ -3000,6 +3158,8 @@ function IpsecFlowSvg({
   tunnelRates,
   tunnelHist,
   locationSource,
+  inventorySource,
+  devices: allDevicesRaw,
 }: {
   m: IpsecGatewayState["metrics"];
   c: ThemeColors;
@@ -3019,6 +3179,10 @@ function IpsecFlowSvg({
   viewMode: ViewMode;
   /** Filter devices to this location ('rdk' for Plano, 'prpl' for McKinney). */
   locationSource?: "rdk" | "prpl";
+  /** Filter the device list to the feed selected for this branch. */
+  inventorySource?: DeviceInventorySource;
+  /** Shared live device inventory supplied by the page. */
+  devices: DeviceView[];
 }) {
   // Keep the canvas tight: less dead space = a larger render scale when the
   // SVG is fit to the card width, i.e. bigger, readable labels.
@@ -3027,12 +3191,12 @@ function IpsecFlowSvg({
 
   // Live IT/OT device inventory (same feed as the Devices page). Show up to 3
   // per domain as the on-prem endpoints originating traffic into the gateway.
-  // Strictly filter by location so Plano (rdk) and McKinney (prpl) devices never
-  // mix — only devices whose locationSource matches this gateway are drawn.
-  const { devices: allDevicesRaw } = useDevices();
-  const allDevices = locationSource
-    ? allDevicesRaw.filter((d) => d.locationSource === locationSource)
-    : allDevicesRaw;
+  // Strictly filter by gateway location and inventory feed so Plano (rdk) and
+  // McKinney (prplhome/ipsec/metrics) devices never mix.
+  const allDevices = allDevicesRaw.filter((d) =>
+    (!locationSource || d.locationSource === locationSource) &&
+    (!inventorySource || d.inventorySource === inventorySource)
+  );
   const itAll = allDevices.filter((d) => d.domain === "IT");
   const otAll = allDevices.filter((d) => d.domain === "OT");
   const itDevices = itAll.slice(0, 3);

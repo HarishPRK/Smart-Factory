@@ -41,12 +41,22 @@ function payloadToOEE(
   const oeeRaw       = typeof raw.OEE          === "number" ? raw.OEE
     : availability * performance * quality;
 
-  const totalCycles  = typeof raw.total_units_produced === "number" ? raw.total_units_produced : 0;
+  // The bridge can publish incomplete/zero placeholders while the PLC has not
+  // completed its first production roll-up. Do not let those placeholders
+  // replace the seeded demo values (or flatten the trend to 0%) on startup.
+  const totalUnits = typeof raw.total_units_produced === "number" ? raw.total_units_produced : 0;
+  const uptimeMin = typeof raw.uptime_in_minutes === "number" ? raw.uptime_in_minutes : 0;
+  const downtimeMin = typeof raw.downtime_in_minutes === "number" ? raw.downtime_in_minutes : 0;
+  // A payload is only usable when every OEE pillar is a finite, positive
+  // roll-up value. Partial PLC startup payloads must not overwrite the demo
+  // values shown until the first complete roll-up arrives.
+  const pillars = [oeeRaw, availability, performance, quality];
+  if (pillars.some((value) => !Number.isFinite(value) || value <= 0)) return null;
+
+  const totalCycles  = totalUnits;
   const goodCycles   = Math.round(totalCycles * quality);
   const rejectCycles = Math.max(0, totalCycles - goodCycles);
 
-  const uptimeMin    = typeof raw.uptime_in_minutes   === "number" ? raw.uptime_in_minutes   : 0;
-  const downtimeMin  = typeof raw.downtime_in_minutes === "number" ? raw.downtime_in_minutes : 0;
   const runTimeSec   = uptimeMin * 60;
   const plannedSec   = (uptimeMin + downtimeMin) * 60;
 
@@ -83,8 +93,23 @@ const TREND_HOURS: Record<OEETimeRange, number> = {
 };
 
 export function useOEE(pollIntervalMs = 15_000): UseOEEResult {
-  const [oee, setOee] = useState<OEEResponse | null>(null);
-  const [trend, setTrend] = useState<OEETrendPoint[]>([]);
+  // Start with the seeded production snapshot so the dashboard never renders
+  // an empty/zero frame while the first poll or MQTT message is settling.
+  const [oee, setOee] = useState<OEEResponse | null>(() => ({
+    machineId: mockOEEMetrics.machineId,
+    timestamp: mockOEEMetrics.timestamp,
+    availability: mockOEEMetrics.availability,
+    performance: mockOEEMetrics.performance,
+    quality: mockOEEMetrics.quality,
+    oee: mockOEEMetrics.oee,
+    totalCycles: mockOEEMetrics.totalCycles,
+    goodCycles: mockOEEMetrics.goodCycles,
+    rejectCycles: mockOEEMetrics.rejectCycles,
+    runTimeSec: mockOEEMetrics.runTimeSec,
+    plannedProductionTimeSec: mockOEEMetrics.plannedProductionTimeSec,
+    shiftId: mockOEEMetrics.shiftId,
+  }));
+  const [trend, setTrend] = useState<OEETrendPoint[]>(() => generateMockOEETrend(24));
   const [liveTrend, setLiveTrend] = useState<OEETrendPoint[]>([]);
   const [loading, setLoading] = useState(false);
   const [trendTimeRange, setTrendTimeRange] = useState<OEETimeRange>("24h");

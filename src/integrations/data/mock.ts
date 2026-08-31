@@ -1,9 +1,16 @@
-import type { AppCategory, AppPolicy, PathThreshold } from '../types';
+import type { AppCategory, AppPolicy, DeviceInventorySource, PathThreshold } from '../types';
 
 /** Source mapping shared by Dynamic Failover and Application Traffic Routing. */
 export const BRANCH_TO_IPSEC_SOURCE: Record<string, 'rdk' | 'prpl'> = {
   'b-pln-01': 'rdk',
   'b-mck-03': 'prpl',
+};
+
+/** Device-list source used by branch-scoped DPS and AAR visualizations.
+ * McKinney's IT/OT fleet is published in the prplhome IPsec metrics feed. */
+export const BRANCH_TO_DEVICE_SOURCE: Record<string, DeviceInventorySource> = {
+  'b-pln-01': 'rdk',
+  'b-mck-03': 'prplhome',
 };
 
 export const pathThresholds: PathThreshold[] = [
