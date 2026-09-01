@@ -191,10 +191,14 @@ export function DevicesDashboard({ devices }: { devices: Device[] }) {
     ? Math.round(wifiRssis.reduce((s, x) => s + x, 0) / wifiRssis.length)
     : null;
 
-  const uptimes = devices.map((d) => d.connectedForHours);
+  const uptimes = devices
+    .map((d) => d.connectedForHours)
+    .filter((hours) => Number.isFinite(hours) && hours > 0);
+  // Keep the fractional value: live Wi-Fi inventory records connection age in
+  // hours, so rounding here hid every session younger than 30 minutes as “—”.
   const avgUptimeH = uptimes.length
-    ? Math.round(uptimes.reduce((s, x) => s + x, 0) / uptimes.length)
-    : 0;
+    ? uptimes.reduce((sum, hours) => sum + hours, 0) / uptimes.length
+    : null;
 
   // ── Sparkline data (last 12 ticks) for stat panels ──
   const labels = useMemo(() => hourLabels(), []);
@@ -216,7 +220,8 @@ export function DevicesDashboard({ devices }: { devices: Device[] }) {
         v: Math.round(wave(7, i + (HOURS - sparkLen), avgRssi ?? -65, 3)),
       }));
   const uptimeSpark = labels.slice(-sparkLen).map((_, i) => ({
-    t: i, v: avgUptimeH + Math.round(Math.sin(i / 4) * 2),
+    t: i,
+    v: Math.max(0, (avgUptimeH ?? 0) - (sparkLen - 1 - i)),
   }));
 
   // ── Link-quality time-series — pivoted by device ──
@@ -333,7 +338,7 @@ export function DevicesDashboard({ devices }: { devices: Device[] }) {
           <StatPanel
             label="Avg uptime"
             big={fmtDur(avgUptimeH)}
-            sub="rolling mean across selected devices"
+            sub="mean of reported connection ages"
             icon={Gauge}
             color={c.accent3}
             spark={uptimeSpark}
@@ -747,9 +752,18 @@ function tooltipStyle(c: ThemeColors) {
   } as const;
 }
 
-function fmtDur(h: number): string {
-  if (h <= 0) return '—';
-  if (h < 24) return `${h}h`;
-  return `${Math.floor(h / 24)}d ${h % 24}h`;
-}
+function fmtDur(hours: number | null): string {
+  if (hours == null || !Number.isFinite(hours) || hours <= 0) return '—';
+  if (hours < 1 / 60) return '<1m';
 
+  const totalMinutes = Math.floor(hours * 60);
+  if (totalMinutes < 60) return `${totalMinutes}m`;
+
+  const wholeHours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (wholeHours < 24) return `${wholeHours}h${minutes ? ` ${minutes}m` : ''}`;
+
+  const days = Math.floor(wholeHours / 24);
+  const remainingHours = wholeHours % 24;
+  return `${days}d${remainingHours ? ` ${remainingHours}h` : ''}`;
+}
