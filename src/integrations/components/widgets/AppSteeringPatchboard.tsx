@@ -33,7 +33,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Laptop, Monitor, Printer, CreditCard, Server, PhoneCall,
   Flame, Wind, DoorClosed, Smartphone, Tablet, Cpu, Plug, HelpCircle,
-  Video, Clapperboard, Mail, Briefcase, Globe, Activity, Gauge,
+  Video, Cctv, Mail, Briefcase, Globe, Activity, Gauge,
   Sparkles, RefreshCw, X, Lock, Unlock,
 } from 'lucide-react';
 import type { Device, IpsecTunnelMetric, AppCategoryId } from '../../types';
@@ -63,17 +63,16 @@ interface AppDef {
   name: string;
   cat: AppCategoryId;
   icon: React.ComponentType<{ size?: number }>;
-  /** The app's own brand hue — carried by its wire, badge, and label. */
+  /** The application's accent hue — carried by its wire, badge, and label. */
   color: string;
   /** Wire thickness ~ traffic intensity of the app class. */
   weight: number;
 }
 
-// Brand palettes (Teams lavender, Netflix red, M365 flame, Salesforce azure…)
-// picked from each brand's family at a shade that reads on both themes.
+// Application palettes are distinct at a glance and tuned to read on both themes.
 const IT_APPS: AppDef[] = [
   { name: 'Microsoft Teams', cat: 'video',    icon: Video,        color: '#7B83EB', weight: 2.6 },
-  { name: 'Netflix',         cat: 'video',    icon: Clapperboard, color: '#E50914', weight: 2.8 },
+  { name: 'Surveillance',    cat: 'video',    icon: Cctv,         color: '#38BDF8', weight: 2.8 },
   { name: 'Microsoft 365',   cat: 'business', icon: Mail,         color: '#D83B01', weight: 2.1 },
   { name: 'VoIP',            cat: 'voice',    icon: PhoneCall,    color: '#06B6D4', weight: 2.3 },
   { name: 'Salesforce',      cat: 'business', icon: Briefcase,    color: '#00A1E0', weight: 2.1 },
@@ -1396,8 +1395,8 @@ export function AppSteeringPatchboard({ branchId }: { branchId: string }) {
         <LegendDot color={tc.accent} label="fiber jack" />
         <LegendDot color={tc.accent2} label="5G jack" />
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ width: 16, height: 2, borderRadius: 2, background: `linear-gradient(90deg, #E50914, ${tc.accent})` }} />
-          wire = app's brand colour · packets re-color through the gateway · speed = live latency
+          <span style={{ width: 16, height: 2, borderRadius: 2, background: `linear-gradient(90deg, #38BDF8, ${tc.accent})` }} />
+          wire = application's accent colour · packets re-color through the gateway · speed = live latency
         </span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
           <Lock size={10} /> freeze locks a client's routing

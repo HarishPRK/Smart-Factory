@@ -11,7 +11,7 @@
  */
 
 export interface TunnelBinding {
-  /** e.g. "Netflix", "Microsoft Teams" */
+  /** e.g. "Surveillance", "Microsoft Teams" */
   application: string;
   /** Tunnel ifname exactly as reported on `<source>/ipsec/metrics`, e.g. "vti-fiber1". */
   tunnel: string;
@@ -185,4 +185,3 @@ export function encodeAppRouteCommand(cmd: AppRouteCommand): Uint8Array<ArrayBuf
 export function toHex(bytes: Uint8Array): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join(' ');
 }
-

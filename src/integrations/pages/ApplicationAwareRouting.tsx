@@ -69,7 +69,7 @@ export function ApplicationAwareRoutingPage({ branchId }: { branchId: string }) 
       />
 
       {/* KPI strip */}
-      <div className="kpi-strip" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+      <div className="kpi-strip kpi-strip--four">
         <SmallStat label="Apps tracked" value={String(totals.apps)} sub={`${totals.enabled} enabled`} icon={Layers} color="var(--accent)" />
         <SmallStat label="Real-time apps" value={String(totals.realtime)} sub="forced to Fiber" icon={Mic} color="var(--err)" />
         <SmallStat label="Flows / min" value={totals.flowsPerMin.toLocaleString()} sub="across all policies" icon={Shuffle} color="var(--accent-2)" />
@@ -366,7 +366,7 @@ function SmallStat({
       <div className="kpi-mid">
         <div className="kpi-value">{value}</div>
       </div>
-      <div className="kpi-trend-sub" style={{ fontSize: 11 }}>{sub}</div>
+      <div className="kpi-trend-sub">{sub}</div>
     </div>
   );
 }
