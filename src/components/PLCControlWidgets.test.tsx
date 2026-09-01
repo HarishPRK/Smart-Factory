@@ -177,7 +177,59 @@ describe("dashboard PLC control widgets", () => {
     });
   });
 
-  it("exposes motor state, sends the exact command, disables while pending, and restores on error", async () => {
+  it("sends the inverse absolute command on a second acknowledged click without telemetry", async () => {
+    sendCommand.mockResolvedValue(undefined);
+    render(
+      <>
+        <MotorFanWidget />
+        <EmergencyLightWidget />
+      </>,
+    );
+
+    const motor = screen.getByRole("button", { name: "Start motor fan" });
+    const emergency = screen.getByRole("button", {
+      name: "Activate emergency beacon",
+    });
+
+    fireEvent.click(motor);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    fireEvent.click(motor);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    fireEvent.click(emergency);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    fireEvent.click(emergency);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(sendCommand.mock.calls).toEqual([
+      ["motor_fan", {
+        _topic: "plc/control",
+        _rawPayload: { boardA_relay_motor: 1 },
+      }],
+      ["motor_fan", {
+        _topic: "plc/control",
+        _rawPayload: { boardA_relay_motor: 0 },
+      }],
+      ["emergency_light", {
+        _topic: "plc/control",
+        _rawPayload: { boardA_relay_alarm: 1 },
+      }],
+      ["emergency_light", {
+        _topic: "plc/control",
+        _rawPayload: { boardA_relay_alarm: 0 },
+      }],
+    ]);
+  });
+
+  it("exposes motor state, sends the exact command, disables while publishing, and restores on error", async () => {
     const command = deferred<void>();
     sendCommand.mockReturnValueOnce(command.promise);
     render(<MotorFanWidget />);
@@ -197,7 +249,7 @@ describe("dashboard PLC control widgets", () => {
       _rawPayload: { boardA_relay_motor: 1 },
     });
     expect(control.getAttribute("aria-label")).toBe(
-      "Waiting for motor fan confirmation",
+      "Publishing motor fan command",
     );
     expect(control.getAttribute("aria-pressed")).toBe("true");
     expect(control.getAttribute("aria-busy")).toBe("true");
@@ -219,7 +271,7 @@ describe("dashboard PLC control widgets", () => {
     expect(control.getAttribute("title")).toContain("Press again to retry");
   });
 
-  it("keeps motor state pending until matching PLC telemetry confirms it", async () => {
+  it("completes motor control after the broker ack without waiting for PLC telemetry", async () => {
     sendCommand.mockResolvedValueOnce(undefined);
     render(<MotorFanWidget />);
 
@@ -229,58 +281,45 @@ describe("dashboard PLC control widgets", () => {
       await Promise.resolve();
     });
 
-    expect(control.getAttribute("aria-label")).toBe(
-      "Waiting for motor fan confirmation",
-    );
-    expect(control.getAttribute("aria-busy")).toBe("true");
-    expect(screen.getByRole("status").textContent).toContain("Starting");
-
-    act(() => {
-      usePLCStore.setState({ motorFanOn: true });
-    });
-    act(() => {
-      vi.advanceTimersByTime(0);
-    });
-
     expect(control.getAttribute("aria-label")).toBe("Stop motor fan");
     expect(control.getAttribute("aria-busy")).toBe("false");
-    expect(screen.getByRole("status").textContent).toContain("Running");
-  });
-
-  it("recovers from a confirmation timeout when late motor telemetry arrives", async () => {
-    sendCommand.mockResolvedValueOnce(undefined);
-    render(<MotorFanWidget />);
-
-    const control = screen.getByRole("button", { name: "Start motor fan" });
-    fireEvent.click(control);
-    await act(async () => {
-      await Promise.resolve();
-    });
-    act(() => {
-      vi.advanceTimersByTime(5_000);
-    });
-
-    expect(control.getAttribute("aria-busy")).toBe("false");
-    expect(screen.getByRole("status").textContent).toContain(
-      "Standby · Retry start",
-    );
-    expect(screen.getByRole("alert").textContent).toContain(
-      "PLC confirmation was not received",
-    );
-
-    act(() => {
-      usePLCStore.setState({ motorFanOn: true });
-    });
-    act(() => {
-      vi.advanceTimersByTime(0);
-    });
-
-    expect(control.getAttribute("aria-label")).toBe("Stop motor fan");
-    expect(screen.getByRole("status").textContent).toContain("Running");
+    expect((control as HTMLButtonElement).disabled).toBe(false);
+    expect(control.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("status").textContent).toContain("Start sent");
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("exposes emergency state, sends the exact command, disables while pending, and restores on error", async () => {
+  it("hands acknowledged motor intent back to live telemetry when it arrives", async () => {
+    sendCommand.mockResolvedValueOnce(undefined);
+    render(<MotorFanWidget />);
+
+    const control = screen.getByRole("button", { name: "Start motor fan" });
+    fireEvent.click(control);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    act(() => {
+      usePLCStore.setState({ motorFanOn: true });
+    });
+    act(() => {
+      vi.advanceTimersByTime(0);
+    });
+
+    expect(control.getAttribute("aria-label")).toBe("Stop motor fan");
+    expect(control.getAttribute("aria-busy")).toBe("false");
+    expect(screen.getByRole("status").textContent).toContain("Running");
+
+    act(() => {
+      usePLCStore.setState({ motorFanOn: false });
+    });
+
+    expect(control.getAttribute("aria-label")).toBe("Start motor fan");
+    expect(screen.getByRole("status").textContent).toContain("Standby");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("exposes emergency state, sends the exact command, disables while publishing, and restores on error", async () => {
     const command = deferred<void>();
     sendCommand.mockReturnValueOnce(command.promise);
     render(<EmergencyLightWidget />);
@@ -302,7 +341,7 @@ describe("dashboard PLC control widgets", () => {
       _rawPayload: { boardA_relay_alarm: 1 },
     });
     expect(control.getAttribute("aria-label")).toBe(
-      "Waiting for emergency beacon confirmation",
+      "Publishing emergency beacon command",
     );
     expect(control.getAttribute("aria-pressed")).toBe("true");
     expect(control.getAttribute("aria-busy")).toBe("true");
@@ -326,7 +365,7 @@ describe("dashboard PLC control widgets", () => {
     expect(control.getAttribute("title")).toContain("Press again to retry");
   });
 
-  it("keeps emergency state pending until matching PLC telemetry confirms it", async () => {
+  it("completes emergency control after the broker ack and later hands off to telemetry", async () => {
     sendCommand.mockResolvedValueOnce(undefined);
     render(<EmergencyLightWidget />);
 
@@ -339,25 +378,17 @@ describe("dashboard PLC control widgets", () => {
     });
 
     expect(control.getAttribute("aria-label")).toBe(
-      "Waiting for emergency beacon confirmation",
+      "Clear emergency beacon",
     );
-    expect(control.getAttribute("aria-busy")).toBe("true");
-    expect(screen.getByRole("status").textContent).toContain("Activating");
-
-    act(() => {
-      usePLCStore.setState({ emergencyLightOn: true });
-    });
-    act(() => {
-      vi.advanceTimersByTime(0);
-    });
-
-    expect(control.getAttribute("aria-label")).toBe(
-      "Waiting for emergency beacon confirmation",
-    );
-    expect(control.getAttribute("aria-busy")).toBe("true");
+    expect(control.getAttribute("aria-busy")).toBe("false");
+    expect((control as HTMLButtonElement).disabled).toBe(false);
+    expect(control.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("status").textContent).toContain("Activate sent");
+    expect(screen.queryByRole("alert")).toBeNull();
 
     act(() => {
       usePLCStore.setState({
+        emergencyLightOn: true,
         relays: [false, true, false, false, false, false, false, false],
       });
     });
@@ -370,5 +401,17 @@ describe("dashboard PLC control widgets", () => {
     );
     expect(control.getAttribute("aria-busy")).toBe("false");
     expect(screen.getByRole("status").textContent).toContain("Active");
+
+    act(() => {
+      usePLCStore.setState({
+        emergencyLightOn: false,
+        relays: [false, false, false, false, false, false, false, false],
+      });
+    });
+
+    expect(control.getAttribute("aria-label")).toBe(
+      "Activate emergency beacon",
+    );
+    expect(screen.getByRole("status").textContent).toContain("Clear");
   });
 });

@@ -1,0 +1,40 @@
+RecipeFormatVersion: "2020-01-25"
+ComponentName: "com.smartfactory.EdgeCommand"
+ComponentVersion: "1.0.0"
+ComponentDescription: "Strict AWS IoT plc/control downlink to the factory Mosquitto broker"
+ComponentPublisher: "Smart Factory"
+
+ComponentConfiguration:
+  DefaultConfiguration:
+    mqttHost: "192.168.10.254"
+    mqttPort: 1883
+    accessControl:
+      aws.greengrass.ipc.mqttproxy:
+        "com.smartfactory.EdgeCommand:subscribe:1":
+          policyDescription: "Subscribe only to the PLC relay command topic"
+          operations:
+            - "aws.greengrass#SubscribeToIoTCore"
+          resources:
+            - "plc/control"
+
+Manifests:
+  - Platform:
+      os: "linux"
+    Artifacts:
+      - URI: "s3://REPLACE_WITH_COMPONENT_ARTIFACT_BUCKET/com.smartfactory.EdgeCommand/1.0.0/edge-command.zip"
+        Unarchive: "ZIP"
+    Lifecycle:
+      Install:
+        RequiresPrivilege: false
+        Script: |-
+          mkdir -p "{work:path}/edge-command"
+          cp -R "{artifacts:decompressedPath}/edge-command/." "{work:path}/edge-command/"
+          npm ci --omit=dev --no-audit --no-fund --prefix "{work:path}/edge-command"
+      Run:
+        RequiresPrivilege: false
+        Setenv:
+          MQTT_HOST: "{configuration:/mqttHost}"
+          MQTT_PORT: "{configuration:/mqttPort}"
+        Script: |-
+          cd "{work:path}/edge-command"
+          exec node scripts/edge-command.mjs

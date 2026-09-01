@@ -1,0 +1,16 @@
+{
+  "name": "smart-factory-edge-command",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node scripts/edge-command.mjs"
+  },
+  "dependencies": {
+    "aws-iot-device-sdk-v2": "1.26.0",
+    "mqtt": "5.15.1"
+  }
+}

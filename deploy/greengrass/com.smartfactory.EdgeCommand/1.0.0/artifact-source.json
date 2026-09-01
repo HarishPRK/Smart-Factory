@@ -1,0 +1,24 @@
+{
+  "componentName": "com.smartfactory.EdgeCommand",
+  "componentVersion": "1.0.0",
+  "archiveName": "edge-command.zip",
+  "archiveRoot": "edge-command",
+  "files": [
+    {
+      "source": "deploy/greengrass/com.smartfactory.EdgeCommand/1.0.0/artifact-source/package.json",
+      "destination": "package.json"
+    },
+    {
+      "source": "deploy/greengrass/com.smartfactory.EdgeCommand/1.0.0/artifact-source/package-lock.json",
+      "destination": "package-lock.json"
+    },
+    {
+      "source": "scripts/edge-command.mjs",
+      "destination": "scripts/edge-command.mjs"
+    },
+    {
+      "source": "scripts/edge-command-contract.mjs",
+      "destination": "scripts/edge-command-contract.mjs"
+    }
+  ]
+}

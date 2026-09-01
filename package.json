@@ -23,6 +23,7 @@
     "mqtt-bridge": "node scripts/mqtt-bridge.mjs",
     "gateway-twin-bridge": "node scripts/gateway-twin-bridge.mjs",
     "edge-republish": "node scripts/edge-republish.mjs",
+    "edge-command": "node scripts/edge-command.mjs",
     "cloud-bridge": "node scripts/cloud-bridge.mjs",
     "aws-latency-probe": "node scripts/aws-latency-probe.mjs",
     "sitewise-ingest": "node scripts/sitewise-ingest.mjs"

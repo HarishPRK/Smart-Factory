@@ -7,17 +7,19 @@ connection.
 ```
 FACTORY LAN                         AWS us-east-1
 PLC → Mosquitto → edge-republish ──(SigV4 publish)──▶ IoT Core
-                                                         │
-                                          (SigV4 subscribe, intra-region ~1-5ms)
-                                                         ▼
+       ▲                                                 │  ▲
+       │                                                 │  │ plc/control
+       └── edge-command ◀──────(exact SigV4 subscribe)───┘  │
+                                                         ▼  │
                                        EC2: cloud-bridge ──WS──▶ nginx ──▶ browser
                                             + serves React bundle
 ```
 
-Three moving parts:
+Four moving parts:
 1. **Factory:** `npm run edge-republish` — mirrors telemetry-only PLC data + `lorawan/#` up to IoT Core. `plc/control` and `plc/cmd` are always blocked.
-2. **EC2:** `npm run cloud-bridge` — subscribes IoT Core, fans out to browsers over WS (port 9001, proxied as `/ws` by nginx).
-3. **EC2:** nginx serves the static dashboard and proxies `/ws` → cloud-bridge.
+2. **Factory:** `npm run edge-command` — subscribes to the exact AWS `plc/control` topic and forwards only canonical, absolute relay commands to local Mosquitto.
+3. **EC2:** `npm run cloud-bridge` — subscribes IoT Core, fans out to browsers over WS (port 9001, proxied as `/ws` by nginx).
+4. **EC2:** nginx serves the static dashboard and proxies `/ws` → cloud-bridge.
 
 ---
 
@@ -46,26 +48,84 @@ policies.
 ```json
 { "Version": "2012-10-17", "Statement": [
   { "Effect": "Allow", "Action": "iot:Connect",
-    "Resource": "arn:aws:iot:us-east-1:841019700679:client/edge-republish-*" },
+    "Resource": [
+      "arn:aws:iot:us-east-1:841019700679:client/edge-republish-*",
+      "arn:aws:iot:us-east-1:841019700679:client/edge-command-*" ] },
   { "Effect": "Allow", "Action": "iot:Publish",
     "Resource": [
-      "arn:aws:iot:us-east-1:841019700679:topic/plc/*",
-      "arn:aws:iot:us-east-1:841019700679:topic/lorawan/*" ] }
+      "arn:aws:iot:us-east-1:841019700679:topic/prplHome/McKinney/lineA/plc1/data",
+      "arn:aws:iot:us-east-1:841019700679:topic/prplHome/McKinney/lineA/plc1/data/*",
+      "arn:aws:iot:us-east-1:841019700679:topic/plc/data",
+      "arn:aws:iot:us-east-1:841019700679:topic/plc/data/*",
+      "arn:aws:iot:us-east-1:841019700679:topic/lorawan/*" ] },
+  { "Effect": "Allow", "Action": "iot:Subscribe",
+    "Resource": "arn:aws:iot:us-east-1:841019700679:topicfilter/plc/control" },
+  { "Effect": "Allow", "Action": "iot:Receive",
+    "Resource": "arn:aws:iot:us-east-1:841019700679:topic/plc/control" }
 ] }
 ```
-The latency probe already proved Publish/Subscribe work on `plc/*`, so your
-current IAM policy may already cover this.
+Keep the downlink `Subscribe` and `Receive` resources exact; do not grant it a
+wildcard command filter. The latency probe proving broad `plc/*` access is not
+a substitute for the edge command identity's least-privilege policy.
 
 ## Step 2 — Factory side
 
 On the machine that can reach the local broker (`192.168.10.254`):
 ```bash
 npm ci
+# Terminal/service 1
 npm run edge-republish
+# Terminal/service 2
+npm run edge-command
 ```
 You should see `Connected to AWS IoT Core — ready to republish` and periodic
-`forwarded=… dropped=…` lines. Keep it running (use pm2 / a Windows service /
-systemd as appropriate).
+`forwarded=… dropped=…` lines from the telemetry process. The command process
+logs `AWS_SUBSCRIBED` and `LOCAL_CONNECTED` readiness events. Keep both running
+as separately supervised processes (use pm2 / a Windows service / systemd as
+appropriate).
+
+`edge-command` publishes nothing when it starts. For each live AWS message, it
+requires the exact `plc/control` topic and exactly one of these numeric binary
+payloads:
+
+```json
+{"boardA_relay_motor":0}
+{"boardA_relay_motor":1}
+{"boardA_relay_alarm":0}
+{"boardA_relay_alarm":1}
+```
+
+Retained messages, additional fields, alternate topics, strings, booleans, and
+non-binary values are rejected. Accepted commands are re-serialized to that
+canonical JSON shape and published to local `plc/control` at QoS 1 with
+`retain=false`. Values are absolute and therefore safe to repeat if AWS
+redelivers a QoS 1 message. After a local broker disconnect, the adapter uses a
+fresh MQTT client rather than replaying an unacknowledged client-side queue.
+
+Commission with the machine de-energized. Send and verify the two `0` commands
+first, then verify PLC telemetry/state feedback before testing either `1`
+command. A `COMMAND_FORWARDED` log means local Mosquitto acknowledged the MQTT
+publish; it is not proof that the PLC applied the output. Keep an independent
+hardware E-stop in the control path.
+
+### Greengrass-native factory deployment
+
+When Greengrass injects both its nucleus domain-socket variable and `SVCUID`,
+the same `edge-command` entry point automatically uses Greengrass IPC instead
+of standalone SigV4 credentials. It requests `SubscribeToIoTCore` at QoS 1 for
+the exact `plc/control` topic and preserves the same validator and local QoS 1,
+non-retained publish path. Partial IPC configuration is fatal; IPC disconnect,
+stream error, or unexpected stream end exits nonzero so Greengrass can restart
+the component.
+
+The versioned recipe and artifact-source metadata are under
+`deploy/greengrass/com.smartfactory.EdgeCommand/1.0.0/`. Its access-control
+policy grants only `aws.greengrass#SubscribeToIoTCore` on `plc/control`, and its
+default local broker is `192.168.10.254:1883`. The Greengrass component replaces
+the standalone `npm run edge-command` process; never run both on one factory.
+The core device certificate's IoT policy must separately grant exact
+`iot:Subscribe` access to `topicfilter/plc/control` and exact `iot:Receive`
+access to `topic/plc/control`; the component needs no IAM access keys.
 
 ## Step 3 — EC2 side
 
@@ -130,9 +190,10 @@ applies only to legacy local `plc/cmd` toggles; the EC2 bridge does not accept
 that legacy topic. Additional trusted browser origins can be listed explicitly
 in `CONTROL_ALLOWED_ORIGINS` (comma-separated).
 
-Publishing to AWS IoT does not by itself actuate a factory-local PLC. Keep the
-AWS-to-factory downlink behind the separately commissioned edge command adapter;
-do not mirror `plc/control` bidirectionally through the telemetry republisher.
+Publishing to AWS IoT actuates a factory-local PLC only while the separately
+commissioned `edge-command` adapter is running and the local PLC consumes
+`plc/control`. Do not run this adapter on EC2, and do not mirror `plc/control`
+bidirectionally through the telemetry republisher.
 
 `MosquittoPLCService` consumes the existing `{ topic, payload, publishedAt }`
 telemetry envelope and the correlated `publish-ack` command response.

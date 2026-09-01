@@ -82,17 +82,13 @@ const MotorFanWidget: React.FC<MotorFanWidgetProps> = ({ className = "" }) => {
   const motorFanOn = usePLCStore((s) => s.motorFanOn);
   const [manualOn, setManualOn] = useState<boolean | null>(null);
   const [commandState, setCommandState] = useState<
-    "idle" | "sending" | "confirming" | "error"
+    "idle" | "sending" | "error"
   >("idle");
   const [commandError, setCommandError] = useState<string | null>(null);
-  const [confirmationTarget, setConfirmationTarget] = useState<boolean | null>(
-    null,
-  );
   const requestedOn = manualOn ?? motorFanOn;
   // Animation, sound, and the activation banner use reported PLC state only.
   const isOn = motorFanOn;
-  const commandPending =
-    commandState === "sending" || commandState === "confirming";
+  const commandPending = commandState === "sending";
   const [bannerEpoch, setBannerEpoch] = useState(0);
   const [dismissedBannerEpoch, setDismissedBannerEpoch] = useState(0);
   const motorSoundRef = useRef<{ stop: () => void } | null>(null);
@@ -128,52 +124,28 @@ const MotorFanWidget: React.FC<MotorFanWidgetProps> = ({ className = "" }) => {
     };
   }, [isOn]);
 
+  // A broker ACK completes the interaction. Keep the acknowledged intent in
+  // the control until matching PLC telemetry arrives, then hand display state
+  // back to the live feed without imposing a second confirmation timeout.
   useEffect(() => {
-    if (
-      (commandState !== "confirming" && commandState !== "error") ||
-      confirmationTarget === null ||
-      motorFanOn !== confirmationTarget
-    ) {
-      return;
-    }
-
-    const timeout = window.setTimeout(() => {
-      setManualOn(null);
-      setCommandState("idle");
-      setCommandError(null);
-      setConfirmationTarget(null);
-    }, 0);
+    if (manualOn === null || motorFanOn !== manualOn) return;
+    const timeout = window.setTimeout(() => setManualOn(null), 0);
     return () => window.clearTimeout(timeout);
-  }, [commandState, confirmationTarget, motorFanOn]);
-
-  useEffect(() => {
-    if (commandState !== "confirming") return;
-
-    const timeout = window.setTimeout(() => {
-      setManualOn(null);
-      setCommandState("error");
-      setCommandError(
-        "Command was published, but PLC confirmation was not received",
-      );
-    }, 5_000);
-    return () => window.clearTimeout(timeout);
-  }, [commandState]);
+  }, [manualOn, motorFanOn]);
 
   const handleToggle = async () => {
     if (commandPending) return;
 
-    const turningOn = !isOn;
+    const turningOn = !requestedOn;
     setManualOn(turningOn);
-    setConfirmationTarget(turningOn);
     setCommandState("sending");
     setCommandError(null);
 
     try {
       await sendCommand("motor_fan", motorFanControlCommand(turningOn));
-      setCommandState("confirming");
+      setCommandState("idle");
     } catch (error) {
       setManualOn(null);
-      setConfirmationTarget(null);
       setCommandState("error");
       setCommandError(
         error instanceof Error ? error.message : "MQTT command failed",
@@ -209,8 +181,8 @@ const MotorFanWidget: React.FC<MotorFanWidgetProps> = ({ className = "" }) => {
       disabled={commandPending}
       aria-label={
         commandPending
-          ? "Waiting for motor fan confirmation"
-          : `${isOn ? "Stop" : "Start"} motor fan`
+          ? "Publishing motor fan command"
+          : `${requestedOn ? "Stop" : "Start"} motor fan`
       }
       aria-pressed={requestedOn}
       aria-busy={commandPending}
@@ -250,14 +222,14 @@ const MotorFanWidget: React.FC<MotorFanWidgetProps> = ({ className = "" }) => {
           />
           {commandState === "sending"
             ? "Publishing"
-            : commandState === "confirming"
-              ? manualOn
-                ? "Starting"
-                : "Stopping"
             : commandState === "error"
               ? isOn
                 ? "Running · Retry stop"
                 : "Standby · Retry start"
+              : manualOn !== null
+                ? manualOn
+                  ? "Start sent"
+                  : "Stop sent"
               : isOn
                 ? "Running"
                 : "Standby"}

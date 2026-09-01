@@ -100,20 +100,16 @@ const EmergencyLightWidget: React.FC<EmergencyLightWidgetProps> = ({
   const alarmRelayOn = usePLCStore((s) => s.relays[1] ?? false);
   const [manualAlert, setManualAlert] = useState<boolean | null>(null);
   const [commandState, setCommandState] = useState<
-    "idle" | "sending" | "confirming" | "error"
+    "idle" | "sending" | "error"
   >("idle");
   const [commandError, setCommandError] = useState<string | null>(null);
-  const [confirmationTarget, setConfirmationTarget] = useState<boolean | null>(
-    null,
-  );
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animRef = useRef<number>(0);
 
   // Only reported telemetry activates the beacon animation, siren, and banner.
   const commandedAlert = manualAlert ?? alarmRelayOn;
   const hasAlert = emergencyLightOn;
-  const commandPending =
-    commandState === "sending" || commandState === "confirming";
+  const commandPending = commandState === "sending";
   const [bannerEpoch, setBannerEpoch] = useState(0);
   const [dismissedBannerEpoch, setDismissedBannerEpoch] = useState(0);
   const sirenRef = useRef<{ stop: () => void } | null>(null);
@@ -151,43 +147,19 @@ const EmergencyLightWidget: React.FC<EmergencyLightWidgetProps> = ({
     };
   }, [hasAlert]);
 
+  // A broker ACK completes the interaction. Live relay telemetry can take over
+  // whenever it catches up, but it is not required to clear the button state.
   useEffect(() => {
-    if (
-      (commandState !== "confirming" && commandState !== "error") ||
-      confirmationTarget === null ||
-      alarmRelayOn !== confirmationTarget
-    ) {
-      return;
-    }
-
-    const timeout = window.setTimeout(() => {
-      setManualAlert(null);
-      setCommandState("idle");
-      setCommandError(null);
-      setConfirmationTarget(null);
-    }, 0);
+    if (manualAlert === null || alarmRelayOn !== manualAlert) return;
+    const timeout = window.setTimeout(() => setManualAlert(null), 0);
     return () => window.clearTimeout(timeout);
-  }, [alarmRelayOn, commandState, confirmationTarget]);
-
-  useEffect(() => {
-    if (commandState !== "confirming") return;
-
-    const timeout = window.setTimeout(() => {
-      setManualAlert(null);
-      setCommandState("error");
-      setCommandError(
-        "Command was published, but PLC confirmation was not received",
-      );
-    }, 5_000);
-    return () => window.clearTimeout(timeout);
-  }, [commandState]);
+  }, [alarmRelayOn, manualAlert]);
 
   const handleToggle = async () => {
     if (commandPending) return;
 
-    const turningOn = !alarmRelayOn;
+    const turningOn = !commandedAlert;
     setManualAlert(turningOn);
-    setConfirmationTarget(turningOn);
     setCommandState("sending");
     setCommandError(null);
 
@@ -196,10 +168,9 @@ const EmergencyLightWidget: React.FC<EmergencyLightWidgetProps> = ({
         "emergency_light",
         emergencyLightControlCommand(turningOn),
       );
-      setCommandState("confirming");
+      setCommandState("idle");
     } catch (error) {
       setManualAlert(null);
-      setConfirmationTarget(null);
       setCommandState("error");
       setCommandError(
         error instanceof Error ? error.message : "MQTT command failed",
@@ -502,8 +473,8 @@ const EmergencyLightWidget: React.FC<EmergencyLightWidgetProps> = ({
       disabled={commandPending}
       aria-label={
         commandPending
-          ? "Waiting for emergency beacon confirmation"
-          : `${alarmRelayOn ? "Clear" : "Activate"} emergency beacon`
+          ? "Publishing emergency beacon command"
+          : `${commandedAlert ? "Clear" : "Activate"} emergency beacon`
       }
       aria-pressed={commandedAlert}
       aria-busy={commandPending}
@@ -535,7 +506,7 @@ const EmergencyLightWidget: React.FC<EmergencyLightWidgetProps> = ({
           className={`text-[9px] font-semibold flex items-center gap-1 px-1.5 py-0.5 rounded-md border transition-all duration-500 ${
             commandState === "error"
               ? "text-red-300/90 bg-red-500/[0.08] border-red-500/[0.2]"
-              : hasAlert
+              : commandedAlert
               ? "text-red-400/85 bg-red-500/[0.08] border-red-500/[0.2]"
               : "text-white/40 bg-white/[0.02] border-white/[0.05]"
           }`}
@@ -543,20 +514,20 @@ const EmergencyLightWidget: React.FC<EmergencyLightWidgetProps> = ({
           aria-live="polite"
         >
           <span
-            className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${hasAlert ? "bg-red-400 animate-pulse" : "bg-white/20"}`}
+            className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${commandedAlert ? "bg-red-400 animate-pulse" : "bg-white/20"}`}
           />
           {commandState === "sending"
             ? "Publishing"
-            : commandState === "confirming"
-              ? manualAlert
-                ? "Activating"
-                : "Clearing"
             : commandState === "error"
               ? alarmRelayOn
                 ? "Active · Retry clear"
                 : hasAlert
                   ? "Alert active · Retry beacon"
                   : "Clear · Retry activate"
+              : manualAlert !== null
+                ? manualAlert
+                  ? "Activate sent"
+                  : "Clear sent"
               : hasAlert
                 ? "Active"
                 : "Clear"}
