@@ -20,6 +20,19 @@ REMOTE_APP_DIR="/opt/smart-factory"
 BACKEND_STAGING_DIR="~/smart-factory-backend"
 CONFIG_STAGING_DIR="~/smart-factory-config"
 
+if [ "${PLC_CONTROL_IAM_CONFIRMED:-0}" != "1" ]; then
+    echo "ERROR: EC2 IAM must allow iot:Publish on topic/plc/control."
+    echo "Apply deploy/smart-factory-ec2-policy.json, then rerun with PLC_CONTROL_IAM_CONFIRMED=1."
+    exit 1
+fi
+
+if [ "${CONTROL_PERIMETER_CONFIRMED:-0}" != "1" ]; then
+    echo "ERROR: Refusing to expose PLC controls without an authenticated/private perimeter."
+    echo "Protect the dashboard with SSO/VPN/authenticated proxy (or a restricted site CIDR),"
+    echo "then rerun with CONTROL_PERIMETER_CONFIRMED=1. Origin and RFID checks are not user authentication."
+    exit 1
+fi
+
 # Build SSH/SCP options as an array so identity paths containing spaces remain
 # one argument (common when the EC2 key was downloaded as "Smart Factory.pem").
 SSH_OPTS=(-o StrictHostKeyChecking=accept-new)
@@ -43,6 +56,7 @@ echo "==> Step 2: Uploading frontend and integration API..."
 ssh "${SSH_OPTS[@]}" "$EC2_HOST" "
     mkdir -p ${STAGING_DIR} \
         ${BACKEND_STAGING_DIR}/server \
+        ${BACKEND_STAGING_DIR}/scripts \
         ${BACKEND_STAGING_DIR}/src/integrations \
         ${CONFIG_STAGING_DIR}
 "
@@ -63,7 +77,11 @@ scp "${SSH_OPTS[@]}" \
     package.json package-lock.json src/integrations/types.ts \
     "${EC2_HOST}:${BACKEND_STAGING_DIR}/"
 scp "${SSH_OPTS[@]}" \
+    scripts/cloud-bridge.mjs scripts/bridge-command.mjs \
+    "${EC2_HOST}:${BACKEND_STAGING_DIR}/scripts/"
+scp "${SSH_OPTS[@]}" \
     deploy/nginx.conf deploy/smart-factory-server.service \
+    deploy/cloud-bridge.service deploy/smart-factory-ec2-policy.json \
     "${EC2_HOST}:${CONFIG_STAGING_DIR}/"
 
 echo "==> Step 3: Installing frontend and integration API..."
@@ -74,16 +92,19 @@ ssh "${SSH_OPTS[@]}" "$EC2_HOST" "
     rm -rf ${STAGING_DIR}
     sudo chown -R nginx:nginx ${REMOTE_DIR}
 
-    sudo mkdir -p ${REMOTE_APP_DIR}/server ${REMOTE_APP_DIR}/src/integrations
+    sudo mkdir -p ${REMOTE_APP_DIR}/server ${REMOTE_APP_DIR}/scripts ${REMOTE_APP_DIR}/deploy ${REMOTE_APP_DIR}/src/integrations
     sudo cp -r ${BACKEND_STAGING_DIR}/server/. ${REMOTE_APP_DIR}/server/
+    sudo cp -r ${BACKEND_STAGING_DIR}/scripts/. ${REMOTE_APP_DIR}/scripts/
     sudo cp ${BACKEND_STAGING_DIR}/package.json ${REMOTE_APP_DIR}/package.json
     sudo cp ${BACKEND_STAGING_DIR}/package-lock.json ${REMOTE_APP_DIR}/package-lock.json
     sudo cp ${BACKEND_STAGING_DIR}/types.ts ${REMOTE_APP_DIR}/src/integrations/types.ts
+    sudo cp ${CONFIG_STAGING_DIR}/smart-factory-ec2-policy.json ${REMOTE_APP_DIR}/deploy/smart-factory-ec2-policy.json
     sudo chown -R ec2-user:ec2-user ${REMOTE_APP_DIR}
     cd ${REMOTE_APP_DIR}
     npm ci --omit=dev --no-audit --no-fund
 
     sudo install -m 0644 ${CONFIG_STAGING_DIR}/smart-factory-server.service /etc/systemd/system/smart-factory-server.service
+    sudo install -m 0644 ${CONFIG_STAGING_DIR}/cloud-bridge.service /etc/systemd/system/cloud-bridge.service
     sudo install -m 0644 ${CONFIG_STAGING_DIR}/nginx.conf /etc/nginx/conf.d/smart-factory.conf
     rm -rf ${BACKEND_STAGING_DIR} ${CONFIG_STAGING_DIR}
 "
@@ -93,6 +114,10 @@ ssh "${SSH_OPTS[@]}" "$EC2_HOST" "
     sudo systemctl daemon-reload
     sudo systemctl enable smart-factory-server.service
     sudo systemctl restart smart-factory-server.service
+    sudo systemctl enable cloud-bridge.service
+    sudo systemctl restart cloud-bridge.service
+    curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 1 \
+        http://127.0.0.1:9001/readyz >/dev/null
     curl --fail --silent --show-error --retry 10 --retry-connrefused --retry-delay 1 \
         http://127.0.0.1:3001/api/health >/dev/null
     sudo nginx -t

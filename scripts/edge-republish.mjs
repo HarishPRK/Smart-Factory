@@ -18,7 +18,7 @@
  *   MQTT_HOST              local broker, default 192.168.10.254
  *   MQTT_PORT             default 1883
  *   EDGE_TOPICS           comma-separated local topic filters to mirror,
- *                         default "prplHome/McKinney/lineA/plc1/#,plc/#,lorawan/#"
+ *                         default telemetry-only PLC + LoRaWAN filters
  *   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY [/ AWS_SESSION_TOKEN]  required
  *   AWS_IOT_ENDPOINT (or IOT_ENDPOINT)   default alht1i2bx8tzt-ats.iot.us-east-1.amazonaws.com
  *   AWS_REGION (or IOT_REGION)           default us-east-1
@@ -35,6 +35,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import mqtt from "mqtt";
 import { mqtt as iotMqtt, iot, auth } from "aws-iot-device-sdk-v2";
+import { isProtectedCommandTopic } from "./bridge-command.mjs";
 
 loadDotenv();
 
@@ -64,7 +65,8 @@ function loadDotenv() {
 
 const MQTT_HOST = process.env.MQTT_HOST ?? "192.168.10.254";
 const MQTT_PORT = Number(process.env.MQTT_PORT ?? 1883);
-const EDGE_TOPICS = (process.env.EDGE_TOPICS ?? "prplHome/McKinney/lineA/plc1/#,plc/#,lorawan/#")
+const EDGE_TOPICS = (process.env.EDGE_TOPICS ??
+  "prplHome/McKinney/lineA/plc1/data/#,plc/data/#,lorawan/#")
   .split(",")
   .map((t) => t.trim())
   .filter(Boolean);
@@ -92,6 +94,7 @@ let received = 0;
 let dropped = 0;
 let forwarded = 0;
 let loggedFirst = false;
+let loggedProtectedTopic = false;
 
 // --- AWS IoT Core (SigV4 WebSocket) publisher ---
 async function connectAws() {
@@ -144,6 +147,17 @@ localClient.on("error", (err) => console.error("[edge] Local MQTT error:", err.m
 
 localClient.on("message", (topic, payloadBuf) => {
   received++;
+  // Never mirror actuator topics to the cloud, even if EDGE_TOPICS is
+  // misconfigured broadly. This prevents retained-command replay and
+  // cloud↔factory echo loops when a separately commissioned downlink exists.
+  if (isProtectedCommandTopic(topic)) {
+    dropped++;
+    if (!loggedProtectedTopic) {
+      loggedProtectedTopic = true;
+      console.error(`[edge] Refusing to mirror protected command topic "${topic}"`);
+    }
+    return;
+  }
   if (!loggedFirst) {
     loggedFirst = true;
     console.log(`[edge] First local message seen on "${topic}" — telemetry is flowing`);

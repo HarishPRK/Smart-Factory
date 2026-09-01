@@ -1,0 +1,18 @@
+[Unit]
+Description=Smart Factory AWS IoT to browser bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/smart-factory
+ExecStart=/usr/bin/node scripts/cloud-bridge.mjs
+Restart=always
+RestartSec=3
+Environment=NODE_ENV=production
+Environment=AWS_REGION=us-east-1
+EnvironmentFile=-/opt/smart-factory/.env
+User=ec2-user
+
+[Install]
+WantedBy=multi-user.target

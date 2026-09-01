@@ -26,6 +26,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import mqtt from "mqtt";
 import { WebSocketServer } from "ws";
+import {
+  commandRequiresAuthorization,
+  createPublishAck,
+  createRfidAuthorizationGate,
+  isAllowedCommandOrigin,
+  parseBrowserPublish,
+} from "./bridge-command.mjs";
 
 // Load `.env` from the project root if present. Vite reads .env for the
 // browser bundle, but Node scripts need to load it themselves. We do this
@@ -67,6 +74,16 @@ function loadDotenv() {
 const MQTT_HOST = process.env.MQTT_HOST ?? "192.168.10.254";
 const MQTT_PORT = Number(process.env.MQTT_PORT ?? 1883);
 const WS_PORT = Number(process.env.WS_PORT ?? 9001);
+const CONTROL_AUTHORIZATION_WINDOW_MS = Number(
+  process.env.CONTROL_AUTHORIZATION_WINDOW_MS ?? 60_000,
+);
+const CONTROL_ALLOWED_ORIGINS = (process.env.CONTROL_ALLOWED_ORIGINS ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const controlAuthorization = createRfidAuthorizationGate({
+  windowMs: CONTROL_AUTHORIZATION_WINDOW_MS,
+});
 
 // --- Local MQTT client (TCP) ---
 const mqttUrl = `mqtt://${MQTT_HOST}:${MQTT_PORT}`;
@@ -86,6 +103,7 @@ const PLC_TOPICS = [
 ];
 
 localClient.on("connect", () => {
+  controlAuthorization.invalidate();
   console.log(`[bridge] Connected to local MQTT broker at ${mqttUrl}`);
   for (const filter of PLC_TOPICS) {
     localClient.subscribe(filter, { qos: 0 }, (err) => {
@@ -105,6 +123,8 @@ localClient.on("connect", () => {
 localClient.on("error", (err) => {
   console.error("[bridge] Local MQTT error:", err.message);
 });
+localClient.on("offline", () => controlAuthorization.invalidate());
+localClient.on("close", () => controlAuthorization.invalidate());
 
 // --- AWS IoT Core client (mTLS, optional) ---
 // Browsers can't do client-cert mTLS to AWS IoT, so the bridge does it on
@@ -194,20 +214,54 @@ wss.on("listening", () => {
   console.log(`[bridge] WebSocket server listening on ws://localhost:${WS_PORT}`);
 });
 
-wss.on("connection", (ws) => {
+wss.on("connection", (ws, request) => {
   console.log("[bridge] Browser connected");
   clients.add(ws);
+  const commandOriginAllowed = isAllowedCommandOrigin(
+    request.headers,
+    CONTROL_ALLOWED_ORIGINS,
+  );
 
-  // Browser → local MQTT (for command publishes only — never proxied to AWS)
+  // Browser → local MQTT (allowlisted command publishes only — never proxied to AWS)
   ws.on("message", (data) => {
-    try {
-      const msg = JSON.parse(data.toString());
-      const topic = msg.topic ?? "plc/cmd";
-      const payload = JSON.stringify(msg.payload ?? msg);
-      localClient.publish(topic, payload);
-    } catch {
-      console.error("[bridge] Bad message from browser");
+    const parsed = parseBrowserPublish(data, { allowLegacyCommand: true });
+    if (!parsed.ok) {
+      const ack = createPublishAck(parsed.requestId, false, parsed.error);
+      if (ack && ws.readyState === 1) ws.send(ack);
+      console.error(`[bridge] Rejected browser command: ${parsed.error}`);
+      return;
     }
+
+    const { requestId, topic, payload } = parsed.command;
+    if (!commandOriginAllowed) {
+      const ack = createPublishAck(requestId, false, "Command origin is not allowed");
+      if (ack && ws.readyState === 1) ws.send(ack);
+      return;
+    }
+    if (
+      commandRequiresAuthorization(parsed.command) &&
+      !controlAuthorization.isAuthorized()
+    ) {
+      const ack = createPublishAck(requestId, false, "Fresh RFID authorization is required");
+      if (ack && ws.readyState === 1) ws.send(ack);
+      return;
+    }
+    if (!localClient.connected) {
+      const ack = createPublishAck(requestId, false, "Local MQTT broker is offline");
+      if (ack && ws.readyState === 1) ws.send(ack);
+      return;
+    }
+
+    const qos = topic === "plc/control" ? 1 : 0;
+    localClient.publish(topic, payload, { qos, retain: false }, (err) => {
+      const ack = createPublishAck(
+        requestId,
+        !err,
+        err ? "Local MQTT publish failed" : undefined,
+      );
+      if (ack && ws.readyState === 1) ws.send(ack);
+      if (err) console.error("[bridge] Command publish error:", err.message);
+    });
   });
 
   ws.on("close", () => {
@@ -222,6 +276,7 @@ function forward(topic, payloadBuf) {
   let payload;
   try {
     payload = JSON.parse(payloadBuf.toString());
+    controlAuthorization.observe(topic, payload);
   } catch {
     payload = payloadBuf.toString(); // tolerate non-JSON publishes
   }

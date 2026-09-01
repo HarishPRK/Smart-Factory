@@ -12,11 +12,15 @@ One-time setup steps for your Amazon Linux EC2 instance.
 
 In AWS Console > EC2 > Security Groups > your instance's SG, add:
 
-| Type | Protocol | Port | Source      |
-|------|----------|------|-------------|
-| HTTP | TCP      | 80   | 0.0.0.0/0  |
+| Type | Protocol | Port | Source                    |
+|------|----------|------|---------------------------|
+| HTTP | TCP      | 80   | Site VPN / corporate CIDR |
 
 Ensure SSH (port 22) is restricted to your IP.
+
+Do not expose `/ws` on `0.0.0.0/0` without an authenticated reverse proxy or
+SSO in front of nginx. The RFID interlock is not operator identity. Public,
+unauthenticated deployment of the actuator endpoint is unsupported.
 
 ## Step 2: Install Nginx
 
@@ -80,12 +84,24 @@ Back on your **local machine** (Git Bash or WSL on Windows):
 
 ```bash
 chmod +x deploy.sh
-./deploy.sh ec2-user@<EC2-PUBLIC-IP> ~/.ssh/your-key.pem
+PLC_CONTROL_IAM_CONFIRMED=1 CONTROL_PERIMETER_CONFIRMED=1 \
+  ./deploy.sh ec2-user@<EC2-PUBLIC-IP> ~/.ssh/your-key.pem
 ```
 
-The script deploys the static site, installs the integration API under
-`/opt/smart-factory`, starts `smart-factory-server.service`, installs the nginx
-proxy configuration, and verifies `/api/health` before reloading nginx.
+Set `PLC_CONTROL_IAM_CONFIRMED=1` only after applying
+`deploy/smart-factory-ec2-policy.json` to the instance role. The deploy script
+stops otherwise so a successful release cannot silently omit control publish
+permission.
+
+Set `CONTROL_PERIMETER_CONFIRMED=1` only after the dashboard is reachable
+through the site VPN/corporate CIDR or an authenticated proxy/SSO. The deploy
+script refuses to install the control bridge without that explicit check.
+
+The script deploys the static site, installs the integration API and IoT bridge
+under `/opt/smart-factory`, starts `smart-factory-server.service` and
+`cloud-bridge.service`, installs the nginx proxy configuration, and verifies
+both `/api/health` and the bridge's AWS IoT subscription readiness before
+reloading nginx.
 
 ## Step 6: Verify
 

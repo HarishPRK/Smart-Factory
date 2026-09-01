@@ -1,5 +1,51 @@
-import { describe, expect, it } from "vitest";
-import { parsePLCPayload } from "./plcService";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MosquittoPLCService, parsePLCPayload } from "./plcService";
+
+class MockWebSocket {
+  static readonly CONNECTING = 0;
+  static readonly OPEN = 1;
+  static readonly CLOSING = 2;
+  static readonly CLOSED = 3;
+
+  static instances: MockWebSocket[] = [];
+
+  readonly url: string;
+  readyState = MockWebSocket.OPEN;
+  sent: string[] = [];
+  onopen: ((event: Event) => void) | null = null;
+  onmessage: ((event: MessageEvent) => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+  onclose: ((event: CloseEvent) => void) | null = null;
+
+  constructor(url: string | URL) {
+    this.url = String(url);
+    MockWebSocket.instances.push(this);
+  }
+
+  send(data: string): void {
+    this.sent.push(data);
+  }
+
+  close(): void {
+    this.readyState = MockWebSocket.CLOSED;
+  }
+
+  receive(data: unknown): void {
+    this.onmessage?.({ data: JSON.stringify(data) } as MessageEvent);
+  }
+}
+
+beforeEach(() => {
+  MockWebSocket.instances = [];
+  vi.stubGlobal("WebSocket", MockWebSocket);
+  vi.stubGlobal("crypto", {
+    randomUUID: vi.fn(() => "command-request-id"),
+  });
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("parsePLCPayload operator precision", () => {
   it("preserves voltage and current precision for immediate live display", () => {
@@ -15,5 +61,80 @@ describe("parsePLCPayload operator precision", () => {
     expect(voltage?.decimals).toBe(2);
     expect(current?.value).toBe(4.114);
     expect(current?.decimals).toBe(2);
+  });
+});
+
+describe("MosquittoPLCService command publishing", () => {
+  function connectedService() {
+    const service = new MosquittoPLCService("ws://bridge.test/ws");
+    service.subscribe(() => {});
+
+    const socket = MockWebSocket.instances.at(-1);
+    if (!socket) throw new Error("Mosquitto service did not create a WebSocket");
+
+    return { service, socket };
+  }
+
+  it("sends the exact motor frame and resolves only for its matching positive ack", async () => {
+    const { service, socket } = connectedService();
+    let settled = false;
+
+    const commandPromise = service
+      .sendCommand("motor_fan", {
+        _topic: "plc/control",
+        _rawPayload: { boardA_relay_motor: 1 },
+      })
+      .then(() => {
+        settled = true;
+      });
+
+    expect(socket.sent).toEqual([
+      JSON.stringify({
+        type: "publish",
+        requestId: "command-request-id",
+        topic: "plc/control",
+        payload: { boardA_relay_motor: 1 },
+      }),
+    ]);
+
+    await Promise.resolve();
+    expect(settled).toBe(false);
+
+    socket.receive({
+      type: "publish-ack",
+      requestId: "some-other-request",
+      ok: true,
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+
+    socket.receive({
+      type: "publish-ack",
+      requestId: "command-request-id",
+      ok: true,
+    });
+
+    await expect(commandPromise).resolves.toBeUndefined();
+    expect(settled).toBe(true);
+  });
+
+  it("rejects the command when the matching publish ack is negative", async () => {
+    const { service, socket } = connectedService();
+    const commandPromise = service.sendCommand("motor_fan", {
+      _topic: "plc/control",
+      _rawPayload: { boardA_relay_motor: 0 },
+    });
+    const rejection = expect(commandPromise).rejects.toThrow(
+      "AWS IoT rejected plc/control",
+    );
+
+    socket.receive({
+      type: "publish-ack",
+      requestId: "command-request-id",
+      ok: false,
+      error: "AWS IoT rejected plc/control",
+    });
+
+    await rejection;
   });
 });

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   PLC_CONTROL_TOPIC,
   actionFromPlcMotorControlPayload,
+  toPlcAlarmControlMessage,
   toPlcMotorControlMessage,
 } from "./plc-control";
 
@@ -17,6 +18,17 @@ describe("verified PLC motor-control contract", () => {
     expect(toPlcMotorControlMessage("STOP")).toEqual({
       topic: PLC_CONTROL_TOPIC,
       payload: { boardA_relay_motor: 0 },
+    });
+  });
+
+  it("maps the emergency beacon to the allowlisted alarm relay", () => {
+    expect(toPlcAlarmControlMessage(true)).toEqual({
+      topic: PLC_CONTROL_TOPIC,
+      payload: { boardA_relay_alarm: 1 },
+    });
+    expect(toPlcAlarmControlMessage(false)).toEqual({
+      topic: PLC_CONTROL_TOPIC,
+      payload: { boardA_relay_alarm: 0 },
     });
   });
 

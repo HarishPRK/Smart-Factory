@@ -1822,6 +1822,15 @@ export class AWSPLCService implements PLCService {
 
 /* ── Mosquitto via local bridge (browser → WS → bridge → MQTT broker) ── */
 
+const COMMAND_ACK_TIMEOUT_MS = 5_000;
+
+function createCommandRequestId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `plc-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export class MosquittoPLCService implements PLCService {
   private ws: WebSocket | null = null;
   private listeners: Set<(state: PLCState) => void> = new Set();
@@ -1834,6 +1843,14 @@ export class MosquittoPLCService implements PLCService {
   private mergedRaw: RawPLCPayload = {};
   private hasUnflushed = false;
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
+  private pendingCommands = new Map<
+    string,
+    {
+      resolve: () => void;
+      reject: (error: Error) => void;
+      timeout: ReturnType<typeof setTimeout>;
+    }
+  >();
   private readonly wsUrl: string;
 
   constructor(wsUrl: string) {
@@ -1867,19 +1884,41 @@ export class MosquittoPLCService implements PLCService {
   }
 
   async sendCommand(deviceId: string, command: Record<string, unknown>): Promise<void> {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+    const ws = this.ws;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
       throw new Error("Not connected to MQTT bridge");
     }
     const topic = (command._topic as string) ?? "plc/cmd";
     const rawPayload = command._rawPayload as Record<string, unknown> | undefined;
-    if (rawPayload) {
-      this.ws.send(JSON.stringify({ topic, payload: rawPayload }));
-    } else {
-      const rest = { ...command };
-      delete (rest as { _topic?: unknown })._topic;
-      delete (rest as { _rawPayload?: unknown })._rawPayload;
-      this.ws.send(JSON.stringify({ topic, payload: { deviceId, ...rest } }));
-    }
+    const rest = { ...command };
+    delete (rest as { _topic?: unknown })._topic;
+    delete (rest as { _rawPayload?: unknown })._rawPayload;
+    const payload = rawPayload ?? { deviceId, ...rest };
+    const requestId = createCommandRequestId();
+
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pendingCommands.delete(requestId);
+        reject(new Error("MQTT bridge did not acknowledge the command"));
+      }, COMMAND_ACK_TIMEOUT_MS);
+
+      this.pendingCommands.set(requestId, { resolve, reject, timeout });
+
+      try {
+        ws.send(
+          JSON.stringify({
+            type: "publish",
+            requestId,
+            topic,
+            payload,
+          }),
+        );
+      } catch (error) {
+        clearTimeout(timeout);
+        this.pendingCommands.delete(requestId);
+        reject(error instanceof Error ? error : new Error("Command send failed"));
+      }
+    });
   }
 
   async fetchCurrentState(): Promise<PLCState> {
@@ -1900,10 +1939,24 @@ export class MosquittoPLCService implements PLCService {
     this.ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data as string) as {
-          topic: string;
-          payload: unknown;
+          type?: string;
+          requestId?: string;
+          ok?: boolean;
+          error?: string;
+          topic?: string;
+          payload?: unknown;
           publishedAt?: number;
         };
+
+        if (msg.type === "publish-ack" && msg.requestId) {
+          const pending = this.pendingCommands.get(msg.requestId);
+          if (!pending) return;
+          clearTimeout(pending.timeout);
+          this.pendingCommands.delete(msg.requestId);
+          if (msg.ok) pending.resolve();
+          else pending.reject(new Error(msg.error || "MQTT publish failed"));
+          return;
+        }
 
         if (msg.topic) emitAnyMessage(msg.topic, msg.payload);
 
@@ -1962,6 +2015,7 @@ export class MosquittoPLCService implements PLCService {
 
     this.ws.onclose = () => {
       console.log("[Mosquitto] Disconnected from bridge");
+      this.rejectPendingCommands("MQTT bridge disconnected before acknowledging the command");
       if (this.listeners.size > 0) {
         this.reconnectTimer = setTimeout(() => this.connect(), 3000);
       }
@@ -1974,6 +2028,7 @@ export class MosquittoPLCService implements PLCService {
   }
 
   private disconnect() {
+    this.rejectPendingCommands("MQTT bridge disconnected before acknowledging the command");
     if (this.flushTimer) {
       clearTimeout(this.flushTimer);
       this.flushTimer = null;
@@ -1986,6 +2041,14 @@ export class MosquittoPLCService implements PLCService {
       this.ws.close();
       this.ws = null;
     }
+  }
+
+  private rejectPendingCommands(message: string) {
+    for (const pending of this.pendingCommands.values()) {
+      clearTimeout(pending.timeout);
+      pending.reject(new Error(message));
+    }
+    this.pendingCommands.clear();
   }
 }
 

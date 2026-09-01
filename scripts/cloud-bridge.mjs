@@ -29,13 +29,22 @@
  *   iot:Connect    on  client/cloud-bridge-*
  *   iot:Subscribe  on  topicfilter/prplHome/McKinney/lineA/plc1/#   (and other subscribed filters)
  *   iot:Receive    on  topic/prplHome/McKinney/lineA/plc1/data      (and other subscribed topics)
+ *   iot:Publish    on  topic/plc/control
  */
 
 import fs from "node:fs";
+import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 import { mqtt as iotMqtt, iot, auth } from "aws-iot-device-sdk-v2";
+import {
+  commandRequiresAuthorization,
+  createPublishAck,
+  createRfidAuthorizationGate,
+  isAllowedCommandOrigin,
+  parseBrowserPublish,
+} from "./bridge-command.mjs";
 
 loadDotenv();
 
@@ -72,6 +81,16 @@ const ENDPOINT = process.env.AWS_IOT_ENDPOINT ?? process.env.IOT_ENDPOINT ??
   "alht1i2bx8tzt-ats.iot.us-east-1.amazonaws.com";
 const REGION = process.env.AWS_REGION ?? process.env.IOT_REGION ?? "us-east-1";
 const CLIENT_ID = `cloud-bridge-${Date.now()}`;
+const CONTROL_AUTHORIZATION_WINDOW_MS = Number(
+  process.env.CONTROL_AUTHORIZATION_WINDOW_MS ?? 60_000,
+);
+const CONTROL_ALLOWED_ORIGINS = (process.env.CONTROL_ALLOWED_ORIGINS ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const controlAuthorization = createRfidAuthorizationGate({
+  windowMs: CONTROL_AUTHORIZATION_WINDOW_MS,
+});
 
 console.log("──────────────────────────────────────────────────────────");
 console.log(" Cloud bridge: AWS IoT Core (SigV4) → WebSocket → browsers");
@@ -82,12 +101,27 @@ console.log(` WS server    : ws://0.0.0.0:${WS_PORT}  (nginx proxies wss→here)
 console.log("──────────────────────────────────────────────────────────");
 
 // --- WebSocket server (browsers connect here, via nginx) ---
-const wss = new WebSocketServer({ port: WS_PORT });
+const bridgeServer = http.createServer((request, response) => {
+  if (request.url !== "/readyz") {
+    response.writeHead(404).end();
+    return;
+  }
+
+  const ready = awsReady && subscriptionsReady;
+  response.writeHead(ready ? 200 : 503, {
+    "Content-Type": "application/json",
+    "Cache-Control": "no-store",
+  });
+  response.end(JSON.stringify({ ready, awsReady, subscriptionsReady }));
+});
+const wss = new WebSocketServer({ server: bridgeServer });
 const clients = new Set();
 let received = 0;
 
-wss.on("listening", () => console.log(`[cloud] WebSocket listening on :${WS_PORT}`));
-wss.on("error", (err) => {
+bridgeServer.listen(WS_PORT, () =>
+  console.log(`[cloud] WebSocket listening on :${WS_PORT}`),
+);
+bridgeServer.on("error", (err) => {
   if (err?.code === "EADDRINUSE") {
     console.error(
       `[cloud] Port ${WS_PORT} is already in use (your local mqtt-bridge?). ` +
@@ -98,23 +132,52 @@ wss.on("error", (err) => {
   }
   process.exit(1);
 });
-wss.on("connection", (ws) => {
+wss.on("connection", (ws, request) => {
   clients.add(ws);
   console.log(`[cloud] Browser connected (${clients.size} total)`);
-  // Browser → IoT Core command relay (plc/cmd etc). The edge subscribes to the
-  // command topic on IoT Core and applies it to the local broker. Read-only
-  // dashboards never send these; included so control still works end-to-end.
-  ws.on("message", (data) => {
-    if (!awsReady || !awsConnection) return;
+  const commandOriginAllowed = isAllowedCommandOrigin(
+    request.headers,
+    CONTROL_ALLOWED_ORIGINS,
+  );
+  // Browser → IoT Core command relay. Only the known PLC command contracts are
+  // accepted, and every modern request receives a broker publish acknowledgement.
+  ws.on("message", async (data) => {
+    const parsed = parseBrowserPublish(data);
+    if (!parsed.ok) {
+      const ack = createPublishAck(parsed.requestId, false, parsed.error);
+      if (ack && ws.readyState === 1) ws.send(ack);
+      console.error(`[cloud] Rejected browser command: ${parsed.error}`);
+      return;
+    }
+
+    const { requestId, topic, payload } = parsed.command;
+    if (!commandOriginAllowed) {
+      const ack = createPublishAck(requestId, false, "Command origin is not allowed");
+      if (ack && ws.readyState === 1) ws.send(ack);
+      return;
+    }
+    if (
+      commandRequiresAuthorization(parsed.command) &&
+      !controlAuthorization.isAuthorized()
+    ) {
+      const ack = createPublishAck(requestId, false, "Fresh RFID authorization is required");
+      if (ack && ws.readyState === 1) ws.send(ack);
+      return;
+    }
+    if (!awsReady || !subscriptionsReady || !awsConnection) {
+      const ack = createPublishAck(requestId, false, "AWS IoT is not connected");
+      if (ack && ws.readyState === 1) ws.send(ack);
+      return;
+    }
+
     try {
-      const msg = JSON.parse(data.toString());
-      const topic = msg.topic ?? "plc/cmd";
-      const payload = JSON.stringify(msg.payload ?? msg);
-      awsConnection.publish(topic, payload, iotMqtt.QoS.AtMostOnce).catch((err) =>
-        console.error("[cloud] Command publish error:", err?.message ?? err),
-      );
-    } catch {
-      console.error("[cloud] Bad command message from browser");
+      await awsConnection.publish(topic, payload, iotMqtt.QoS.AtLeastOnce);
+      const ack = createPublishAck(requestId, true);
+      if (ack && ws.readyState === 1) ws.send(ack);
+    } catch (err) {
+      const ack = createPublishAck(requestId, false, "AWS IoT publish failed");
+      if (ack && ws.readyState === 1) ws.send(ack);
+      console.error("[cloud] Command publish error:", err?.message ?? err);
     }
   });
   ws.on("close", () => {
@@ -129,6 +192,7 @@ function broadcast(topic, payloadBuf) {
   let bridgeTs;
   try {
     payload = JSON.parse(payloadBuf.toString());
+    controlAuthorization.observe(topic, payload);
     if (payload && typeof payload === "object" && typeof payload._bridgeTs === "number") {
       bridgeTs = payload._bridgeTs;
     }
@@ -145,6 +209,7 @@ function broadcast(topic, payloadBuf) {
 
 // --- AWS IoT Core (SigV4 WebSocket) subscriber ---
 let awsReady = false;
+let subscriptionsReady = false;
 let awsConnection = null;
 
 async function connectAws() {
@@ -163,12 +228,20 @@ async function connectAws() {
 
   awsConnection.on("interrupt", (err) => {
     awsReady = false;
+    subscriptionsReady = false;
+    controlAuthorization.invalidate();
     console.warn("[cloud] IoT connection interrupted:", err?.error ?? String(err));
   });
   awsConnection.on("resume", async () => {
     awsReady = true;
+    controlAuthorization.invalidate();
     console.log("[cloud] IoT connection resumed — re-subscribing");
-    await subscribeAll();
+    try {
+      await subscribeAll();
+    } catch (err) {
+      console.error("[cloud] Re-subscribe failed:", err?.message ?? err);
+      process.exit(1);
+    }
   });
   awsConnection.on("error", (err) => console.error("[cloud] IoT error:", err));
 
@@ -179,6 +252,9 @@ async function connectAws() {
 }
 
 async function subscribeAll() {
+  subscriptionsReady = false;
+  controlAuthorization.invalidate();
+  const failures = [];
   for (const filter of CLOUD_TOPICS) {
     try {
       await awsConnection.subscribe(filter, iotMqtt.QoS.AtMostOnce, (topic, payload) =>
@@ -187,8 +263,13 @@ async function subscribeAll() {
       console.log(`[cloud] Subscribed to ${filter}`);
     } catch (err) {
       console.error(`[cloud] Subscribe failed for ${filter}:`, err?.message ?? err);
+      failures.push(filter);
     }
   }
+  if (failures.length > 0) {
+    throw new Error(`AWS IoT subscriptions failed: ${failures.join(", ")}`);
+  }
+  subscriptionsReady = true;
 }
 
 // Heartbeat — shows messages arriving from IoT Core and how many browsers are
@@ -209,6 +290,7 @@ connectAws().catch((err) => {
 process.on("SIGINT", async () => {
   console.log("\n[cloud] Shutting down…");
   try { wss.close(); } catch { /* ignore */ }
+  try { bridgeServer.close(); } catch { /* ignore */ }
   try { if (awsConnection) await awsConnection.disconnect(); } catch { /* ignore */ }
   process.exit(0);
 });

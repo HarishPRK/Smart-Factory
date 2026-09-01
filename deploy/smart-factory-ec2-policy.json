@@ -31,7 +31,8 @@
         "arn:aws:iot:us-east-1:841019700679:topicfilter/shellyplus1pm-cc7b5c844c18/online",
         "arn:aws:iot:us-east-1:841019700679:topicfilter/shellyplus1pm-cc7b5c844c18/status",
         "arn:aws:iot:us-east-1:841019700679:topicfilter/shellyplus1pm-cc7b5c844c18/status/switch:0",
-        "arn:aws:iot:us-east-1:841019700679:topicfilter/rdk/shelly/ce-server/rpc"
+        "arn:aws:iot:us-east-1:841019700679:topicfilter/rdk/shelly/ce-server/rpc",
+        "arn:aws:iot:us-east-1:841019700679:topicfilter/smart-factory/langgraph/response"
       ]
     },
     {
@@ -43,13 +44,15 @@
       "Effect": "Allow",
       "Action": "iot:Publish",
       "Resource": [
+        "arn:aws:iot:us-east-1:841019700679:topic/plc/control",
         "arn:aws:iot:us-east-1:841019700679:topic/rdk/path/control",
         "arn:aws:iot:us-east-1:841019700679:topic/prpl/path/control",
         "arn:aws:iot:us-east-1:841019700679:topic/rdk/approute/control",
         "arn:aws:iot:us-east-1:841019700679:topic/prpl/approute/control",
         "arn:aws:iot:us-east-1:841019700679:topic/rdk/matter/devices/refresh",
         "arn:aws:iot:us-east-1:841019700679:topic/rdk/matter/device/control",
-        "arn:aws:iot:us-east-1:841019700679:topic/shellyplus1pm-cc7b5c844c18/rpc"
+        "arn:aws:iot:us-east-1:841019700679:topic/shellyplus1pm-cc7b5c844c18/rpc",
+        "arn:aws:iot:us-east-1:841019700679:topic/smart-factory/langgraph/request"
       ]
     }
   ]

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { usePLCContext } from "../context/PLCContext";
+import { motorFanControlCommand } from "../services/plcControlCommands";
 import { usePLCStore } from "../stores/plcStore";
 
 /* ── Web Audio motor hum generator ───────────────────── */
@@ -79,9 +80,22 @@ interface MotorFanWidgetProps {
 const MotorFanWidget: React.FC<MotorFanWidgetProps> = ({ className = "" }) => {
   const { sendCommand } = usePLCContext(false);
   const motorFanOn = usePLCStore((s) => s.motorFanOn);
-  const [manualOn, setManualOn] = useState(false);
-  // ON if manually toggled OR PLC says motor is on (Photo-E triggered)
-  const isOn = manualOn || motorFanOn;
+  const rfidAuthorized = usePLCStore((s) => s.rfidAuthorized);
+  const [manualOn, setManualOn] = useState<boolean | null>(null);
+  const [commandState, setCommandState] = useState<
+    "idle" | "sending" | "confirming" | "error"
+  >("idle");
+  const [commandError, setCommandError] = useState<string | null>(null);
+  const [confirmationTarget, setConfirmationTarget] = useState<boolean | null>(
+    null,
+  );
+  const requestedOn = manualOn ?? motorFanOn;
+  // Animation, sound, and the activation banner use reported PLC state only.
+  const isOn = motorFanOn;
+  const commandPending =
+    commandState === "sending" || commandState === "confirming";
+  // Stopping is always available as a fail-safe, even after badge expiry.
+  const badgeRequired = !rfidAuthorized && !isOn;
   const [bannerEpoch, setBannerEpoch] = useState(0);
   const [dismissedBannerEpoch, setDismissedBannerEpoch] = useState(0);
   const motorSoundRef = useRef<{ stop: () => void } | null>(null);
@@ -117,15 +131,57 @@ const MotorFanWidget: React.FC<MotorFanWidgetProps> = ({ className = "" }) => {
     };
   }, [isOn]);
 
-  const handleToggle = () => {
-    const turningOn = !manualOn;
+  useEffect(() => {
+    if (
+      (commandState !== "confirming" && commandState !== "error") ||
+      confirmationTarget === null ||
+      motorFanOn !== confirmationTarget
+    ) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setManualOn(null);
+      setCommandState("idle");
+      setCommandError(null);
+      setConfirmationTarget(null);
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, [commandState, confirmationTarget, motorFanOn]);
+
+  useEffect(() => {
+    if (commandState !== "confirming") return;
+
+    const timeout = window.setTimeout(() => {
+      setManualOn(null);
+      setCommandState("error");
+      setCommandError(
+        "Command was published, but PLC confirmation was not received",
+      );
+    }, 5_000);
+    return () => window.clearTimeout(timeout);
+  }, [commandState]);
+
+  const handleToggle = async () => {
+    if (commandPending || badgeRequired) return;
+
+    const turningOn = !isOn;
     setManualOn(turningOn);
-    // Publish to plc/control using the legacy 8ch relay key (firmware contract).
-    const relayState = turningOn ? 1 : 0;
-    sendCommand("motor_fan", {
-      _topic: "plc/control",
-      _rawPayload: { boardA_relay_motor: relayState },
-    }).catch(() => {});
+    setConfirmationTarget(turningOn);
+    setCommandState("sending");
+    setCommandError(null);
+
+    try {
+      await sendCommand("motor_fan", motorFanControlCommand(turningOn));
+      setCommandState("confirming");
+    } catch (error) {
+      setManualOn(null);
+      setConfirmationTarget(null);
+      setCommandState("error");
+      setCommandError(
+        error instanceof Error ? error.message : "MQTT command failed",
+      );
+    }
   };
 
   // RPM ramps up/down — used only for animation speed
@@ -149,9 +205,27 @@ const MotorFanWidget: React.FC<MotorFanWidgetProps> = ({ className = "" }) => {
     speedFactor > 0.35 ? ((speedFactor - 0.35) / 0.65) * 0.22 : 0;
 
   return (
-    <div
-      className={`card p-3 flex flex-col gap-2 animate-fade-in delay-4 cursor-pointer active:scale-[0.97] transition-all duration-300 rounded-xl ${className}`}
+    <button
+      type="button"
+      className={`card w-full appearance-none text-left p-3 flex flex-col gap-2 animate-fade-in delay-4 cursor-pointer active:scale-[0.97] transition-all duration-300 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 disabled:cursor-wait disabled:opacity-90 ${className}`}
       onClick={handleToggle}
+      disabled={commandPending || badgeRequired}
+      aria-label={
+        badgeRequired
+          ? "RFID badge required for motor control"
+          : commandPending
+            ? "Waiting for motor fan confirmation"
+            : `${isOn ? "Stop" : "Start"} motor fan`
+      }
+      aria-pressed={requestedOn}
+      aria-busy={commandPending}
+      title={
+        badgeRequired
+          ? "Scan an authorized RFID badge before operating the motor."
+          : commandError
+            ? `Motor command failed: ${commandError}. Press again to retry.`
+            : undefined
+      }
     >
       {/* Header */}
       <div className="flex justify-between items-center flex-none">
@@ -168,16 +242,36 @@ const MotorFanWidget: React.FC<MotorFanWidgetProps> = ({ className = "" }) => {
         </div>
         <span
           className={`text-[9px] font-semibold flex items-center gap-1 px-1.5 py-0.5 rounded-md border transition-all duration-700 ${
-            isOn
+            badgeRequired
+              ? "text-amber-300/90 bg-amber-500/[0.08] border-amber-500/[0.2]"
+              : commandState === "error"
+              ? "text-red-300/90 bg-red-500/[0.08] border-red-500/[0.2]"
+              : requestedOn
               ? "text-indigo-300/80 bg-indigo-500/[0.06] border-indigo-500/[0.15]"
               : "text-white/40 bg-white/[0.02] border-white/[0.05]"
           }`}
+          role="status"
+          aria-live="polite"
         >
           <span
-            className={`w-1.5 h-1.5 rounded-full transition-all duration-700 ${isOn ? "bg-indigo-400 animate-pulse-glow" : "bg-white/20"}`}
-            style={isOn ? { color: "#7ab4ee" } : undefined}
+            className={`w-1.5 h-1.5 rounded-full transition-all duration-700 ${requestedOn ? "bg-indigo-400 animate-pulse-glow" : "bg-white/20"}`}
+            style={requestedOn ? { color: "#7ab4ee" } : undefined}
           />
-          {isOn ? "Running" : "Standby"}
+          {badgeRequired
+            ? "Badge"
+            : commandState === "sending"
+            ? "Publishing"
+            : commandState === "confirming"
+              ? manualOn
+                ? "Starting"
+                : "Stopping"
+            : commandState === "error"
+              ? isOn
+                ? "Running · Retry stop"
+                : "Standby · Retry start"
+              : isOn
+                ? "Running"
+                : "Standby"}
         </span>
       </div>
 
@@ -307,6 +401,8 @@ const MotorFanWidget: React.FC<MotorFanWidgetProps> = ({ className = "" }) => {
               </div>
             </div>
             <button
+              type="button"
+              aria-label="Dismiss motor activation notification"
               onClick={(e) => {
                 e.stopPropagation();
                 setDismissedBannerEpoch(bannerEpoch);
@@ -326,7 +422,13 @@ const MotorFanWidget: React.FC<MotorFanWidgetProps> = ({ className = "" }) => {
         </div>,
         document.body,
       )}
-    </div>
+      {commandError && (
+        <span className="sr-only" role="alert">
+          Motor command failed: {commandError}. Press the motor control again to
+          retry.
+        </span>
+      )}
+    </button>
   );
 };
 
