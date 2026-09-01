@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { PageHeader } from '../components/PageHeader';
 import { Card } from '../components/Card';
 import { Modal } from '../ui/Modal';
@@ -13,7 +13,6 @@ import type { AppCategory, AppCategoryId, AppPolicy } from '../types';
 import { useTheme, useThemeColors } from '../ui/Theme';
 import { AiInsightCard } from '../components/widgets/AiInsightCard';
 import { AppSteeringPatchboard } from '../components/widgets/AppSteeringPatchboard';
-import { ClientTunnelConstellation } from '../components/widgets/ClientTunnelConstellation';
 
 const catIcon: Record<AppCategoryId, React.ComponentType<{ size?: number }>> = {
   voice: Mic, video: Video, business: Briefcase, web: Globe, bulk: Cloud, iot: Cpu,
@@ -110,16 +109,6 @@ export function ApplicationAwareRoutingPage({ branchId }: { branchId: string }) 
             sub="Each client carries one application — grab its plug and patch it into a different tunnel; the change publishes as a proto3 AppRouteCommand on the gateway's approute topic"
           >
             <AppSteeringPatchboard branchId={branchId} />
-          </Card>
-        </div>
-
-        {/* Traffic Constellation — live clients → gateway → IPsec tunnels */}
-        <div className="col-12">
-          <Card
-            title="Traffic Constellation"
-            sub="Live clients orbiting this branch's gateway — each comet is a client's traffic riding its assigned IPsec tunnel"
-          >
-            <ClientTunnelConstellation branchId={branchId} />
           </Card>
         </div>
 
@@ -269,8 +258,8 @@ export function ApplicationAwareRoutingPage({ branchId }: { branchId: string }) 
                     cursor={{ fill: chart.chartCursor }}
                   />
                   <Bar dataKey="mbps" radius={[6, 6, 0, 0]}>
-                    {topApps.map((_, i) => (
-                      <rect key={i} fill={`url(#bar-${i})`} />
+                    {topApps.map((app, i) => (
+                      <Cell key={app.name} fill={`url(#bar-${i})`} />
                     ))}
                   </Bar>
                 </BarChart>
