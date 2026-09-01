@@ -99,7 +99,7 @@ beforeEach(() => {
   usePLCStore.setState({
     motorFanOn: false,
     emergencyLightOn: false,
-    rfidAuthorized: true,
+    rfidAuthorized: false,
     relays: [false, false, false, false, false, false, false, false],
   });
 });
@@ -113,8 +113,8 @@ afterEach(() => {
 });
 
 describe("dashboard PLC control widgets", () => {
-  it("requires an authorized RFID badge before either control can publish", () => {
-    usePLCStore.setState({ rfidAuthorized: false });
+  it("allows motor start and emergency activation without an RFID badge", () => {
+    sendCommand.mockReturnValue(new Promise<void>(() => undefined));
     render(
       <>
         <MotorFanWidget />
@@ -122,17 +122,24 @@ describe("dashboard PLC control widgets", () => {
       </>,
     );
 
-    const motor = screen.getByRole("button", {
-      name: "RFID badge required for motor control",
-    });
+    const motor = screen.getByRole("button", { name: "Start motor fan" });
     const emergency = screen.getByRole("button", {
-      name: "RFID badge required for emergency beacon control",
+      name: "Activate emergency beacon",
     });
-    expect((motor as HTMLButtonElement).disabled).toBe(true);
-    expect((emergency as HTMLButtonElement).disabled).toBe(true);
+    expect((motor as HTMLButtonElement).disabled).toBe(false);
+    expect((emergency as HTMLButtonElement).disabled).toBe(false);
+
     fireEvent.click(motor);
     fireEvent.click(emergency);
-    expect(sendCommand).not.toHaveBeenCalled();
+
+    expect(sendCommand).toHaveBeenCalledWith("motor_fan", {
+      _topic: "plc/control",
+      _rawPayload: { boardA_relay_motor: 1 },
+    });
+    expect(sendCommand).toHaveBeenCalledWith("emergency_light", {
+      _topic: "plc/control",
+      _rawPayload: { boardA_relay_alarm: 1 },
+    });
   });
 
   it("always permits fail-safe motor stop and alarm clear after badge expiry", () => {

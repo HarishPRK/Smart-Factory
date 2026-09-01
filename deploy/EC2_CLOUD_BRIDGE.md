@@ -121,14 +121,14 @@ to AWS IoT on `plc/control`. The browser waits for the broker acknowledgement;
 an unavailable bridge or denied IAM publish is shown as a retry state instead
 of a false local success. Applying the checked-in EC2 IAM policy is required.
 
-Energizing commands are permitted only from the dashboard origin after a fresh
-physical RFID rising edge is observed in PLC telemetry. A retained/high RFID
-value after bridge restart does not authorize control, and a held value does
-not extend the window. The default command window is 60 seconds; set
-`CONTROL_AUTHORIZATION_WINDOW_MS` in the EC2 `.env` only if commissioning calls
-for a different window. Exact relay-off STOP/CLEAR commands remain available
-after expiry as a fail-safe. Additional trusted browser origins can be listed
-explicitly in `CONTROL_ALLOWED_ORIGINS` (comma-separated).
+Motor and emergency-beacon ON commands are permitted from the dashboard origin
+without an RFID badge, but only after fresh PLC telemetry reports E-stop clear.
+The bridge invalidates that safety baseline whenever its MQTT connection drops,
+so reconnecting cannot reuse stale state. Exact relay-off STOP/CLEAR commands
+remain unconditional fail-safe actions. `CONTROL_AUTHORIZATION_WINDOW_MS` now
+applies only to legacy local `plc/cmd` toggles; the EC2 bridge does not accept
+that legacy topic. Additional trusted browser origins can be listed explicitly
+in `CONTROL_ALLOWED_ORIGINS` (comma-separated).
 
 Publishing to AWS IoT does not by itself actuate a factory-local PLC. Keep the
 AWS-to-factory downlink behind the separately commissioned edge command adapter;
@@ -155,8 +155,8 @@ it through as `publishedAt`, this number is the **true factory → IoT Core → 
 Do not expose nginx `/ws` publicly without operator authentication. Use the
 site VPN/corporate CIDR, SSO, or an authenticated reverse proxy and set
 `CONTROL_PERIMETER_CONFIRMED=1` only after that perimeter is in place. Origin
-checking is CSWSH defense-in-depth and the RFID window is a physical interlock;
-neither identifies the remote operator.
+checking is CSWSH defense-in-depth and the PLC E-stop telemetry guard is a
+machine-state check; neither identifies the remote operator.
 
 ## Recommended hardening
 

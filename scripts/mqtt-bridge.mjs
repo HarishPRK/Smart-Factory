@@ -28,6 +28,7 @@ import mqtt from "mqtt";
 import { WebSocketServer } from "ws";
 import {
   commandRequiresAuthorization,
+  commandRequiresSafetyCheck,
   createPublishAck,
   createRfidAuthorizationGate,
   isAllowedCommandOrigin,
@@ -235,6 +236,18 @@ wss.on("connection", (ws, request) => {
     const { requestId, topic, payload } = parsed.command;
     if (!commandOriginAllowed) {
       const ack = createPublishAck(requestId, false, "Command origin is not allowed");
+      if (ack && ws.readyState === 1) ws.send(ack);
+      return;
+    }
+    if (
+      commandRequiresSafetyCheck(parsed.command) &&
+      !controlAuthorization.isSafeToEnergize()
+    ) {
+      const ack = createPublishAck(
+        requestId,
+        false,
+        "Fresh PLC telemetry showing E-stop clear is required",
+      );
       if (ack && ws.readyState === 1) ws.send(ack);
       return;
     }

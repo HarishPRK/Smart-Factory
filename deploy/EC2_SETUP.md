@@ -19,8 +19,8 @@ In AWS Console > EC2 > Security Groups > your instance's SG, add:
 Ensure SSH (port 22) is restricted to your IP.
 
 Do not expose `/ws` on `0.0.0.0/0` without an authenticated reverse proxy or
-SSO in front of nginx. The RFID interlock is not operator identity. Public,
-unauthenticated deployment of the actuator endpoint is unsupported.
+SSO in front of nginx. The PLC E-stop telemetry guard is not operator identity.
+Public, unauthenticated deployment of the actuator endpoint is unsupported.
 
 ## Step 2: Install Nginx
 

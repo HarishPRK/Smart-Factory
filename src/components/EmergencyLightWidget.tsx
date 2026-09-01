@@ -98,7 +98,6 @@ const EmergencyLightWidget: React.FC<EmergencyLightWidgetProps> = ({
   const { sendCommand } = usePLCContext(false);
   const emergencyLightOn = usePLCStore((s) => s.emergencyLightOn);
   const alarmRelayOn = usePLCStore((s) => s.relays[1] ?? false);
-  const rfidAuthorized = usePLCStore((s) => s.rfidAuthorized);
   const [manualAlert, setManualAlert] = useState<boolean | null>(null);
   const [commandState, setCommandState] = useState<
     "idle" | "sending" | "confirming" | "error"
@@ -115,8 +114,6 @@ const EmergencyLightWidget: React.FC<EmergencyLightWidgetProps> = ({
   const hasAlert = emergencyLightOn;
   const commandPending =
     commandState === "sending" || commandState === "confirming";
-  // Clearing the alarm relay remains available if the badge window expires.
-  const badgeRequired = !rfidAuthorized && !alarmRelayOn;
   const [bannerEpoch, setBannerEpoch] = useState(0);
   const [dismissedBannerEpoch, setDismissedBannerEpoch] = useState(0);
   const sirenRef = useRef<{ stop: () => void } | null>(null);
@@ -186,7 +183,7 @@ const EmergencyLightWidget: React.FC<EmergencyLightWidgetProps> = ({
   }, [commandState]);
 
   const handleToggle = async () => {
-    if (commandPending || badgeRequired) return;
+    if (commandPending) return;
 
     const turningOn = !alarmRelayOn;
     setManualAlert(turningOn);
@@ -502,22 +499,18 @@ const EmergencyLightWidget: React.FC<EmergencyLightWidgetProps> = ({
       type="button"
       className={`card w-full appearance-none text-left p-3 flex flex-col gap-2 animate-fade-in delay-5 cursor-pointer active:scale-[0.97] transition-all duration-300 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 disabled:cursor-wait disabled:opacity-90 ${className}`}
       onClick={handleToggle}
-      disabled={commandPending || badgeRequired}
+      disabled={commandPending}
       aria-label={
-        badgeRequired
-          ? "RFID badge required for emergency beacon control"
-          : commandPending
-            ? "Waiting for emergency beacon confirmation"
-            : `${alarmRelayOn ? "Clear" : "Activate"} emergency beacon`
+        commandPending
+          ? "Waiting for emergency beacon confirmation"
+          : `${alarmRelayOn ? "Clear" : "Activate"} emergency beacon`
       }
       aria-pressed={commandedAlert}
       aria-busy={commandPending}
       title={
-        badgeRequired
-          ? "Scan an authorized RFID badge before operating the emergency beacon."
-          : commandError
-            ? `Emergency command failed: ${commandError}. Press again to retry.`
-            : undefined
+        commandError
+          ? `Emergency command failed: ${commandError}. Press again to retry.`
+          : undefined
       }
     >
       {/* Header */}
@@ -540,9 +533,7 @@ const EmergencyLightWidget: React.FC<EmergencyLightWidgetProps> = ({
         </div>
         <span
           className={`text-[9px] font-semibold flex items-center gap-1 px-1.5 py-0.5 rounded-md border transition-all duration-500 ${
-            badgeRequired
-              ? "text-amber-300/90 bg-amber-500/[0.08] border-amber-500/[0.2]"
-              : commandState === "error"
+            commandState === "error"
               ? "text-red-300/90 bg-red-500/[0.08] border-red-500/[0.2]"
               : hasAlert
               ? "text-red-400/85 bg-red-500/[0.08] border-red-500/[0.2]"
@@ -554,9 +545,7 @@ const EmergencyLightWidget: React.FC<EmergencyLightWidgetProps> = ({
           <span
             className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${hasAlert ? "bg-red-400 animate-pulse" : "bg-white/20"}`}
           />
-          {badgeRequired
-            ? "Badge"
-            : commandState === "sending"
+          {commandState === "sending"
             ? "Publishing"
             : commandState === "confirming"
               ? manualAlert

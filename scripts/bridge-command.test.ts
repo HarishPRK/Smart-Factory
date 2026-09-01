@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   commandRequiresAuthorization,
+  commandRequiresSafetyCheck,
   createPublishAck,
   createRfidAuthorizationGate,
   isAllowedCommandOrigin,
@@ -99,22 +100,35 @@ describe("browser MQTT command allowlist", () => {
     );
   });
 
-  it("keeps relay-off commands fail-safe when authorization expires", () => {
-    const start = parseBrowserPublish(
-      JSON.stringify({
-        topic: "plc/control",
-        payload: { boardA_relay_motor: 1 },
-      }),
-    );
-    const stop = parseBrowserPublish(
-      JSON.stringify({
-        topic: "plc/control",
-        payload: { boardA_relay_motor: 0 },
-      }),
-    );
+  it("uses the safety gate, not RFID, for plc/control relay commands", () => {
+    for (const field of ["boardA_relay_motor", "boardA_relay_alarm"]) {
+      for (const value of [0, 1]) {
+        const parsed = parseBrowserPublish(
+          JSON.stringify({
+            topic: "plc/control",
+            payload: { [field]: value },
+          }),
+        );
 
-    expect(start.ok && commandRequiresAuthorization(start.command)).toBe(true);
-    expect(stop.ok && commandRequiresAuthorization(stop.command)).toBe(false);
+        expect(parsed.ok).toBe(true);
+        if (!parsed.ok) continue;
+        expect(commandRequiresAuthorization(parsed.command)).toBe(false);
+        expect(commandRequiresSafetyCheck(parsed.command)).toBe(value === 1);
+      }
+    }
+
+    const legacy = parseBrowserPublish(
+      JSON.stringify({
+        topic: "plc/cmd",
+        payload: { deviceId: "photoE", action: "toggle" },
+      }),
+      { allowLegacyCommand: true },
+    );
+    expect(legacy.ok).toBe(true);
+    if (legacy.ok) {
+      expect(commandRequiresAuthorization(legacy.command)).toBe(true);
+      expect(commandRequiresSafetyCheck(legacy.command)).toBe(false);
+    }
   });
 
   it("identifies command topics that the telemetry uplink must never mirror", () => {
@@ -136,6 +150,7 @@ describe("browser MQTT command allowlist", () => {
 
     expect(gate.isAuthorized()).toBe(false);
     gate.observe("plc/data", { boardB_io_push_lock_button: 0 });
+    expect(gate.isSafeToEnergize()).toBe(true);
     // A retained/high first sample after restart is not a fresh badge scan.
     gate.observe("prplHome/McKinney/lineA/plc1/data/boardA", {
       boardA_rfid_authorized_user: 1,
@@ -152,6 +167,40 @@ describe("browser MQTT command allowlist", () => {
     gate.observe("plc/data", { rfid_authorized: "false" });
     gate.observe("plc/data", { rfid_authorized: "true" });
     expect(gate.isAuthorized()).toBe(true);
+  });
+
+  it("requires fresh E-stop-clear telemetry before energizing a relay", () => {
+    let now = 1_000;
+    const gate = createRfidAuthorizationGate({
+      telemetryFreshnessMs: 5_000,
+      now: () => now,
+    });
+
+    expect(gate.isSafeToEnergize()).toBe(false);
+    gate.observe("plc/data", { boardB_io_push_lock_button: 0 });
+    expect(gate.isSafeToEnergize()).toBe(true);
+
+    gate.observe("plc/data", { system_emergency_stop: 1 });
+    expect(gate.isSafeToEnergize()).toBe(false);
+    gate.observe("plc/data", { system_emergency_stop: 0 });
+    expect(gate.isSafeToEnergize()).toBe(true);
+
+    now = 6_001;
+    expect(gate.isSafeToEnergize()).toBe(false);
+    gate.observe("plc/data", { boardA_voltage_pot_1: 4.61 });
+    expect(gate.isSafeToEnergize()).toBe(false);
+    gate.observe("plc/data", { boardB_io_push_lock_button: 0 });
+    expect(gate.isSafeToEnergize()).toBe(true);
+
+    gate.observe("plc/data", { system_was_in_emergency_stop_state: 1 });
+    expect(gate.isSafeToEnergize()).toBe(false);
+    gate.observe("plc/data", { boardA_current_pot: 5.8 });
+    expect(gate.isSafeToEnergize()).toBe(false);
+    gate.observe("plc/data", { boardB_io_push_lock_button: 0 });
+    expect(gate.isSafeToEnergize()).toBe(true);
+
+    gate.invalidate();
+    expect(gate.isSafeToEnergize()).toBe(false);
   });
 
   it("hard-blocks during E-stop and clears on every supported E-stop variant", () => {

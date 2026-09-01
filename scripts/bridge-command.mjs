@@ -88,12 +88,17 @@ export function createPublishAck(requestId, ok, error) {
   });
 }
 
-/**
- * Energizing/toggling requires an operator grant. Exact relay-off commands are
- * deliberately fail-safe so an expired badge can never prevent a STOP/CLEAR.
- */
+/** Legacy local toggles still require an RFID operator grant. */
 export function commandRequiresAuthorization(command) {
-  if (command?.topic !== PLC_CONTROL_TOPIC) return true;
+  return command?.topic !== PLC_CONTROL_TOPIC;
+}
+
+/**
+ * Relay ON commands require fresh PLC telemetry showing that E-stop is clear.
+ * Exact relay-off commands remain unconditional fail-safe STOP/CLEAR actions.
+ */
+export function commandRequiresSafetyCheck(command) {
+  if (command?.topic !== PLC_CONTROL_TOPIC) return false;
   try {
     const payload = JSON.parse(command.payload);
     return Object.values(payload)[0] !== 0;
@@ -117,7 +122,7 @@ export function createRfidAuthorizationGate({
   now = Date.now,
 } = {}) {
   let authorizedUntil = 0;
-  let lastTelemetryAt = null;
+  let lastEStopTelemetryAt = null;
   let sawEmergencyStopBaseline = false;
   const rfidLevels = new Map();
   const emergencyStopLevels = new Map();
@@ -125,24 +130,39 @@ export function createRfidAuthorizationGate({
 
   const invalidate = () => {
     authorizedUntil = 0;
-    lastTelemetryAt = null;
+    lastEStopTelemetryAt = null;
     sawEmergencyStopBaseline = false;
     rfidLevels.clear();
     emergencyStopLevels.clear();
     latchedEmergencyStopLevel = false;
   };
 
+  const isSafeToEnergize = () => {
+    const emergencyStopActive = [...emergencyStopLevels.values()].some(
+      Boolean,
+    );
+    return (
+      sawEmergencyStopBaseline &&
+      !emergencyStopActive &&
+      lastEStopTelemetryAt !== null &&
+      now() - lastEStopTelemetryAt <= telemetryFreshnessMs
+    );
+  };
+
   return {
     invalidate,
     observe(topic, payload) {
       if (!isPlcDataTopic(topic) || !isPlainObject(payload)) return;
-      lastTelemetryAt = now();
 
-      for (const [field, active] of readBitEntries(
+      const emergencyStopEntries = readBitEntries(
         payload,
         EMERGENCY_STOP_FIELDS,
-      )) {
-        emergencyStopLevels.set(field, active);
+      );
+      if (emergencyStopEntries.length > 0) {
+        lastEStopTelemetryAt = now();
+        for (const [field, active] of emergencyStopEntries) {
+          emergencyStopLevels.set(field, active);
+        }
       }
       const emergencyStopActive = [...emergencyStopLevels.values()].some(
         Boolean,
@@ -163,6 +183,10 @@ export function createRfidAuthorizationGate({
       if (emergencyStopActive || latchedEmergencyStopRising) {
         authorizedUntil = 0;
       }
+      if (latchedEmergencyStopRising) {
+        lastEStopTelemetryAt = null;
+        sawEmergencyStopBaseline = false;
+      }
 
       const rfidEntries = readBitEntries(payload, RFID_AUTHORIZATION_FIELDS);
       const freshRfidRisingEdge = rfidEntries.some(
@@ -179,15 +203,10 @@ export function createRfidAuthorizationGate({
         authorizedUntil = now() + windowMs;
       }
     },
+    isSafeToEnergize,
     isAuthorized() {
-      const emergencyStopActive = [...emergencyStopLevels.values()].some(
-        Boolean,
-      );
       return (
-        sawEmergencyStopBaseline &&
-        !emergencyStopActive &&
-        lastTelemetryAt !== null &&
-        now() - lastTelemetryAt <= telemetryFreshnessMs &&
+        isSafeToEnergize() &&
         authorizedUntil > 0 &&
         now() <= authorizedUntil
       );
