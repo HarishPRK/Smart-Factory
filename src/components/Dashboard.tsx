@@ -96,7 +96,9 @@ const Dashboard: React.FC = () => {
   const [networkBranchId, setNetworkBranchId] = useState<NetworkBranchId>("b-mck-03");
   const [videoOpen, setVideoOpen] = useState(false);
   const [gwTwinOpen, setGwTwinOpen] = useState(false);
+  const [smartMeterOpen, setSmartMeterOpen] = useState(false);
   const gwTwinFullscreenRef = useRef<HTMLDivElement>(null);
+  const smartMeterFullscreenRef = useRef<HTMLDivElement>(null);
   const [unsOpen, setUnsOpen] = useState(false);
   const predAlertCount = usePredictionStore((s) => s.anomalyAlerts.length);
   const { filteredAlerts } = useFilters();
@@ -104,7 +106,7 @@ const Dashboard: React.FC = () => {
   // The integration modals cover the whole screen, so freeze the 3D render
   // loop while one is open — on integrated GPUs the scene otherwise competes
   // with the modal for the GPU and makes it take seconds to appear.
-  const scenePaused = dpsOpen || appRoutingOpen || devicesDomain !== null || onboardingOpen || videoOpen || gwTwinOpen;
+  const scenePaused = dpsOpen || appRoutingOpen || devicesDomain !== null || onboardingOpen || videoOpen || gwTwinOpen || smartMeterOpen;
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -171,6 +173,21 @@ const Dashboard: React.FC = () => {
               <rect x="12" y="8" width="5" height="4" rx="1" stroke="currentColor" strokeWidth="1.4" />
               <rect x="3" y="13" width="5" height="4" rx="1" stroke="currentColor" strokeWidth="1.4" />
               <path d="M8 5h2.5v10H8M10.5 10H12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            </svg>
+          </button>
+
+          {/* Smart meter twin */}
+          <button
+            type="button"
+            onClick={() => setSmartMeterOpen(true)}
+            title="Open Aituzero smart meter twin"
+            aria-label="Open Aituzero smart meter twin"
+            className="icon-btn w-10 h-10 flex items-center justify-center rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-white/60 hover:text-white transition-colors"
+          >
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" />
+              <rect x="7" y="7" width="10" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" />
+              <path d="M8 16h2m2 0h2m2 0h1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
           </button>
 
@@ -475,6 +492,25 @@ const Dashboard: React.FC = () => {
         >
           <div ref={gwTwinFullscreenRef} style={{ height: "78vh", minHeight: 480, borderRadius: 12, overflow: "hidden" }}>
             <GatewayTwinEmbed />
+          </div>
+        </IntegrationModal>
+      )}
+      {smartMeterOpen && (
+        <IntegrationModal
+          open
+          onClose={() => setSmartMeterOpen(false)}
+          title="Aituzero Smart Meter · Simulation"
+          layout="immersive"
+          enableFullscreen
+          fullscreenTargetRef={smartMeterFullscreenRef}
+        >
+          <div ref={smartMeterFullscreenRef} style={{ height: "calc(var(--fit-vh, 100vh) - 152px)", minHeight: 480, borderRadius: 12, overflow: "hidden" }}>
+            <iframe
+              title="Aituzero Form 2S smart meter digital twin"
+              src="/widgets/aituzero-meter/"
+              loading="lazy"
+              style={{ width: "100%", height: "100%", border: 0, background: "#f1f4f5" }}
+            />
           </div>
         </IntegrationModal>
       )}
