@@ -38,7 +38,7 @@
 .plant-console .operations-titlebar__status { gap: 13px; font-size: 10px; }
 .plant-console .operations-titlebar__status button { background: #1c2938; border-color: #344458; border-radius: 5px; color: #ccdae8; padding: 8px 10px; font-size: 11px; }
 .plant-console .connection-state { margin-right: 6px; color: #c6ae85; }
-.plant-console .operations-grid { grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; }
+.plant-console .operations-grid { grid-template-columns: minmax(0, 1fr) 480px; gap: 16px; }
 .plant-console .operations-main { gap: 14px; }
 .plant-console.is-model-focused .operations-grid { grid-template-columns: minmax(0, 1fr); }
 .plant-console.is-model-focused .operations-sidebar { display: none; }
@@ -112,7 +112,7 @@
 
 @media (min-width: 1700px) {
   .plant-console { padding-right: 26px; padding-left: 106px; }
-  .plant-console .operations-grid { grid-template-columns: minmax(0, 1fr) 400px; gap: 20px; }
+  .plant-console .operations-grid { grid-template-columns: minmax(0, 1fr) 510px; gap: 20px; }
   .plant-console .kpi-card { height: 90px; }
   .plant-console .kpi-card__primary { font-size: 26px; }
   .plant-label strong { font-size: 12px; }
@@ -124,7 +124,7 @@
   .operations-rail { width: 68px; }
   .rail-brand { width: 68px; }
   .plant-console .operations-nav { padding: 24px 6px; }
-  .plant-console .operations-grid { grid-template-columns: minmax(0, 1fr) 370px; gap: 12px; }
+  .plant-console .operations-grid { grid-template-columns: minmax(0, 1fr) 440px; gap: 12px; }
   .plant-console .operations-titlebar h1 { font-size: 23px; }
   .plant-console .operations-titlebar__status { gap: 7px; }
   .plant-console .workspace-tag, .plant-console .workspace-name { display: none; }
