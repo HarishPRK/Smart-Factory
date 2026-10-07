@@ -22,7 +22,7 @@ import {
 
 type PLCContextMeta = Pick<
   UsePLCLiveResult,
-  "isConnected" | "error" | "sendCommand"
+  "isConnected" | "telemetrySource" | "lastReceivedAt" | "error" | "sendCommand"
 >;
 
 const PLCServiceContext = createContext<PLCService | null>(null);
@@ -62,10 +62,12 @@ export const PLCProvider: React.FC<{ children: React.ReactNode }> = ({
   const liveContextValue = useMemo<PLCContextMeta>(
     () => ({
       isConnected: live.isConnected,
+      telemetrySource: live.telemetrySource,
+      lastReceivedAt: live.lastReceivedAt,
       error: live.error,
       sendCommand: live.sendCommand,
     }),
-    [live.isConnected, live.error, live.sendCommand],
+    [live.isConnected, live.telemetrySource, live.lastReceivedAt, live.error, live.sendCommand],
   );
 
   // Sync PLC data into Zustand right before paint, but coalesce bursts of MQTT
@@ -75,30 +77,24 @@ export const PLCProvider: React.FC<{ children: React.ReactNode }> = ({
   const pendingRef = useRef<{
     params: typeof live.params;
     outputs: typeof live.outputs;
+    source: typeof live.telemetrySource;
+    receivedAt: typeof live.lastReceivedAt;
   } | null>(null);
   const rafRef = useRef<number | null>(null);
   useLayoutEffect(() => {
-    pendingRef.current = { params: live.params, outputs: live.outputs };
+    pendingRef.current = { params: live.params, outputs: live.outputs, source: live.telemetrySource, receivedAt: live.lastReceivedAt };
     if (rafRef.current != null) return;
     rafRef.current = requestAnimationFrame(() => {
       rafRef.current = null;
       const latest = pendingRef.current;
       if (!latest) return;
       pendingRef.current = null;
-      usePLCStore.setState({
-        params: latest.params,
-        motorFanOn: latest.outputs.motorFanOn,
-        emergencyLightOn: latest.outputs.emergencyLightOn,
-        photoESensor: latest.outputs.photoESensor,
-        metalSensor: latest.outputs.metalSensor,
-        rfidAuthorized: latest.outputs.rfidAuthorized,
-        pushButton: latest.outputs.pushButton,
-        relays: latest.outputs.relay ?? [],
-        alerts: latest.outputs.alerts ?? [],
-      });
+      usePLCStore.getState().updateFromPLC(latest.params, latest.outputs, { source: latest.source, receivedAt: latest.receivedAt });
     });
   }, [
     live.params,
+    live.telemetrySource,
+    live.lastReceivedAt,
     live.outputs.motorFanOn,
     live.outputs.emergencyLightOn,
     live.outputs.photoESensor,
@@ -124,54 +120,11 @@ export const PLCProvider: React.FC<{ children: React.ReactNode }> = ({
       rfidOverride === null
         ? live.outputs
         : { ...live.outputs, rfidAuthorized: rfidOverride };
-    setDigitalTwinPLCFeed(live.params, effectiveOutputs);
-  }, [live.params, live.outputs, rfidOverride]);
+    setDigitalTwinPLCFeed(live.params, effectiveOutputs, live.telemetrySource);
+  }, [live.params, live.outputs, live.telemetrySource, rfidOverride]);
 
-  // Sample live PLC values into the history ring buffers at 2 Hz so the
-  // prediction engine has data to work with in MQTT/IoT-Core modes. The
-  // mock plcSimulation already does this when active, but in live mode
-  // there's no other writer — without this the prediction panel stays
-  // empty because usePredictions early-returns on historyVoltage.length<5.
-  useEffect(() => {
-    const MAX_HISTORY = 100;
-    const hV: number[] = [];
-    const hC: number[] = [];
-    const hP: number[] = [];
-    const hT: number[] = [];
-
-    const id = setInterval(() => {
-      const params = usePLCStore.getState().params;
-      const find = (paramId: string): number | null => {
-        const p = params.find((x) => x.id === paramId);
-        if (!p || p.kind !== "analog") return null;
-        if (p.placeholder) return null;
-        return typeof p.value === "number" ? p.value : null;
-      };
-      const v = find("voltage");
-      const c = find("current");
-      const ph = find("ph");
-      const t = find("temperature");
-      if (v === null && c === null && ph === null && t === null) return;
-
-      const push = (arr: number[], val: number | null) => {
-        if (val === null) return;
-        arr.push(val);
-        if (arr.length > MAX_HISTORY) arr.shift();
-      };
-      push(hV, v);
-      push(hC, c);
-      push(hP, ph);
-      push(hT, t);
-
-      usePLCStore.setState({
-        historyVoltage: [...hV],
-        historyCurrent: [...hC],
-        historyPH: [...hP],
-        historyTemp: [...hT],
-      });
-    }, 500);
-    return () => clearInterval(id);
-  }, []);
+  // Receipt histories are written by updateFromPLC. Never repeat a retained
+  // reading on a timer: a stale controller sample is not a new measurement.
 
   // Run prediction engine continuously
   usePredictions();
@@ -184,10 +137,10 @@ export const PLCProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Push every PLC update into the ring buffer
   useEffect(() => {
-    if (live.isConnected) {
+    if (live.isConnected && live.telemetrySource === "plc") {
       buffer.push(live.params, live.outputs);
     }
-  }, [live.params, live.outputs, live.isConnected, buffer]);
+  }, [live.params, live.outputs, live.isConnected, live.telemetrySource, live.lastReceivedAt, buffer]);
 
   return (
     <PLCServiceContext.Provider value={service}>
@@ -244,10 +197,12 @@ export function usePLCContext(active = true): UsePLCLiveResult {
       params,
       outputs,
       isConnected: ctx.isConnected,
+      telemetrySource: ctx.telemetrySource,
+      lastReceivedAt: ctx.lastReceivedAt,
       error: ctx.error,
       sendCommand: ctx.sendCommand,
     }),
-    [params, outputs, ctx.isConnected, ctx.error, ctx.sendCommand],
+    [params, outputs, ctx.isConnected, ctx.telemetrySource, ctx.lastReceivedAt, ctx.error, ctx.sendCommand],
   );
 }
 

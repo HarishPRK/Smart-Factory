@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { subscribeRawPLCPayload, type RawPLCPayload } from "../services/plcService";
+import { PLC_TELEMETRY_STALE_MS } from "../services/receivedTelemetry";
 import MotorSpinner3D from "./MotorSpinner3D";
 
 /* ── Live snapshot of the Shelly proEM 3-phase meter ──────
@@ -363,31 +364,51 @@ const ThreePhaseMotorWidget: React.FC<ThreePhaseMotorWidgetProps> = ({
   connected = true,
 }) => {
   const [meter, setMeter] = useState<MeterReading>(EMPTY_READING);
+  const [receivedAt, setReceivedAt] = useState<number | null>(null);
+  const [now, setNow] = useState(Date.now);
   const [open, setOpen] = useState(false);
   const closeDetails = useCallback(() => setOpen(false), []);
 
   useEffect(() => {
-    const unsubscribe = subscribeRawPLCPayload((payload) => {
+    const unsubscribe = subscribeRawPLCPayload((payload, receipt) => {
       const next = readMeter(payload);
       // A meter payload full of missing-value sentinels clears prior readings.
       // Unrelated PLC updates do not erase the latest meter sample.
-      if (Object.keys(payload).some((key) => key.startsWith("boardB_shellypro3em_data_"))) setMeter(next);
+      const meterKeys = Object.keys(payload).filter((key) => key.startsWith("boardB_shellypro3em_data_"));
+      if (meterKeys.length) {
+        setMeter(next);
+        // A partially refreshed meter snapshot must not call its retained
+        // voltage/current channels live or animate a motor from stale power.
+        const measuredKeys = meterKeys.filter((key) => pickReal(payload, key) !== null);
+        const snapshotReceipt = receipt && measuredKeys.length
+          ? Math.min(...measuredKeys.map((key) => receipt.keyReceivedAt[key] ?? 0)) : Date.now();
+        setReceivedAt(snapshotReceipt || null);
+        setNow(Date.now());
+      }
     });
     return unsubscribe;
   }, []);
 
+  useEffect(() => {
+    if (receivedAt === null) return;
+    const deadline = Math.max(0, receivedAt + PLC_TELEMETRY_STALE_MS - Date.now());
+    const timeout = setTimeout(() => setNow(Date.now()), deadline);
+    return () => clearTimeout(timeout);
+  }, [receivedAt]);
+
+  const meterConnected = connected && receivedAt !== null && now - receivedAt < PLC_TELEMETRY_STALE_MS;
   const state = classifyMotor(meter);
-  const running = connected && state === "running";
+  const running = meterConnected && state === "running";
   const energised: Record<"a" | "b" | "c", boolean> = {
-    a: connected && (meter.a.voltage ?? 0) > VOLTAGE_LIVE_THRESHOLD,
-    b: connected && (meter.b.voltage ?? 0) > VOLTAGE_LIVE_THRESHOLD,
-    c: connected && (meter.c.voltage ?? 0) > VOLTAGE_LIVE_THRESHOLD,
+    a: meterConnected && (meter.a.voltage ?? 0) > VOLTAGE_LIVE_THRESHOLD,
+    b: meterConnected && (meter.b.voltage ?? 0) > VOLTAGE_LIVE_THRESHOLD,
+    c: meterConnected && (meter.c.voltage ?? 0) > VOLTAGE_LIVE_THRESHOLD,
   };
 
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className={`card-inner pi-meter ${className}`} aria-label="View three-phase motor details">
-        <span className="pi-meter__heading"><strong>3-phase motor</strong><span data-state={connected ? state : "offline"}>{!meter.hasAny ? "No data" : !connected ? "Last received" : state === "running" ? "Running" : state === "energized" ? "Energized" : "No voltage"}</span></span>
+        <span className="pi-meter__heading"><strong>3-phase motor</strong><span data-state={meterConnected ? state : "offline"}>{!meter.hasAny ? "No data" : !meterConnected ? "Last received" : state === "running" ? "Running" : state === "energized" ? "Energized" : "No voltage"}</span></span>
         <PhaseBus live={energised} />
         <span className="pi-meter__phases">{(["a", "b", "c"] as const).map((leg, index) => <span key={leg} data-live={energised[leg]}><span><i style={{ backgroundColor: PHASE_COLORS[leg] }} />L{index + 1}</span><strong>{fmt(meter[leg].voltage, 1)} <small>V</small></strong><span className="pi-meter__phase-amount">{fmt(meter[leg].current, 2)} <small>A</small></span><span className="pi-meter__phase-amount">{fmt(meter[leg].actPower, 1)} <small>W</small></span></span>)}</span>
         <span className="pi-meter__totals"><span><small>Active power</small><span><strong><LiveAmount value={meter.totalActPower} decimals={1} /></strong> W</span></span><span><small>Total current</small><span><strong><LiveAmount value={meter.totalCurrent} decimals={2} /></strong> A</span></span></span>
@@ -399,7 +420,7 @@ const ThreePhaseMotorWidget: React.FC<ThreePhaseMotorWidgetProps> = ({
           meter={meter}
           running={running}
           state={state}
-          connected={connected}
+          connected={meterConnected}
           onClose={closeDetails}
         />
       )}

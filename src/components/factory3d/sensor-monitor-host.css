@@ -1,6 +1,10 @@
 .plant-console .twin-heading__meta { align-items: center; gap: 12px; }
 .plant-console .twin-inspector-slot { width: 100%; min-width: 0; }
+.plant-console .twin-inspector__reading-source { display: block; margin-top: 4px; color: #a7bbc6; font-size: 10px; }
+.plant-console .twin-inspector__waiting { color: #adc4cf; font-size: 11px; line-height: 1.5; }
 .plant-console .operations-sidebar { overflow-anchor: none; }
+.plant-console .operations-main { container-type: inline-size; container-name: factory-main; }
+.twin-workbench { --twin-monitor-width: clamp(256px, 24%, 280px); }
 .plant-console .twin-monitor-toggle {
   display: inline-flex;
   align-items: center;
@@ -19,8 +23,24 @@
 .plant-console .twin-monitor-toggle:hover { background: #26444f; color: #eef5f7; }
 .plant-console .twin-monitor-toggle[aria-expanded="true"] { background: #43d8f1; color: #08212a; border-color: #43d8f1; }
 .plant-console .twin-monitor-toggle:focus-visible { outline: 2px solid #7deafb; outline-offset: 2px; }
-.twin-monitor-overlay { position: absolute; top: 108px; right: 14px; bottom: 52px; width: min(286px, calc(100% - 28px)); z-index: 15; }
-.twin-monitor-overlay > .sensor-monitor { max-height: 100%; height: 100%; }
+.twin-monitor-overlay { position: absolute; top: 49px; right: 0; bottom: 0; width: var(--twin-monitor-width); z-index: 15; border-left: 1px solid #38515f; background: #14232d; }
+.twin-monitor-overlay > .sensor-monitor { max-height: none; height: 100%; border: 0; border-radius: 0; }
+.plant-console .twin-workbench:has(.twin-monitor-overlay) .twin-canvas { right: var(--twin-monitor-width); }
+.plant-console .twin-workbench:has(.twin-monitor-overlay) .twin-toolbar,
+.plant-console .twin-workbench:has(.twin-monitor-overlay) .twin-scene-footer { right: calc(var(--twin-monitor-width) + 14px); }
+.plant-console .twin-workbench:has(.twin-monitor-overlay) .twin-toolbar { flex-wrap: wrap; }
+.plant-console .twin-workbench:has(.twin-monitor-overlay) .twin-tool-group { margin-left: auto; }
+.plant-console .twin-workbench:has(.twin-monitor-overlay) .twin-navigation-hint { display: none; }
+@container factory-main (max-width: 900px) {
+  .twin-heading__meta > .twin-source { display: none; }
+}
+@container factory-main (max-width: 599px) {
+  .operations-twin:has(.twin-workbench:not(:fullscreen) .twin-monitor-overlay) { min-height: 745px; }
+  .plant-console .twin-workbench:not(:fullscreen):has(.twin-monitor-overlay) .twin-canvas { right: 0; bottom: 320px; }
+  .plant-console .twin-workbench:not(:fullscreen):has(.twin-monitor-overlay) .twin-toolbar { right: 9px; }
+  .plant-console .twin-workbench:not(:fullscreen):has(.twin-monitor-overlay) .twin-scene-footer { right: 9px; bottom: 332px; }
+  .twin-workbench:not(:fullscreen) .twin-monitor-overlay { top: auto; bottom: 0; width: 100%; height: 320px; border-left: 0; border-top: 1px solid #38515f; }
+}
 @media (max-width: 700px) {
   .plant-console .twin-heading__meta > .twin-source { display: none; }
   .plant-console .twin-monitor-toggle { min-height: 30px; font-size: 11px; padding: 0 8px; }

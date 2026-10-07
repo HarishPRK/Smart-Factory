@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MosquittoPLCService, PLC_DATA_TOPIC, type RawPLCPayload } from "../services/plcService";
 import { usePLCStore } from "../stores/plcStore";
 import PLCParametersWidget from "./PLCParametersWidget";
+import ClassicPLCParametersWidget from "../legacy/components/PLCParametersWidget";
 
 const { sendCommand } = vi.hoisted(() => ({ sendCommand: vi.fn() }));
 vi.mock("../context/PLCContext", () => ({
@@ -90,6 +91,22 @@ function analogChannel(label: string) {
 }
 
 describe("PLC telemetry payload parity", () => {
+  it("preserves the same parsed readings when moving from New UI to Classic UI without sending commands", () => {
+    receive(referencePayload);
+    const modern = render(<PLCParametersWidget />);
+    expect(analogChannel("Voltage").getByText("4.31")).toBeTruthy();
+    expect(analogChannel("Pressure").getByText("53.0")).toBeTruthy();
+    const receivedParams = usePLCStore.getState().params;
+    modern.unmount();
+    render(<ClassicPLCParametersWidget />);
+    for (const value of ["4.31", "4.01", "9.4", "53.0", "100.0", "26.4", "936", "204"]) {
+      expect(screen.getByText(value)).toBeTruthy();
+    }
+    expect(usePLCStore.getState().params).toBe(receivedParams);
+    expect(sendCommand).not.toHaveBeenCalled();
+    expect(FixtureSocket.latest.sent).toEqual([]);
+  });
+
   it("renders the reference analog, relay, digital and three-phase readings from a real-shaped frame", () => {
     render(<PLCParametersWidget />);
     receive(referencePayload);
@@ -143,9 +160,24 @@ describe("PLC telemetry payload parity", () => {
 
     receive({ boardA_relay_motor: 1, boardA_relay_alarm: 1, boardA_rfid_authorized_user: 1 });
     expect(screen.getByText("Alarm")).toBeTruthy();
-    expect(screen.getByText("Authorized · Intake unlocked")).toBeTruthy();
+    expect(screen.getByText("Badge authorized")).toBeTruthy();
     expect(usePLCStore.getState().motorFanOn).toBe(true);
     expect(usePLCStore.getState().emergencyLightOn).toBe(true);
     expect(FixtureSocket.latest.sent).toEqual([]);
+  });
+
+  it("does not refresh a silent meter when another board keeps publishing", () => {
+    render(<PLCParametersWidget />);
+    receive(referencePayload);
+    const meter = within(screen.getByRole("button", { name: "View three-phase motor details" }));
+    expect(meter.getByText("Running")).toBeTruthy();
+    act(() => vi.advanceTimersByTime(16_000));
+    receive({ boardA_voltage_pot_1: 4.4 });
+    expect(meter.getByText("Last received")).toBeTruthy();
+    expect(meter.getByText("-0.2")).toBeTruthy();
+    expect(meter.queryByText("Running")).toBeNull();
+    receive(referencePayload);
+    expect(meter.getByText("Running")).toBeTruthy();
+    expect(sendCommand).not.toHaveBeenCalled();
   });
 });

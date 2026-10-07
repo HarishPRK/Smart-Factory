@@ -1,0 +1,4 @@
+/* Snapshot presentation from 12e37c0. Activate only for the legacy UI. */
+@import "./legacy-index.css";
+@import "./legacy-global-theme.css";
+@import "./legacy-integration-tokens.css";

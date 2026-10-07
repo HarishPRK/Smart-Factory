@@ -3,7 +3,6 @@ import { Link } from './OfferingNavigation';
 import { ArrowRight, Check, ChevronRight, Cpu, Pause, Play, RotateCcw } from 'lucide-react';
 import { SolutionScene } from './SolutionScene';
 import type { ScenarioId } from './scenePrimitives';
-import './solution-showcase.css';
 
 const CHAPTERS = ['The incident', 'The blind spot', 'Edge response', 'The outcome'] as const;
 const CHAPTER_TIMES = [0, 4, 10, 17];

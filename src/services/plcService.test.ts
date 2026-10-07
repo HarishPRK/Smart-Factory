@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MosquittoPLCService, parsePLCPayload } from "./plcService";
+import { MosquittoPLCService, parsePLCPayload, PLC_DATA_TOPIC, subscribeRawPLCPayload, type PLCState, type RawPLCReceipt } from "./plcService";
 
 class MockWebSocket {
   static readonly CONNECTING = 0;
@@ -45,6 +45,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe("parsePLCPayload operator precision", () => {
@@ -61,6 +62,38 @@ describe("parsePLCPayload operator precision", () => {
     expect(voltage?.decimals).toBe(2);
     expect(current?.value).toBe(4.114);
     expect(current?.decimals).toBe(2);
+  });
+});
+
+describe("parsePLCPayload fire and authentication semantics", () => {
+  it.each([
+    [0, "critical"], [49.9, "critical"], [50, "critical"],
+    [50.1, "warning"], [59.9, "warning"], [60, "warning"],
+    [60.1, "normal"], [65, "normal"], [100, "normal"],
+  ] as const)("classifies scaled fire input %s as %s", (value, status) => {
+    const state = parsePLCPayload({ boardB_analog_8ch_b_fire_sensor: value });
+    expect(state.params.find((param) => param.id === "fire")).toMatchObject({ value, status, placeholder: false });
+  });
+
+  it.each([
+    [2047.5, 50, "critical"], [2457, 60, "warning"], [2661.75, 65, "normal"],
+  ] as const)("normalizes raw fire ADC %s before applying thresholds", (adc, value, status) => {
+    const state = parsePLCPayload({ boardB_analog_8ch_b_fire_sensor: adc });
+    expect(state.params.find((param) => param.id === "fire")).toMatchObject({ value, status, placeholder: false });
+  });
+
+  it.each([0, 1])("keeps fingerprint %s informational without setting an emergency or granting access", (value) => {
+    const state = parsePLCPayload({ boardB_esp32_finger_match: value });
+    for (const id of ["intake_fingerprint", "dispatch_fingerprint"]) {
+      expect(state.params.find((param) => param.id === id)).toMatchObject({ value, status: "normal", placeholder: false });
+    }
+    expect(state.params.find((param) => param.id === "system_emergency_stop")).toMatchObject({ active: false, placeholder: true });
+    expect(state.outputs.rfidAuthorized).toBe(false);
+  });
+
+  it("keeps a missing fire input unavailable instead of treating the fallback zero as a hazard", () => {
+    const state = parsePLCPayload({ boardB_esp32_finger_match: 0 });
+    expect(state.params.find((param) => param.id === "fire")).toMatchObject({ status: "normal", placeholder: true });
   });
 });
 
@@ -160,5 +193,52 @@ describe("MosquittoPLCService command publishing", () => {
     });
 
     await rejection;
+  });
+
+  it("marks real transport receipts explicitly and preserves old channel time across board slices", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(100_000);
+    const states: PLCState[] = [];
+    const service = new MosquittoPLCService("ws://bridge.test/ws");
+    const unsubscribe = service.subscribe((state) => states.push(state));
+    const socket = MockWebSocket.instances.at(-1)!;
+    socket.receive({ topic: `${PLC_DATA_TOPIC}/boardA`, payload: { boardA_voltage_pot_1: 4.31 } });
+    vi.advanceTimersByTime(20);
+    expect(states[0]).toMatchObject({ source: "plc", receivedAt: 100_020 });
+    expect(states[0].params.find((param) => param.id === "voltage")?.receivedAt).toBe(100_000);
+    vi.advanceTimersByTime(16_000);
+    socket.receive({ topic: `${PLC_DATA_TOPIC}/boardB`, payload: { boardA_current_pot: 4.01 } });
+    vi.advanceTimersByTime(20);
+    expect(states[1].params.find((param) => param.id === "voltage")).toMatchObject({ value: 4.31, receivedAt: 100_000 });
+    expect(states[1].params.find((param) => param.id === "current")).toMatchObject({ value: 4.01, receivedAt: 116_020 });
+    unsubscribe();
+    vi.advanceTimersByTime(1000);
+  });
+
+  it("publishes underlying raw meter receipt times without refreshing them on unrelated merged slices", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(100_000);
+    const receipts: RawPLCReceipt[] = [];
+    const rawUnsubscribe = subscribeRawPLCPayload((_payload, receipt) => { if (receipt) receipts.push(receipt); });
+    const service = new MosquittoPLCService("ws://bridge.test/ws");
+    const unsubscribe = service.subscribe(() => {});
+    const socket = MockWebSocket.instances.at(-1)!;
+    const meterKey = "boardB_shellypro3em_data_c_voltage";
+    socket.receive({ topic: `${PLC_DATA_TOPIC}/boardB`, payload: { [meterKey]: 230.2 } });
+    vi.advanceTimersByTime(20);
+    expect(receipts[0]).toMatchObject({ source: "plc", receivedAt: 100_000, keyReceivedAt: { [meterKey]: 100_000 } });
+    vi.advanceTimersByTime(16_000);
+    socket.receive({ topic: `${PLC_DATA_TOPIC}/boardA`, payload: { boardA_voltage_pot_1: 4.31 } });
+    vi.advanceTimersByTime(20);
+    expect(receipts[1]).toMatchObject({ receivedAt: 116_020, keyReceivedAt: { [meterKey]: 100_000, boardA_voltage_pot_1: 116_020 } });
+    // Listeners can keep the old metadata snapshot safely; subsequent receipts
+    // cannot mutate it into an invented newer measurement.
+    expect(receipts[0].keyReceivedAt.boardA_voltage_pot_1).toBeUndefined();
+    socket.receive({ topic: `${PLC_DATA_TOPIC}/boardB`, payload: { [meterKey]: 231.1 } });
+    expect(receipts[2].keyReceivedAt[meterKey]).toBe(116_040);
+    expect(receipts[1].keyReceivedAt[meterKey]).toBe(100_000);
+    rawUnsubscribe();
+    unsubscribe();
+    vi.advanceTimersByTime(1000);
   });
 });

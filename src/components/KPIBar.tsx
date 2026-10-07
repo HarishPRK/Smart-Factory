@@ -34,7 +34,6 @@ import KpiSparkline from "./KpiSparkline";
 import WorkspacePreview from "./WorkspacePreview";
 import LorawanWidget from "./LorawanWidget";
 import ZoneTabs from "./ZoneTabs";
-import "../kpi-workspace.css";
 
 function hexToRgbChannels(hex: string) {
   const normalized = hex.replace("#", "");

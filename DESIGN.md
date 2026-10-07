@@ -9,6 +9,7 @@ colors:
   rail: "#0a1117"
   panel: "#17232d"
   metric-panel: "#14242e"
+  sensor-monitor-panel: "#15242d"
   panel-raised: "#1d2d38"
   edge: "#2e4553"
   edge-strong: "#497080"
@@ -80,9 +81,9 @@ typography:
     letterSpacing: "0.01em"
   measurement:
     fontFamily: "'Inter Variable', Inter, system-ui, sans-serif"
-    fontSize: "24px"
+    fontSize: "clamp(22px, 22cqi, 28px)"
     fontWeight: 550
-    lineHeight: 1.2
+    lineHeight: 1.1
     letterSpacing: "-0.025em"
   inspector-reading:
     fontFamily: "'Geist Mono', 'JetBrains Mono', monospace"
@@ -156,9 +157,9 @@ components:
     height: "86px"
     width: "192px"
   sensor-monitor:
-    backgroundColor: "{colors.panel}"
+    backgroundColor: "{colors.sensor-monitor-panel}"
     textColor: "{colors.text}"
-    rounded: "{rounded.dialog}"
+    rounded: "0"
   sensor-monitor-row:
     backgroundColor: "transparent"
     padding: "5px"
@@ -171,7 +172,7 @@ components:
   sensor-face:
     backgroundColor: "#152731"
     rounded: "{rounded.card}"
-    padding: "12px 8px 11px"
+    padding: "8px"
   button-langgraph:
     backgroundColor: "#18333e"
     textColor: "{colors.primary-hover}"
@@ -238,6 +239,7 @@ Cyan indicates interaction; neutral slate supports dense information; status and
 - **Panel Edge / Strong Edge** (`edge`, `edge-strong`): one-pixel separation and stronger interactive boundaries.
 - **Cool White / Secondary Blue Gray / Dim Blue Gray** (`text`, `text-secondary`, `text-dim`): text hierarchy.
 - **Studio Blue Gray** (`scene`): the rendered scene background.
+- **Monitor Slate** (`sensor-monitor-panel`): the flush sensor rail inside the twin.
 
 **The Cyan Means Interaction Rule.** Reserve filled cyan controls for current or selected interaction states; use dark ink inside them.
 
@@ -257,38 +259,38 @@ Cyan indicates interaction; neutral slate supports dense information; status and
 - **Body:** compact explanations and source disclosures use the `body` scale. Launcher descriptions remain in title tooltips.
 - **Label:** KPI and workspace names share the 11px, weight-650 `metric-label` role. LoRaWAN readings use 12px at weight 550; state and source metadata generally uses 9–11px.
 - **Metric:** KPI values use the 24px, weight-600 `metric` role at every breakpoint.
-- **Measurement:** analog sensor values use the full-width, tabular 24px `measurement` role with 10px units on their own line. Formatted readings longer than five characters reduce to 20px. Power monitor values use Inter at 17px for primary phase values, 11px for additional V/A/W readings, and 20px for totals.
+- **Measurement:** analog sensor values use the tabular `measurement` role at weight 600, scaling with the card container from 21px to 30px, with 10px units on the same baseline. Long formatted readings use a smaller container-responsive size. Power monitor values use Inter at 17px for primary phase values, 11px for additional V/A/W readings, and 20px for totals.
 - **Inspector reading:** the existing compact mono reading uses `inspector-reading`.
 
 **The Stable Reading Rule.** Use tabular numerals, keep units separate, and display missing measurements as unavailable rather than zero.
 
 ## Layout
 
-The desktop shell retains a 76px left rail, 98px left content padding, 20px right padding, a 62px header, and a 98px title region. The main grid uses a flexible model column and a 380px sidebar separated by 16px. The main stack places the instrument rail above the factory; the sidebar places the sensor monitor above PLC telemetry and hardware controls by default, with selected-machine inspection taking the monitor position.
+The desktop shell retains a 76px left rail, 98px left content padding, 20px right padding, a 62px header, and a 98px title region. The main grid uses a flexible model column and a 480px sidebar separated by 16px. The main stack places the instrument rail above the factory, with the sensor monitor inside the twin. The separate sidebar holds PLC telemetry, hardware controls, and selected-machine inspection.
 
 KPI cards have a fixed 192px width and 86px height, 10px 12px padding, and 8px gaps, grouped at the left of the rail. All thirteen workspace cards share the same fixed 192px width, 86px height, 10px 12px padding, and 8px gaps, including LoRaWAN. Thirteen workspace launchers include LangGraph AI. The rail scrolls horizontally with proximity snapping instead of shrinking labels. Its reduced height gives more vertical space to the digital twin.
 
-The twin has a 49px heading and a canvas extending to its bottom edge. Tools overlay its top; status and Fit line sit near the bottom. There is no production-sequence strip. Focus model hides the sidebar; fullscreen and focused mode use an overlay inspector. The three-quarter overview frames all seven stations from [-23.5, 23.29, 32.96] toward [-2, 0.5, 2]. Aspect compensation scales camera distance relative to that target so narrow views retain the equipment footprint.
+The twin has a 49px heading. Its open sensor monitor occupies a flush right rail below that heading, sized with `clamp(256px, 24%, 280px)`. The actual canvas, toolbar, and footer reserve the rail width. Tools overlay the scene top; status and Fit line sit near the bottom. There is no production-sequence strip. Focus model hides the separate sidebar. Without an external inspector host, the stage inspector overlays the scene only when the monitor is closed. The three-quarter overview frames all seven stations from [-23.5, 23.29, 32.96] toward [-2, 0.5, 2]. Aspect compensation scales camera distance relative to that target so narrow views retain the equipment footprint. Shared camera-view state preserves Plan or Elevation when toggling the monitor resizes the canvas.
 
 Responsive behavior:
 
-- At 1700px and above, the shell uses a 400px sidebar, 20px grid gap, and 106px left / 26px right padding.
-- At 1200px and below, the rail becomes 68px, the sidebar 370px, and the grid gap 12px.
+- At 1700px and above, the shell uses a 510px sidebar, 20px grid gap, and 106px left / 26px right padding.
+- At 1200px and below, the rail becomes 68px, the sidebar 440px, and the grid gap 12px.
 - At 960px and below, the primary layout stacks, sidebar sections form a full-width vertical stack, and the model is 650px high.
 - At 700px and below, the toolbar wraps with a 66px minimum height; KPI cards retain their fixed 192px width and 86px height. Workspace cards retain the same 192px by 86px frame. Analytics and LoRaWAN layouts simplify.
 - At 640px and below, the rail becomes a 56px top bar, gutters become 10px, and the model is 425px high. Inspector and telemetry follow the model.
+- When the `factory-main` container is narrower than 600px, the monitor occupies a 320px-high region below the canvas and the twin has a 745px minimum height. Fullscreen retains the right rail.
 - Short desktops allow document scrolling; the page is never scaled to fit.
 
 Analytics is a bounded dialog up to 1220px wide, with independently scrolling content and horizontal section navigation. Its SVG charts use responsive pixel dimensions. LoRaWAN uses a drawer up to 760px wide with a compact summary and explicit empty state.
 
 ## Elevation & Depth
 
-KPI cards and ordinary containers are flat, with surface shifts and fine borders. Hover brightens a card and its border without a lift. Analog sensor tiles use a restrained beveled surface and recessed reading face; their hover preserves the same surface and position. Floating labels, settings, dialogs, and drawers use soft black shadows; docked inspectors remove their overlay shadow.
+KPI cards and ordinary containers are flat, with surface shifts and fine borders. Hover brightens a card and its border without a lift. Analog sensor tiles use a continuous matte surface with a fine channel-tinted edge; their hover preserves the same surface and position. The dimensional SVG supplies depth without a nested recessed box. Floating labels, settings, dialogs, and drawers use soft black shadows; docked inspectors remove their overlay shadow.
 
 ### Shadow Vocabulary
 
 - **Analog tile bevel:** `inset 0 1px 0 #ffffff0a, 0 3px 7px #05121924`.
-- **Recessed analog face:** `inset 0 2px 4px #0310164d, inset 0 -1px 0 #ffffff0a`.
 - **Machine label:** `0 3px 10px #00000040`.
 - **Floating settings / inspector:** `0 9px 28px #00000040`.
 - **Analytics dialog:** `0 22px 76px #0008`.
@@ -300,7 +302,7 @@ The model uses cast shadows, local environment reflections on equipment, warm ke
 
 ## Shapes
 
-Major KPI cards, actuator cards, analog sensor tiles, the twin, and docked inspectors use 12px corners. PLC containers and Analytics use 14px; the power monitor uses 9px. Controls and badges use smaller 4–7px corners. Analog instruments are individual tiles with 8px gaps in three columns at every breakpoint. Their recessed reading faces use 7px corners; digital I/O retains separated rows.
+Major KPI cards, actuator cards, analog sensor tiles, the twin, and docked inspectors use 12px corners. PLC containers and Analytics use 14px; the power monitor uses 9px. Controls and badges use smaller 4–7px corners. Analog instruments are individual square tiles (`aspect-ratio: 1`) with 8px padding and 8px gaps in three columns at every breakpoint. Their recessed reading faces use 7px corners; digital I/O retains separated rows.
 
 The factory remains a cutaway slab with machine pads, rear service wall, utility racks, safety fences, and conveyor geometry. The former floor title and header PET tag are removed. Colored equipment is authored geometry, not a raster replacement. Service panels, louvers, guard frames, bolted flanges, anchor feet, fan grilles, and hoses add physical specificity while keeping process internals visible.
 
@@ -322,13 +324,17 @@ Metric instruments pair a 24px tinted icon tile with a title and change chip, th
 
 Workspace launchers share the KPI surface, 24px tinted icon tile, and 11px title scale. Each tool places a word-free 112px by 28px destination diagram at the lower left and a 22px tinted launch affordance at the lower right. These static diagrams explain the destination without claiming counts, activity, or telemetry. Functional descriptions stay in title tooltips. All thirteen actions remain available, including LangGraph AI. LoRaWAN uses a static 40px by 28px radio drawing beside its 12px reading: reported average moisture, reported average temperature, or device count. It excludes values flagged as simulated gap fills. Before the first packet, its reading is Awaiting data and its status is Waiting; received packets use Received, while an actual battery reading below 3.3V uses Low battery. Its custom accessible label retains the full source-qualified values and units, and the card opens the full drawer.
 
-PLC telemetry begins with a controller-link schematic and explicit connected, unavailable, awaiting-payload, or last-received wording. Operator access, analog sensors, digital I/O, and a full-width three-phase power monitor follow. Eight supported analog faces remain visible before data arrives: voltage, current, pH, pressure, MQ gas, turbidity, light, and ORP. Relay, photoelectric, and metal-detection rows also remain present without received values. Channel-colored labels and 5px square swatches remain visible offline, and 3px range tracks mix the channel color at 26% with #263d49. Unavailable analog and digital readings show neutral dashes; the relay explicitly shows No reading. Known normal analog readings display Normal; Normal, warning/critical, and No reading labels sit below the instrument graphic. Scales, nominal markers, and visible nominal numbers (for example, 5 nom) remain configuration rather than samples. Relay Alarm remains distinct from an unavailable hardware link. Warning and critical fills stay separate from channel identity. The received count and key explain availability. The power monitor includes a phase schematic and per-phase V/A/W readings. Last received values are identified when disconnected. Hardware telemetry starts unknown, and hardware hooks and snapshot fallbacks supply no sample telemetry. Hardware command handlers remain intact; RFID testing stays labeled as a test override.
+PLC telemetry begins with a compact controller-link schematic, channel coverage and actual last-frame time. Operator access, analog sensors, digital I/O, and a full-width three-phase power monitor follow. Eight supported analog faces remain visible before data arrives: voltage, current, pH, pressure, MQ gas, turbidity, light, and ORP. Relay, photoelectric, and metal-detection rows also remain present without received values. Channel-colored labels and 5px square swatches remain visible offline, and 3px range tracks mix the channel color at 26% with #263d49. Unavailable readings show neutral dashes; status and scale labels use 9px. Scales, nominal markers and visible nominal numbers remain configuration rather than samples. Warning and critical status stays distinct from channel identity and hardware availability. Operator access shows received RFID feedback, without a test override in this panel. Existing hardware command handlers remain intact.
 
-Each analog tile uses 12px 8px 11px padding and a recessed full-width numeric face with a minimum 44px reading area. Its 58px by 36px dimensional SVG stacks above the status in a minimum 49px area: extruded voltage bars, current rails, calibrated pH tiles, a pressure dial, gas beads, a turbidity vessel, a light lens, or bipolar ORP. The latest valid sample controls position within its configured range; these graphics do not depict history. Instrument shapes and configured references remain visible when unavailable, with no sample fill or marker. Minimum, nominal, and maximum labels anchor the range below. CSS shading and SVG faces provide the requested physical depth within the dark cyan system, without WebGL or new dependencies.
+New UI telemetry accepts only explicitly received PLC parameters and finite engineering values. Per-channel receipt timestamps determine freshness: after 15 seconds without a matching update, retained values display Last received rather than Normal or live status. Histories append only actual receipts; a timer, model update, cached channel or unrelated board packet cannot create a sample or refresh freshness. The power monitor retains raw meter readings and per-phase V/A/W values, with the oldest received field qualifying its snapshot freshness. Missing firmware-sentinel values remain unavailable. Classic simulation presentation remains separate from the New telemetry contract.
+
+Each square analog tile uses a continuous matte surface with 10px padding and a flexible reading area with 8px vertical margins. Its dimensional SVG scales from 36px to 62px wide using `clamp(36px, 44cqi, 62px)`, with automatic height at an 8:5 aspect ratio, beside the status: extruded voltage bars, current rails, calibrated pH tiles, a pressure dial, gas beads, a turbidity vessel, a light lens, or bipolar ORP. The latest received sample controls position within its configured range; these graphics do not depict history. Instrument shapes and configured references remain visible when unavailable, with no sample fill or marker. Minimum, nominal, and maximum labels anchor the range below. SVG faces provide dimensional depth within the dark cyan system, without WebGL or new dependencies.
 
 The meter dialog is titled Aituzero Smart Meter, without an unconditional Simulation label. It embeds `/widgets/aituzero-meter/index.html` explicitly so the meter entry document loads instead of the dashboard SPA fallback.
 
-The Sensor monitor is visible by default in the existing sidebar above PLC telemetry. Its named toggle lives in the twin heading and exposes the current expanded state. The panel contains 34 sensor readings across seven stage groups, in rows at least 44px high, inside an independently scrolling area capped at 460px on desktop and 360px at 700px and below. Sim identifies modeled values and Live identifies PLC input; missing values use neutral dashes and no source badge. The 48px by 18px trends use the most recent 24 stored history samples, break across invalid values, and show a neutral rule when fewer than two valid samples exist. Process interlocks separately report Clear, Triggered, or neutral Unavailable with Sim, Live, or Mixed source qualification when known. Selecting a reading focuses its station and replaces the monitor with the stage inspector; returning to the whole line restores the monitor. Closing the monitor returns keyboard focus to its toggle. If no sidebar inspector host is available, the panel uses a bounded overlay inside the twin.
+The Sensor monitor is visible by default inside the twin, controlled by a named toggle in its heading. It stays in place during station selection; only the separate stage inspector uses the external sidebar host. Its flush square-edged panel fits the available twin height, with only the reading list scrolling. The header identifies Hardware only and shows availability across 34 configured channels in seven groups; physical sources shared across stations are explicitly labeled Shared input. Received channels lead each group, while missing channels collapse into a concise awaiting PLC count. No modeled readings or simulation totals appear. Rows align channel-colored readings and units in a 72px value column beside 48px trends; their minimum height is 40px, or 44px for coarse pointers. Raw engineering values and units remain source-qualified rather than mapped through visual-model ranges.
+
+The 48px by 18px monitor trends use the most recent 24 actual receipt samples and mark the latest valid point; fewer than two valid samples produce a neutral rule. Process interlocks use the received emergency-stop input only, reporting its actual state or Awaiting PLC; stale input is Last received rather than a current clear state. Selecting a row focuses its station and highlights that group without replacing the monitor. Returning to the whole line clears selection, and closing the monitor returns keyboard focus to its toggle. Settings temporarily hide the panel.
 
 ### Inputs / Fields
 
@@ -338,15 +344,25 @@ Display settings retain native selects, checkboxes, and a speed range with visib
 
 The charcoal rail uses icon-and-label destinations with bright cyan current state and becomes horizontal on phones. Plant KPIs and Workspaces use underline tabs above the card rail. Analytics supplies its own scrolling section navigation and range controls. Shared root tokens and semantic dialog boundaries keep portal workspaces within the cyan system.
 
+The header includes a compact New UI / Classic UI selector. New is the default; a validated `?ui=` choice overrides the browser's saved preference. Switching replaces the active dashboard and its stylesheet while retaining the shared PLC provider, live histories, filters, and device state. Classic restores the earlier dashboard and conveyor twin from `12e37c0`; its appearance remains isolated from the cyan theme. Only one dashboard and primary twin canvas is mounted. Classic avoids global viewport zoom so its WebGL canvas fills the available scene.
+
 ### Inspection and Process
 
-LangGraph AI has a named in-flow header entry and a workspace launcher, separate from Ask AI. Its open entry uses cyan selection. The existing conversation remains mounted when the dialog closes, preserving chat across reopening. The dialog retains its composer, focus trap, and focus restoration. The former unlabelled floating trigger is no longer the entry pattern; current styling is in `src/components/langgraph-entry.css`.
+LangGraph AI has a named in-flow header entry and a workspace launcher, separate from Ask AI. Its open entry uses cyan selection. The conversation remains mounted when the dialog closes, preserving chat across reopening. A bounded 1240px by 860px workspace uses a 248px investigation rail for Production, Sensors & energy, and Safety & devices. The main area displays concise starter rows or a readable conversation with structured lists, headings, code and tables. Its persistent multiline composer supports Enter to send and Shift+Enter for a new line. Request acceptance, identifier, elapsed time and response state follow the actual request lifecycle, without invented thinking phases. Retry, cancel, focus trapping and focus restoration remain available; advisory status stays explicit. Phones place topic navigation above the conversation. Styling is in `src/components/langgraph-workspace.css`, with entry styling in `src/components/langgraph-entry.css`.
 
-Selecting equipment focuses the camera and opens an inspector in the sensor monitor position beside the model on desktop or below it on phones. It identifies Modeled process and estimated quality, and explains that available PLC inputs replace simulated sensor values.
+Selecting equipment focuses the camera while the in-twin monitor remains visible. When an external inspector host is available, the stage inspector opens there beside the model on desktop or below it on phones. Its sensor readings are received PLC inputs only, with explicit missing, shared and stale qualification. No estimated quality or modeled sensor values appear. A separately labeled Twin state identifies the illustrated machine state.
 
 The factory shows resin feed, a forming preform, bottle expansion, nozzle docking, continuous filling, eased capping, cooling, scanning, and robotic carton packing. Products, machines, gripper, and carton share a pausable speed-aware clock. Robot transfer includes vertical clearance, neck attachment, placement through the open carton center, and withdrawal before closure. Instanced pellets and rollers control rendering cost. Bulk resin traverses its feed path in 18 logical seconds with calmer tumbling and auger rotation; the discrete product timeline stays intact.
 
 This cycle is illustrative, not calibrated physical timing. Scene selection, camera movement, render settings, and simulation controls do not issue hardware commands. There is no X-ray control or production-sequence strip.
+
+New UI reads the configured threshold effects and equipment states on every frame. Stop and emergency-stop effects freeze the entire illustrated process at its current position, while quality-only alerts keep the line moving and configured slowdowns cap its speed. Filling streams, cooling airflow and inspection scans switch off during a stop. The simulation continues evaluating readings, allowing the visual cycle to resume from the same position when the fault clears. This presentation interlock sends no equipment command and does not alter Classic behavior.
+
+The scaled fire input uses a falling hazard signal: values at or below 50 indicate a fire hazard, values above 50 through 60 indicate warning, and values above 60 are normal. These inclusive boundaries apply to the PLC status, sensor monitor and both fire-equipped cells. Fingerprint 0 means no scan and is informational; neither fingerprint state creates an alarm or stops production. RFID access gating and the dedicated PLC emergency-stop input remain independent.
+
+Affected machine housings emit a restrained amber or red signal while retaining their matte paint. Tower lights, illuminated cell boundaries, stage labels and a hall wash share the alarm state; healthy cells display amber hold lights when the line is paused. Pulses stay at 0.65 Hz for warnings and 1.1 Hz for critical conditions, becoming steady for reduced motion. A compact in-scene notice identifies the originating cause, input source and inspection action.
+
+One technician follows clear exterior service aisles to the originating fault, checks outside the equipment boundary and retreats when readings recover. This independent visual clock can continue while production is held. Its label always identifies Simulated maintenance. Fire, gas and emergency-stop incidents show exterior safety assessment rather than a repair posture. The technician never clears an alarm or dispatches a real worker. The Pressure fault (model only) preview lives under Simulation tools and is rejected or canceled when live PLC input is available.
 
 ## Do's and Don'ts
 

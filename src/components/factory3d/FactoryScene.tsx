@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Canvas, useThree } from "@react-three/fiber";
 import { Environment, Lightformer, OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import CameraController, { OVERVIEW_POSITION, OVERVIEW_TARGET, resetCameraView, setCameraTarget, setOverviewAspect } from "./CameraController";
@@ -9,29 +9,29 @@ import TwinWorkbench from "./TwinWorkbench";
 import { STAGE_POSITIONS } from "./digitalTwinLayout";
 import { useSceneSelectionStore } from "../../stores/sceneSelectionStore";
 import { useSceneSettingsStore } from "../../stores/sceneSettingsStore";
-import { usePLCStore } from "../../stores/plcStore";
+import type { CameraView } from "./twinPresentation";
 
-function SceneCamera() {
+function SceneCamera({ view }: { view: CameraView }) {
   const size = useThree((s) => s.size);
   const selected = useSceneSelectionStore((s) => s.selectedStageId);
   useEffect(() => {
-    setOverviewAspect(size.width / Math.max(1, size.height));
-    if (!selected) { resetCameraView(); return; }
+    const aspect = size.width / Math.max(1, size.height);
+    const projectionScale = Math.max(1, 1.45 / Math.max(aspect, 0.4));
+    setOverviewAspect(aspect);
+    if (!selected) {
+      if (view === "top") setCameraTarget([0, 49 * projectionScale, 0.01], [0, 0, 0]);
+      else if (view === "front") setCameraTarget([0, 13 * projectionScale, 43 * projectionScale], [0, 0, 0]);
+      else resetCameraView();
+      return;
+    }
     const [x, , z] = STAGE_POSITIONS[selected];
     const height = selected === "intake" ? 3 : 2;
     const distance = selected === "intake" ? 15 : 10;
     const narrow = size.width < 600;
     // Three-quarter inspection retains depth and reserves the inspector edge.
     setCameraTarget([x - (narrow ? 4 : 5), height + 5, z + distance], [x, height, z - 0.2]);
-  }, [selected, size.width, size.height]);
+  }, [selected, view, size.width, size.height]);
   return <CameraController />;
-}
-
-function EmergencySignal() {
-  const active = usePLCStore((s) => s.emergencyLightOn);
-  const light = useRef<THREE.PointLight>(null);
-  useFrame(({ clock }) => { if (light.current) light.current.intensity = active ? 8 + Math.sin(clock.elapsedTime * 6) * 4 : 0; });
-  return <pointLight ref={light} position={[0, 6, 1]} distance={30} color="#f26458" intensity={0} />;
 }
 
 function Studio() {
@@ -51,6 +51,7 @@ function Studio() {
 
 export default function FactoryScene({ paused = false, inspectorHost = null }: { paused?: boolean; inspectorHost?: HTMLElement | null }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [view, setView] = useState<CameraView>("perspective");
   const containerRef = useRef<HTMLDivElement>(null);
   const quality = useSceneSettingsStore((s) => s.quality);
   const toggleFullscreen = useCallback(async () => {
@@ -75,8 +76,8 @@ export default function FactoryScene({ paused = false, inspectorHost = null }: {
       onCreated={({ gl }) => { gl.toneMapping = THREE.ACESFilmicToneMapping; gl.toneMappingExposure = 0.88; gl.outputColorSpace = THREE.SRGBColorSpace; }}>
       <Studio />
       <OrbitControls makeDefault target={OVERVIEW_TARGET} enableDamping dampingFactor={0.08} maxPolarAngle={Math.PI / 2.1} minPolarAngle={0.08} minDistance={6} maxDistance={125} rotateSpeed={0.65} />
-      <SceneCamera /><ProductionPlant /><EmergencySignal /><StudioEffects />
+      <SceneCamera view={view} /><ProductionPlant /><StudioEffects />
     </Canvas></div>
-    <TwinWorkbench isFullscreen={isFullscreen} onFullscreen={toggleFullscreen} inspectorHost={isFullscreen ? null : inspectorHost} />
+    <TwinWorkbench isFullscreen={isFullscreen} onFullscreen={toggleFullscreen} inspectorHost={isFullscreen ? null : inspectorHost} cameraView={view} onCameraViewChange={setView} />
   </div>;
 }

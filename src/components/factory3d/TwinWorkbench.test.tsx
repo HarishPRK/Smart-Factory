@@ -5,6 +5,7 @@ import { useDigitalTwinStore } from "../../stores/digitalTwinStore";
 import { useSceneSelectionStore } from "../../stores/sceneSelectionStore";
 import { useSceneSettingsStore } from "../../stores/sceneSettingsStore";
 import type { ManufacturingStage } from "../../types/digitalTwin";
+import { usePLCStore } from "../../stores/plcStore";
 import { resetCameraView, setCameraTarget } from "./CameraController";
 
 vi.mock("./CameraController", () => ({ resetCameraView: vi.fn(), setCameraTarget: vi.fn() }));
@@ -21,6 +22,7 @@ beforeEach(() => {
   vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => { callback(0); return 1; });
   useDigitalTwinStore.setState({ stages: [stage], tick: 0, userSpeedMultiplier: 1, activeScenario: null });
+  usePLCStore.setState({ params: [{ id: "ph", kind: "analog", label: "pH", value: 7.4, min: 0, max: 14, decimals: 1, status: "normal", accentHex: "#43d8f1" }], telemetrySource: "plc", lastReceivedAt: Date.now(), receivedHistories: {} });
   useSceneSelectionStore.getState().clear();
   useSceneSettingsStore.setState({ labelsVisible: true, sensorMonitorVisible: false, xrayMode: false, flowVisible: false, quality: "medium", postFxQuality: "med" });
 });
@@ -47,9 +49,10 @@ describe("Digital twin workbench navigation", () => {
     mount();
     expect(useSceneSelectionStore.getState().selectedStageId).toBe("mixing");
     expect(screen.getByRole("region", { name: "Pepsi Filling inspector" })).toBeTruthy();
-    expect(screen.getByText("7.2")).toBeTruthy();
-    expect(screen.getByText("Modeled process")).toBeTruthy();
-    expect(screen.getByText("99% estimated quality")).toBeTruthy();
+    expect(screen.getByText("7.4")).toBeTruthy();
+    expect(screen.queryByText("7.2")).toBeNull();
+    expect(screen.getByText("PLC inputs")).toBeTruthy();
+    expect(screen.queryByText("99% estimated quality")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Close stage inspector" }));
     expect(useSceneSelectionStore.getState().selectedStageId).toBeNull();
     expect(screen.queryByRole("region", { name: "Pepsi Filling inspector" })).toBeNull();
@@ -63,14 +66,55 @@ describe("Digital twin workbench navigation", () => {
     sidebar.append(host);
     document.body.append(sidebar);
     render(<TwinWorkbench isFullscreen={false} onFullscreen={vi.fn()} inspectorHost={host} />);
-    fireEvent.click(screen.getByRole("button", { name: /Filling pH: 7.2.*Focus station/ }));
-    expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Filling" }));
+    fireEvent.click(screen.getByRole("button", { name: /Filling pH: 7.4.*Focus station/ }));
+    expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Filling", level: 3 }));
     sidebar.scrollTop = 140;
     fireEvent.click(screen.getByRole("button", { name: "Return to whole line" }));
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Sensor monitor" }));
     expect(screen.getByRole("region", { name: "Sensor monitor" })).toBeTruthy();
-    expect(sidebar.scrollTop).toBe(0);
+    expect(sidebar.scrollTop).toBe(140);
     sidebar.remove();
+  });
+
+  it("keeps the monitor inside the twin while the selected station uses the sidebar inspector", () => {
+    useSceneSettingsStore.setState({ sensorMonitorVisible: true });
+    const host = document.createElement("div");
+    document.body.append(host);
+    const { container } = render(<TwinWorkbench isFullscreen={false} onFullscreen={vi.fn()} inspectorHost={host} />);
+    const monitor = screen.getByRole("region", { name: "Sensor monitor" });
+    expect(host.contains(monitor)).toBe(false);
+    expect(container.querySelector(".twin-monitor-overlay")?.contains(monitor)).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: /Filling pH: 7.4.*Focus station/ }));
+    expect(screen.getByRole("region", { name: "Sensor monitor" })).toBe(monitor);
+    expect(host.contains(screen.getByRole("region", { name: "Pepsi Filling inspector" }))).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Close sensor monitor" }));
+    expect(useSceneSelectionStore.getState().selectedStageId).toBe("mixing");
+    fireEvent.click(screen.getByRole("button", { name: "Sensor monitor" }));
+    expect(useSceneSelectionStore.getState().selectedStageId).toBe("mixing");
+    host.remove();
+  });
+
+  it("shares the chosen projection with the scene so resizing the monitor preserves it", () => {
+    const onCameraViewChange = vi.fn();
+    const props = { isFullscreen: false, onFullscreen: vi.fn(), onCameraViewChange };
+    const { rerender } = render(<TwinWorkbench {...props} cameraView="perspective" />);
+    fireEvent.click(screen.getByRole("button", { name: "Plan" }));
+    expect(onCameraViewChange).toHaveBeenCalledWith("top");
+    expect(setCameraTarget).not.toHaveBeenCalled();
+    rerender(<TwinWorkbench {...props} cameraView="top" />);
+    fireEvent.click(screen.getByRole("button", { name: "Sensor monitor" }));
+    expect(screen.getByRole("button", { name: "Plan" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Close sensor monitor" }));
+    expect(screen.getByRole("button", { name: "Plan" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("never substitutes modeled readings into a machine inspector", () => {
+    usePLCStore.setState({ telemetrySource: "simulation", params: [], lastReceivedAt: null });
+    useSceneSelectionStore.getState().select("mixing");
+    mount();
+    expect(screen.getByText("No PLC readings for this machine yet.")).toBeTruthy();
+    expect(screen.queryByText("7.2")).toBeNull();
+    expect(screen.queryByText("99% estimated quality")).toBeNull();
   });
 
   it("returns from an inspected stage to plan and perspective views", () => {

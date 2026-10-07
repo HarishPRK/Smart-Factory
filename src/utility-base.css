@@ -1,0 +1,2 @@
+/* Both presentation variants share utilities, not theme overrides. */
+@import "tailwindcss";

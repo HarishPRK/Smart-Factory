@@ -2,7 +2,6 @@ import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { StageId } from "../../types/digitalTwin";
-import { useDigitalTwinStore } from "../../stores/digitalTwinStore";
 import { Block, Cylinder, Feet, Fence, HMI, MACHINE_PAINT, METAL, Pallet, Pipe, StackLight } from "./industrialPrimitives";
 import { useLineClock } from "./LineProcess";
 import { AnchorFeet, FanGuard, GuardFrame, Hose, InspectionPort, ServicePanel } from "./MachineDetails";
@@ -30,7 +29,7 @@ function Intake() {
     <Block at={[2.5, 1.05, 1.5]} size={[0.7, 1.8, 0.65]} color={METAL.shell} round /><HMI at={[2.5, 1.5, 1.86]} />
     <ServicePanel at={[2.5, 0.75, 1.836]} width={0.58} height={0.8} color={METAL.shell} vent />
     <Hose points={[[2.5, 0.6, 1.17], [2.5, 0.4, 0.85], [1.55, 0.4, 0.7]]} radius={0.045} />
-    <StackLight at={[2.5, 2, 1.5]} />
+    <StackLight stageId="intake" at={[2.5, 2, 1.5]} />
   </group>;
 }
 
@@ -68,7 +67,7 @@ function Molder() {
       {[1.28, 1.9].map((y) => <Cylinder key={y} at={[0, y, 0.13]} radius={0.035} height={0.025} rotation={[Math.PI / 2, 0, 0]} color={METAL.dark} />)}
     </group>)}</group>
     <group ref={rod}><Cylinder at={[0, 2.42, 0]} radius={0.025} height={0.8} /><Cylinder at={[0, 3.02, 0]} radius={0.13} height={0.4} color={METAL.blue} /></group>
-    <Block at={[2.53, 2, 1.24]} size={[0.6, 1.9, 0.44]} round /><HMI at={[2.53, 2.5, 1.5]} /><StackLight at={[2.75, 3.35, -0.9]} />
+    <Block at={[2.53, 2, 1.24]} size={[0.6, 1.9, 0.44]} round /><HMI at={[2.53, 2.5, 1.5]} /><StackLight stageId="forming" at={[2.75, 3.35, -0.9]} />
   </group>;
 }
 
@@ -81,7 +80,7 @@ function Filler() {
     if (head.current) { head.current.position.x = pose.nozzleX; head.current.position.y = pose.nozzleTip; }
     if (stream.current) {
       const liquidTop = BELT_Y - CELL_Y + (0.045 + 0.96 * pose.fill) * BOTTLE_SCALE;
-      stream.current.visible = pose.stream > 0;
+      stream.current.visible = pose.stream > 0 && !clock.current.alarm.lineStopped;
       stream.current.scale.y = Math.max(0.001, pose.nozzleTip - liquidTop);
       stream.current.position.y = (pose.nozzleTip + liquidTop) / 2;
       (stream.current.material as THREE.MeshBasicMaterial).opacity = pose.stream * 0.85;
@@ -114,7 +113,7 @@ function Filler() {
     <GuardFrame at={[0, 2.2, 1.51]} width={4.5} height={2} />
     {[-1.27, 1.27].map((x) => <ServicePanel key={x} at={[x, 0.66, 1.765]} width={2.3} height={0.43} color={MACHINE_PAINT.mixing} />)}
     <Hose points={[[2.2, 3.65, -1.01], [2.28, 3.65, -1.12], [2.28, 0.95, -1.12], [1.8, 0.9, -1.12]]} />
-    <HMI at={[2.25, 2.65, 0.9]} /><StackLight at={[2.25, 3.8, -0.9]} />
+    <HMI at={[2.25, 2.65, 0.9]} /><StackLight stageId="mixing" at={[2.25, 3.8, -0.9]} />
   </group>;
 }
 
@@ -123,7 +122,7 @@ function Cooling() {
   useFrame(() => {
     const t = stationPhase(clock.current.time, "curing");
     fans.current?.children.forEach((fan) => { fan.rotation.y = clock.current.time * 5; });
-    if (air.current) { air.current.visible = t !== null; air.current.position.x = 3 - (t ?? 0) * 6; air.current.children.forEach((line, i) => { line.position.y = 0.1 - ((clock.current.time * 1.6 + i * 0.17) % 1) * 0.6; }); }
+    if (air.current) { air.current.visible = t !== null && !clock.current.alarm.lineStopped; air.current.position.x = 3 - (t ?? 0) * 6; air.current.children.forEach((line, i) => { line.position.y = 0.1 - ((clock.current.time * 1.6 + i * 0.17) % 1) * 0.6; }); }
   });
   return <group>
     <Feet width={5.5} depth={2.6} /><Block at={[0, 0.65, 0]} size={[6.3, 0.5, 3.2]} color={METAL.dark} round />
@@ -143,7 +142,7 @@ function Cooling() {
       {[-0.72, 0.72].map((dx) => <Block key={dx} at={[x + dx, 3.15, 0]} size={[0.08, 0.08, 2.2]} color={METAL.steel} />)}
     </group>)}
     <group ref={air}>{[-0.45, 0, 0.45].map((z) => <group key={z}><Pipe points={[[0.12, 2.9, z], [0.28, 2.4, z], [0.45, 1.9, z]]} radius={0.025} color="#38add0" opacity={0.7} /></group>)}</group>
-    <HMI at={[2.6, 2.25, 1.53]} /><StackLight at={[-2.8, 3.2, -1.1]} />
+    <HMI at={[2.6, 2.25, 1.53]} /><StackLight stageId="curing" at={[-2.8, 3.2, -1.1]} />
   </group>;
 }
 
@@ -151,10 +150,10 @@ function Inspection() {
   const clock = useLineClock(); const scanner = useRef<THREE.Mesh>(null); const pass = useRef<THREE.Mesh>(null);
   useFrame(() => {
     const t = stationPhase(clock.current.time, "quality");
-    if (scanner.current) { scanner.current.visible = t !== null && t < 0.85; scanner.current.position.y = BELT_Y - CELL_Y + 0.02 + (t === null ? 0 : (t / 0.85) * 0.61); }
+    if (scanner.current) { scanner.current.visible = t !== null && t < 0.85 && !clock.current.alarm.lineStopped; scanner.current.position.y = BELT_Y - CELL_Y + 0.02 + (t === null ? 0 : (t / 0.85) * 0.61); }
     if (pass.current) {
       pass.current.visible = t !== null && t >= 0.85;
-      const bad = useDigitalTwinStore.getState().stages.find((s) => s.id === "quality")?.status === "faulted";
+      const bad = clock.current.alarm.stageAlarms.quality?.severity === "critical";
       (pass.current.material as THREE.MeshBasicMaterial).color.set(bad ? "#db5a42" : "#42a77f");
     }
   });
@@ -172,7 +171,7 @@ function Inspection() {
     </group>)}
     <mesh ref={scanner} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[1.25, 1.2]} /><meshBasicMaterial color="#27a8c6" transparent opacity={0.36} side={THREE.DoubleSide} depthWrite={false} /></mesh>
     <mesh ref={pass} position={[0, 3.48, -0.5]}><sphereGeometry args={[0.16, 16, 12]} /><meshBasicMaterial color="#42a77f" /></mesh>
-    <HMI at={[-1.65, 2.65, 0]} /><StackLight at={[1.65, 3.5, -0.5]} />
+    <HMI at={[-1.65, 2.65, 0]} /><StackLight stageId="quality" at={[1.65, 3.5, -0.5]} />
   </group>;
 }
 
@@ -216,7 +215,7 @@ function Packaging() {
   return <group>
     <Block at={[0, 0.1, -0.4]} size={[6.6, 0.2, 5.8]} color="#597788" />
     <Robot />
-    <Block at={[-2.65, 1.25, -2]} size={[0.7, 2.1, 0.7]} round /><HMI at={[-2.65, 1.85, -1.62]} /><StackLight at={[-2.65, 2.4, -2]} />
+    <Block at={[-2.65, 1.25, -2]} size={[0.7, 2.1, 0.7]} round /><HMI at={[-2.65, 1.85, -1.62]} /><StackLight stageId="packaging" at={[-2.65, 2.4, -2]} />
     <ServicePanel at={[-2.65, 1.01, -1.639]} width={0.58} height={1.05} color={METAL.shell} vent />
     {/* An empty case enters beside the pickup point, clear of the arm pedestal. */}
     {[-0.48, 0.48].map((x) => <Block key={x} at={[2.1 + x, 1.1, -1.5]} size={[0.07, 0.16, 3]} color={METAL.dark} />)}
@@ -233,7 +232,7 @@ function Dispatch() {
     <AnchorFeet points={[[-1.7, 0.08, -0.2], [1.7, 0.08, -0.2]]} />
     <Hose points={[[0, 3.32, -0.5], [0, 3.45, -0.52], [1.7, 3.45, -0.52], [1.76, 2.46, -0.52], [1.7, 2.46, -0.25]]} radius={0.029} />
     <Block at={[0, 3.2, -0.2]} size={[0.4, 0.3, 0.5]} color={METAL.shell} round />
-    <HMI at={[1.7, 2.5, 0]} /><StackLight at={[1.65, 3.55, -0.2]} />
+    <HMI at={[1.7, 2.5, 0]} /><StackLight stageId="dispatch" at={[1.65, 3.55, -0.2]} />
     <Pallet at={[0, 0.08, -2.25]} /><Pallet at={[3.2, 0.08, -1.4]} /><Pallet at={[3.2, 0.08, 1.35]} />
     <Fence at={[0, 0, -3.6]} length={4} />
   </group>;

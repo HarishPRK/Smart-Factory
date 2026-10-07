@@ -1,0 +1,19 @@
+/* Loaded as text by UIVersionShell. Only the active presentation is applied. */
+@import "../../index.css";
+@import "../../globalTheme.css";
+@import "../../integrations/design-tokens.css";
+@import "../langgraph-entry.css";
+@import "/src/components/langgraph-workspace.css";
+@import "../../kpi-workspace.css";
+@import "../workspace-details.css";
+@import "../../plc-instruments.css";
+@import "../factory3d/sensor-monitor-host.css";
+@import "../factory3d/sensor-monitor.css";
+@import "../../integrations/pages/ServiceOfferings.css";
+@import "../../integrations/pages/HardwareAnomalies.css";
+@import "../../integrations/components/offerings/solution-showcase.css";
+@import "../../operations.css";
+@import "../../plant-console.css";
+@import "../../plant-daylight.css";
+@import "../../application-cyan.css";
+@import "../factory3d/twin-alarm-response.css";

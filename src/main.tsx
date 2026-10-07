@@ -1,14 +1,8 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import "./index.css";
-import "./globalTheme.css";
-import "./integrations/design-tokens.css";
+import "./utility-base.css";
 import "@fontsource-variable/dm-sans";
-import "./operations.css";
 import "@fontsource-variable/inter/index.css";
-import "./plant-console.css";
-import "./plant-daylight.css";
-import "./application-cyan.css";
 import App from "./App.tsx";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { ToastProvider } from "./integrations/ui/Toast";

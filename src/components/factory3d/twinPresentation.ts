@@ -1,5 +1,7 @@
 import type { StageId } from "../../types/digitalTwin";
 
+export type CameraView = "perspective" | "top" | "front";
+
 export const STAGE_NAMES: Record<StageId, string> = {
   intake: "Material intake", mixing: "Filling", forming: "Blow molding",
   curing: "Cooling", quality: "Inspection", packaging: "Packaging", dispatch: "Dispatch",

@@ -37,32 +37,8 @@
   outline-offset: 3px;
 }
 
-.langgraph-dialog { border-radius: 14px !important; }
-.langgraph-dialog > [aria-hidden],
-.langgraph-dialog__header > [aria-hidden] { display: none; }
-.langgraph-dialog__header { flex-shrink: 0; background: #17232d !important; border-color: #2e4553 !important; }
-.langgraph-dialog h2 { margin-top: 0; line-height: 1.3; letter-spacing: -0.025em; }
-.langgraph-dialog input::placeholder { color: #a7bbc6; opacity: 1; }
-.langgraph-composer__source > span { display: none; }
-.langgraph-dialog .langgraph-empty__heading { margin: 0; font-size: clamp(24px, 3vw, 34px); font-weight: 600; letter-spacing: -0.03em; color: #eef5f7; line-height: 1.2; }
-.langgraph-empty__help { margin: -7px 0 0; max-width: 60ch; font-size: 13px; line-height: 1.6; color: #a7bbc6; }
-.langgraph-dialog form { border-color: #497080 !important; box-shadow: none !important; }
-.langgraph-dialog form button[type="submit"] { display: grid; place-items: center; flex-shrink: 0; border-color: #43d8f1 !important; background: #43d8f1 !important; color: #08212a !important; }
-.langgraph-dialog .lg-prompt-card { box-shadow: none !important; animation: none !important; }
-.langgraph-dialog .lg-prompt-card:hover { transform: none !important; box-shadow: none !important; border-color: #67e3f5 !important; }
-.langgraph-dialog .lg-prompt-card > [aria-hidden] { background: #203f4b !important; border-color: #497080 !important; box-shadow: none !important; }
-.langgraph-dialog__actions button { background: #1d2d38 !important; color: #a7bbc6 !important; border-color: #497080 !important; }
-
 @media (max-width: 640px) {
   .plant-console .operations-header { gap: 12px; }
   .plant-console .operations-header .operations-header__actions { gap: 7px; }
   .plant-console .operations-header__actions .operations-langgraph { gap: 5px; padding: 0 8px; }
-  .langgraph-dialog .langgraph-dialog__header { padding: 12px !important; gap: 10px; flex-wrap: wrap; }
-  .langgraph-dialog .langgraph-dialog__actions { gap: 6px !important; }
-  .langgraph-dialog .langgraph-empty { padding: 18px 0 !important; }
-  .langgraph-dialog .langgraph-composer__source { display: none !important; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .langgraph-dialog, .langgraph-dialog * { animation: none !important; scroll-behavior: auto !important; transition: none !important; }
 }

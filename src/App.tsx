@@ -1,14 +1,17 @@
 import { FilterProvider } from "./context/FilterContext";
 import { PLCProvider } from "./context/PLCContext";
-import Dashboard from "./components/Dashboard";
+import UIVersionShell from "./components/ui-version/UIVersionShell";
+import { UIVersionProvider } from "./components/ui-version/UIVersionProvider";
 
 function App() {
   return (
-    <FilterProvider>
-      <PLCProvider>
-        <Dashboard />
-      </PLCProvider>
-    </FilterProvider>
+    <UIVersionProvider>
+      <FilterProvider>
+        <PLCProvider>
+          <UIVersionShell />
+        </PLCProvider>
+      </FilterProvider>
+    </UIVersionProvider>
   );
 }
 

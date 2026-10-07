@@ -1,3 +1,5 @@
+"use no memo";
+// Store arrays are intentionally mutable: snapshots must be rebuilt on every subscribed tick.
 /**
  * useDigitalTwinData — For 2D UI panels only
  *

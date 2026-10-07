@@ -1,5 +1,4 @@
 import React, { useEffect } from "react";
-import "./workspace-details.css";
 import ReactDOM from "react-dom";
 import {
   useLorawanSensors,

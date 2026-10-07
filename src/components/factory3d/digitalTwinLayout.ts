@@ -11,6 +11,7 @@ import type {
   OutputDeviceConfig,
   ThresholdEffect,
 } from "../../types/digitalTwin";
+import { FIRE_HAZARD_THRESHOLD, FIRE_WARNING_THRESHOLD } from "../../services/safetyThresholds";
 
 // ── Stage positions along the zig-zag conveyor (x, y, z) ──
 //
@@ -83,6 +84,8 @@ export const STAGE_STATUS_COLORS: Record<string, { hex: string; emissive: number
 // ── Sensor Configurations per Stage ────────────────────────
 
 const INTAKE_SENSORS: SensorConfig[] = [
+  // Fingerprint readings report authentication events; threshold engines exclude
+  // this input from alarms because 0 is the scanner's normal idle state.
   { sensorId: "intake_gps",         type: "gps",         label: "GPS",          unit: "m",   min: 0, max: 100, nominal: 50,  warningThreshold: 70,  criticalThreshold: 90,  volatility: 0.5 },
   { sensorId: "intake_fingerprint", type: "fingerprint",  label: "Fingerprint",  unit: "",    min: 0, max: 1,   nominal: 1,   warningThreshold: 0.5, criticalThreshold: 0.2, volatility: 0.1 },
   { sensorId: "intake_lidar",       type: "lidar",        label: "LiDAR",        unit: "mm",  min: 0, max: 50,  nominal: 25,  warningThreshold: 35,  criticalThreshold: 45,  volatility: 0.8 },
@@ -119,10 +122,8 @@ const CURING_SENSORS: SensorConfig[] = [
   { sensorId: "curing_mq",       type: "mq_gas",           label: "MQ Gas",      unit: "ppm",  min: 0, max: 1000, nominal: 30,   warningThreshold: 300,  criticalThreshold: 500,  volatility: 6.0 },
   { sensorId: "curing_motion",   type: "microwave_motion", label: "Motion",      unit: "",     min: 0, max: 1,    nominal: 0,    warningThreshold: 0.7,  criticalThreshold: 0.9,  volatility: 0.15 },
   // V2 additions — fire detection in oven, cooling airflow
-  // Fire sensor publishes HIGH when everything is fine (95 ± a bit) and DROPS
-  // when fire/smoke is detected. nominal=95, warning fires below 90,
-  // critical/emergency-stop fires below 75.
-  { sensorId: "curing_fire",     type: "fire",             label: "Fire",        unit: "",     min: 0, max: 100,  nominal: 95,   warningThreshold: 90,   criticalThreshold: 75,   volatility: 0.3 },
+  // Fire input: >60 safe, >50 through 60 warning, <=50 fire hazard.
+  { sensorId: "curing_fire",     type: "fire",             label: "Fire",        unit: "",     min: 0, max: 100,  nominal: 95,   warningThreshold: FIRE_WARNING_THRESHOLD, criticalThreshold: FIRE_HAZARD_THRESHOLD, volatility: 0.3 },
   { sensorId: "curing_flow_air", type: "flow_air",         label: "Cooling Air", unit: "SCFM", min: 0, max: 300,  nominal: 220,  warningThreshold: 150,  criticalThreshold: 100,  volatility: 4.0 },
 ];
 
@@ -148,7 +149,7 @@ const PACKAGING_SENSORS: SensorConfig[] = [
   // V2 additions — case presence, fire detection, operator E-stop
   { sensorId: "pkg_proximity", type: "proximity",        label: "Case Prox.", unit: "",    min: 0, max: 1,   nominal: 1,  warningThreshold: 0.5, criticalThreshold: 0.2, volatility: 0.1 },
   // Fire: high = safe, low = fire detected. See curing_fire for rationale.
-  { sensorId: "pkg_fire",      type: "fire",             label: "Fire",       unit: "",    min: 0, max: 100, nominal: 95, warningThreshold: 90,  criticalThreshold: 75,  volatility: 0.3 },
+  { sensorId: "pkg_fire",      type: "fire",             label: "Fire",       unit: "",    min: 0, max: 100, nominal: 95, warningThreshold: FIRE_WARNING_THRESHOLD, criticalThreshold: FIRE_HAZARD_THRESHOLD, volatility: 0.3 },
   { sensorId: "pkg_estop",     type: "emergency_stop",   label: "E-Stop",     unit: "",    min: 0, max: 1,   nominal: 0,  warningThreshold: 0.5, criticalThreshold: 0.9, volatility: 0.0 },
 ];
 

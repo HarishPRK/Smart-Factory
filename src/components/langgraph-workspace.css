@@ -1,0 +1,179 @@
+/* Unique New component boundary; Classic retains its own agent presentation. */
+.langgraph-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 18px; background: #02080dcc; animation: langgraph-reveal 160ms ease-out; }
+.langgraph-workspace.langgraph-dialog { position: relative; display: flex; flex-direction: column; width: min(1240px, 96vw); height: min(860px, 93dvh); overflow: hidden; border-radius: 16px !important; border: 1px solid #35505f; background: #13212b !important; color: #eaf3f7; box-shadow: 0 24px 80px #0009 !important; font-family: var(--font-sans, "Inter Variable", sans-serif); }
+.langgraph-workspace *, .langgraph-workspace *::before, .langgraph-workspace *::after { box-sizing: border-box; }
+.langgraph-workspace ::selection { color: #effcff; background: #286071; }
+.langgraph-workspace :is(button, textarea, a, summary, [tabindex="0"]):focus-visible { outline: 2px solid #73e5f3 !important; outline-offset: 3px; }
+.langgraph-workspace :is(button, textarea) { font-family: inherit; }
+.langgraph-workspace button { cursor: pointer; transition: background 150ms ease, color 150ms ease; }
+.langgraph-workspace button:disabled { cursor: default; opacity: .45; }
+.langgraph-workspace h2, .langgraph-workspace h3, .langgraph-workspace h4, .langgraph-workspace p { margin: 0; }
+.langgraph-workspace .langgraph-dialog__header { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 82px; padding: 18px 24px; background: #162834 !important; border-bottom: 1px solid #304854; }
+.langgraph-identity { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.langgraph-identity__mark { display: grid; place-items: center; width: 44px; height: 44px; background: #224450; color: #70e5f5; border-radius: 12px; box-shadow: inset 0 1px 0 #ffffff0d, 0 4px 8px #06121840; }
+.langgraph-workspace .langgraph-identity h2 { font-size: 19px; font-weight: 650; letter-spacing: -.025em; line-height: 1.25; }
+.langgraph-identity p { margin-top: 4px !important; color: #aec3ce; font-size: 12px; }
+.langgraph-workspace .langgraph-dialog__actions { display: flex; align-items: center; gap: 10px; }
+.langgraph-advisory { display: inline-flex; align-items: center; gap: 6px; margin-right: 14px; color: #acced6; font-size: 11px; }
+.langgraph-workspace .langgraph-dialog__actions :is(.langgraph-quiet-button, .langgraph-icon-button) { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 36px; padding: 0 11px; border: 1px solid #3b5664 !important; border-radius: 7px; background: transparent !important; color: #c0d5df !important; font-size: 12px; }
+.langgraph-workspace .langgraph-dialog__actions .langgraph-icon-button { width: 36px; padding: 0; }
+.langgraph-workspace .langgraph-dialog__actions :is(.langgraph-quiet-button, .langgraph-icon-button):hover:not(:disabled) { background: #284451 !important; color: #effbff !important; }
+.langgraph-workspace__body { display: flex; flex: 1; min-height: 0; }
+.langgraph-investigations { display: flex; flex-direction: column; flex: 0 0 248px; min-width: 0; padding: 28px 18px 20px; background: #101e28; border-right: 1px solid #2b424f; }
+.langgraph-investigations__intro { padding: 0 10px 22px; }
+.langgraph-investigations__intro h3 { font-size: 14px; font-weight: 600; }
+.langgraph-investigations__intro p { margin-top: 8px !important; color: #adc2cd; font-size: 12px; line-height: 1.6; }
+.langgraph-investigations nav { display: flex; flex-direction: column; gap: 7px; }
+.langgraph-topic { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 46px; padding: 10px 12px; background: transparent; color: #adc3cf; border: 1px solid transparent; border-radius: 8px; text-align: left; font-size: 12px; font-weight: 500; }
+.langgraph-topic > svg:last-child { margin-left: auto; width: 14px; }
+.langgraph-topic:hover { background: #1c3441; color: #def4fa; }
+.langgraph-topic[aria-pressed="true"] { color: #9aeeff; background: #1d3b48; border-color: #355d6a; }
+.langgraph-agent-route { margin: 30px 10px 0; padding-top: 28px; border-top: 1px solid #2b424f; }
+.langgraph-agent-route__diagram { display: flex; align-items: center; justify-content: center; gap: 9px; color: #70a2b6; }
+.langgraph-agent-route__diagram > svg:nth-of-type(2) { color: #70e5f5; flex: 0 0 auto; }
+.langgraph-agent-route__diagram > span { height: 1px; width: 20px; background: #416774; }
+.langgraph-agent-route h4 { margin-top: 23px !important; font-size: 13px; line-height: 1.5; font-weight: 500; color: #d5e8ef; }
+.langgraph-agent-route p { margin-top: 7px !important; color: #a3bac8; font-size: 11px; line-height: 1.65; }
+.langgraph-followups { margin: 28px 10px 0; padding-top: 23px; border-top: 1px solid #2b424f; }
+.langgraph-followups h4 { color: #c1dae4; font-size: 12px; font-weight: 500; margin-bottom: 12px !important; }
+.langgraph-followups button { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 38px; padding: 8px 0; border: 0; background: transparent; color: #a7c6d3; text-align: left; font-size: 11px; }
+.langgraph-followups button:hover:not(:disabled) { color: #97e8f8; }
+.langgraph-followups svg { flex: 0 0 auto; }
+.langgraph-investigations__footer { display: flex; align-items: flex-start; gap: 9px; margin: auto 10px 0; padding-top: 36px; color: #96b2c0; }
+.langgraph-investigations__footer svg { margin-top: 2px; flex: 0 0 auto; color: #78a7b5; }
+.langgraph-investigations__footer p { font-size: 11px; line-height: 1.65; }
+.langgraph-conversation { display: flex; flex-direction: column; min-width: 0; flex: 1; background: #152631; }
+.langgraph-conversation__scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #496877 #152631; }
+.langgraph-start { width: min(760px, 100%); margin: 0 auto; padding: clamp(28px, 4vh, 46px) clamp(24px, 4vw, 56px) 32px; }
+.langgraph-start__intro h3 { color: #eef7fa; font-size: clamp(27px, 2.7vw, 38px); letter-spacing: -.035em; line-height: 1.2; font-weight: 600; text-wrap: balance; }
+.langgraph-start__intro p { margin-top: 15px !important; font-size: 13px; line-height: 1.7; color: #adc5d1; }
+.langgraph-starters { margin-top: 34px; }
+.langgraph-starters__heading h4 { font-size: 13px; font-weight: 600; color: #c9e5ee; }
+.langgraph-starters__heading p { font-size: 12px; color: #a5bfcd; line-height: 1.6; margin-top: 6px !important; }
+.langgraph-starters__list { margin-top: 16px; border-top: 1px solid #35505e; }
+.langgraph-starter { width: 100%; min-height: 66px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 14px 4px; border: 0; border-bottom: 1px solid #304957; background: transparent; text-align: left; color: #dceaf0; }
+.langgraph-starter > span { display: grid; gap: 5px; }
+.langgraph-starter strong { font-size: 13px; font-weight: 550; }
+.langgraph-starter > span > span { color: #adc3cf; font-size: 11px; line-height: 1.4; }
+.langgraph-starter > svg { flex: 0 0 auto; color: #78cfdf; }
+.langgraph-starter:hover:not(:disabled) { background: #1d3743; }
+.langgraph-starter:hover:not(:disabled) strong { color: #a4efff; }
+.langgraph-messages { width: min(800px, 100%); padding: 30px clamp(22px, 4vw, 50px) 40px; margin: 0 auto; }
+.langgraph-question { margin: 0 0 28px auto; max-width: 85%; text-align: right; }
+.langgraph-question__label { display: block; margin-bottom: 7px; font-size: 10px; color: #a6c1ce; }
+.langgraph-question p { display: inline-block; padding: 13px 17px; text-align: left; background: #214452; color: #def6fc; border-radius: 12px 12px 3px 12px; font-size: 14px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.langgraph-answer { margin: 0 0 34px; }
+.langgraph-answer__header { display: flex; align-items: center; gap: 8px; padding-bottom: 16px; margin-bottom: 17px; border-bottom: 1px solid #365361; color: #a3e7f4; }
+.langgraph-answer__header strong { font-size: 12px; font-weight: 600; color: #cdeaf1; }
+.langgraph-answer__header time { margin-left: auto; color: #a4beca; font-size: 10px; font-variant-numeric: tabular-nums; }
+.langgraph-answer__note { color: #adc4cf; font-size: 12px; line-height: 1.7; }
+.langgraph-response { color: #dceaf0; font-size: 14px; line-height: 1.85; overflow-wrap: anywhere; }
+.langgraph-response > * { max-width: 72ch; }
+.langgraph-response > p { white-space: pre-line; margin: 0 0 18px !important; }
+.langgraph-response > h4 { margin: 26px 0 9px !important; color: #eff8fa; font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
+.langgraph-response > h4:first-child { margin-top: 0 !important; }
+.langgraph-response :is(ul, ol) { padding-left: 24px; margin: 12px 0 20px; }
+.langgraph-response li { padding: 3px 0 3px 5px; white-space: pre-line; }
+.langgraph-response li::marker { color: #92bdcb; font-variant-numeric: tabular-nums; }
+.langgraph-response strong { color: #f0f8fb; font-weight: 600; }
+.langgraph-response a { color: #8ee7f5; text-underline-offset: 4px; text-decoration-thickness: 1px; }
+.langgraph-response :is(code, pre) { font-family: var(--font-mono, "JetBrains Mono Variable", monospace); font-size: .88em; }
+.langgraph-response code { padding: 2px 5px; color: #cbeefa; background: #0d1e28; border-radius: 4px; }
+.langgraph-response pre { padding: 17px; background: #0e1c26; border-radius: 9px; overflow-x: auto; white-space: pre; margin: 16px 0; }
+.langgraph-response pre code { padding: 0; background: none; border-radius: 0; }
+.langgraph-response blockquote { margin: 18px 0; padding: 12px 16px; background: #1c3441; border-left: 1px solid #5a8d9e; color: #c6dde7; white-space: pre-line; }
+.langgraph-response__table { overflow-x: auto; margin: 20px 0; max-width: 100%; scrollbar-width: thin; }
+.langgraph-response table { border-collapse: collapse; width: 100%; font-size: 12px; line-height: 1.65; }
+.langgraph-response :is(th, td) { padding: 11px 12px; text-align: left; border-bottom: 1px solid #36505e; min-width: 100px; }
+.langgraph-response th { color: #cbebf4; background: #1d3743; font-weight: 600; }
+.langgraph-request { margin: 0 0 32px; padding: 20px; border: 1px solid #355d6a; border-radius: 12px; background: #172e3a; }
+.langgraph-request__heading { display: flex; align-items: flex-start; gap: 11px; }
+.langgraph-request__activity { flex: 0 0 auto; color: #79d8e9; padding-top: 1px; }
+.langgraph-request__heading > div { flex: 1; min-width: 0; }
+.langgraph-request__heading strong { font-size: 13px; line-height: 1.5; font-weight: 600; color: #d6f3fa; }
+.langgraph-request__heading p { margin-top: 6px !important; font-size: 11px; line-height: 1.7; color: #adc6d2; }
+.langgraph-cancel { display: inline-flex; gap: 5px; align-items: center; padding: 5px 7px; background: transparent; color: #f2b2a7; border: 1px solid #7c544f; border-radius: 5px; font-size: 10px; }
+.langgraph-cancel:hover { background: #493433; }
+.langgraph-request__steps { display: flex; list-style: none; padding: 0; margin: 22px 0 15px; gap: 0; }
+.langgraph-request__steps li { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 10px 0; border-top: 1px solid #4c6774; color: #a4bcc8; font-size: 10px; }
+.langgraph-request__steps li[data-state="complete"] { border-color: #58bba9; color: #8ee0c8; }
+.langgraph-request__steps li[data-state="active"] { border-color: #74dce9; color: #a1eefb; }
+.langgraph-request__metadata { display: flex; align-items: start; gap: 18px; justify-content: space-between; color: #adc7d3; font-size: 10px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.langgraph-request__metadata span:first-child { min-width: 0; }
+.langgraph-request__metadata span:last-child { flex-shrink: 0; }
+.langgraph-request__metadata code { margin-left: 3px; font-family: var(--font-mono, monospace); font-size: 10px; overflow-wrap: anywhere; }
+.langgraph-request__cancel-note { margin-top: 13px !important; color: #a7bfcc; font-size: 10px; line-height: 1.6; }
+.langgraph-answer--error .langgraph-answer__header { color: #f2a797; border-color: #78544b; }
+.langgraph-answer--error .langgraph-answer__header strong { color: #f8c0b4; }
+.langgraph-request-error > p:first-child { color: #f4b7ac; font-size: 13px; line-height: 1.7; margin-bottom: 8px !important; overflow-wrap: anywhere; }
+.langgraph-retry { display: inline-flex; align-items: center; gap: 7px; border: 1px solid #4c7282; border-radius: 6px; color: #b7e6f1; background: #213b47; padding: 8px 12px; font-size: 11px; margin-top: 14px; }
+.langgraph-retry:hover { background: #2b4d5b; }
+.langgraph-request-details { margin-top: 16px; color: #a5bdc9; font-size: 10px; }
+.langgraph-request-details summary { cursor: pointer; width: fit-content; }
+.langgraph-request-details dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 16px; row-gap: 7px; margin-top: 12px; }
+.langgraph-request-details dd { margin: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.langgraph-composer-wrap { flex: 0 0 auto; padding: 20px clamp(22px, 4vw, 50px) 16px; background: #13242f; border-top: 1px solid #304a58; }
+.langgraph-workspace form.langgraph-composer { width: min(700px, 100%); margin: 0 auto; padding: 14px 15px 11px; border: 1px solid #4c7282 !important; border-radius: 12px; background: #1c3541; box-shadow: inset 0 1px 0 #ffffff06 !important; }
+.langgraph-workspace form.langgraph-composer:focus-within { border-color: #80d7e5 !important; }
+.langgraph-composer__label { display: block; margin-bottom: 8px; color: #b9dae6; font-size: 11px; font-weight: 550; }
+.langgraph-composer__field { display: flex; align-items: flex-end; gap: 14px; }
+.langgraph-workspace textarea { display: block; flex: 1; min-width: 0; width: 100%; max-height: 130px; min-height: 48px; resize: vertical; border: 0; outline: 0; padding: 0; background: transparent; color: #eff8fb; font-size: 14px; line-height: 1.55; caret-color: #8be6f5; }
+.langgraph-workspace textarea::placeholder { color: #aac4d0; opacity: 1; }
+.langgraph-workspace form.langgraph-composer textarea,
+.langgraph-workspace form.langgraph-composer textarea:focus,
+.langgraph-workspace form.langgraph-composer textarea:focus-visible { border: 0 !important; outline: none !important; box-shadow: none !important; }
+.langgraph-workspace form.langgraph-composer button[type="submit"] { display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 auto; border: 0; border-radius: 8px; color: #09212a !important; background: #56dcec !important; }
+.langgraph-workspace form.langgraph-composer button[type="submit"]:hover:not(:disabled) { background: #8ce9f5 !important; }
+.langgraph-composer__help { display: flex; justify-content: space-between; align-items: center; gap: 12px; max-width: 700px; margin: 10px auto 0; color: #a4bdca; font-size: 9px; line-height: 1.5; }
+@keyframes langgraph-reveal { from { opacity: .6; } to { opacity: 1; } }
+@media (max-width: 850px) {
+  .langgraph-investigations { flex-basis: 205px; padding-inline: 12px; }
+  .langgraph-advisory { display: none; }
+  .langgraph-start { padding-inline: 26px; }
+  .langgraph-composer__linebreak-hint { display: none; }
+}
+@media (max-width: 640px) {
+  .langgraph-backdrop { padding: 8px; }
+  .langgraph-workspace.langgraph-dialog { width: 100%; height: 96dvh; border-radius: 12px !important; }
+  .langgraph-workspace .langgraph-dialog__header { padding: 14px !important; min-height: 74px; gap: 9px; flex-wrap: nowrap; }
+  .langgraph-identity { gap: 9px; }
+  .langgraph-identity__mark { width: 36px; height: 36px; border-radius: 9px; }
+  .langgraph-workspace .langgraph-identity h2 { font-size: 16px; }
+  .langgraph-identity p { font-size: 10px; }
+  .langgraph-workspace .langgraph-dialog__actions { gap: 6px; }
+  .langgraph-workspace .langgraph-dialog__actions :is(.langgraph-quiet-button, .langgraph-icon-button) { min-width: 40px; height: 40px; }
+  .langgraph-quiet-button span { display: none; }
+  .langgraph-workspace__body { flex-direction: column; }
+  .langgraph-investigations { flex: 0 0 auto; padding: 9px; border-right: 0; border-bottom: 1px solid #2b424f; }
+  .langgraph-investigations__intro, .langgraph-agent-route, .langgraph-investigations__footer { display: none; }
+  .langgraph-followups { display: flex; overflow-x: auto; scrollbar-width: thin; gap: 15px; padding-top: 6px; margin: 7px 5px 0; }
+  .langgraph-followups h4 { display: none; }
+  .langgraph-followups button { flex: 0 0 auto; width: auto; min-height: 32px; font-size: 10px; }
+  .langgraph-investigations nav { flex-direction: row; gap: 4px; }
+  .langgraph-topic { flex: 1; min-width: 0; justify-content: center; min-height: 44px; padding: 8px 4px; gap: 5px; font-size: 10px; line-height: 1.4; }
+  .langgraph-topic > svg:first-child { width: 14px; flex: 0 0 auto; }
+  .langgraph-topic > svg:last-child { display: none; }
+  .langgraph-conversation { min-height: 0; }
+  .langgraph-start { padding: 27px 21px; }
+  .langgraph-start__intro h3 { font-size: 27px; }
+  .langgraph-start__intro p { font-size: 12px; margin-top: 13px !important; }
+  .langgraph-starters { margin-top: 28px; }
+  .langgraph-starter { min-height: 70px; padding: 13px 2px; }
+  .langgraph-messages { padding: 25px 19px 30px; }
+  .langgraph-question { max-width: 92%; }
+  .langgraph-question p { padding: 12px; font-size: 13px; }
+  .langgraph-response { font-size: 13px; line-height: 1.8; }
+  .langgraph-request { padding: 15px 12px; }
+  .langgraph-request__heading { gap: 8px; flex-wrap: wrap; }
+  .langgraph-request__heading > div { flex-basis: calc(100% - 40px); }
+  .langgraph-cancel { margin-left: auto; min-height: 32px; padding: 6px 9px; }
+  .langgraph-request__metadata { flex-wrap: wrap; gap: 7px; }
+  .langgraph-composer-wrap { padding: 13px 13px 12px; }
+  .langgraph-workspace form.langgraph-composer { padding: 12px; }
+  .langgraph-workspace textarea { font-size: 16px; min-height: 52px; }
+  .langgraph-workspace form.langgraph-composer button[type="submit"] { width: 44px; height: 44px; }
+  .langgraph-composer__help { font-size: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .langgraph-backdrop, .langgraph-workspace, .langgraph-workspace * { animation: none !important; scroll-behavior: auto !important; transition: none !important; }
+}

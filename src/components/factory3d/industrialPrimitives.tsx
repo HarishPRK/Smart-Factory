@@ -1,7 +1,12 @@
 /* eslint-disable react-refresh/only-export-components -- Shared material colors accompany the primitive geometry API. */
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { RoundedBox } from "@react-three/drei";
+import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import type { StageId } from "../../types/digitalTwin";
+import { useDigitalTwinStore } from "../../stores/digitalTwinStore";
+import { useLineClock } from "./LineProcess";
+import { ALARM_LIGHT_COLORS, alarmPulse } from "./alarmLighting";
 
 export type Point3 = [number, number, number];
 export const METAL = { shell: "#e4e9e8", edge: "#87999f", dark: "#26353d", steel: "#c1c9cc", blue: "#22b9d4", yellow: "#e3ad52", glass: "#b9eaf1" };
@@ -41,10 +46,23 @@ export function HMI({ at, rotation = [0, 0, 0] }: { at: Point3; rotation?: Point
   </group>;
 }
 
-export function StackLight({ at, color = "#63d9b5" }: { at: Point3; color?: string }) {
+export function StackLight({ at, stageId }: { at: Point3; stageId: StageId }) {
+  const clock = useLineClock();
+  const lamps = useRef<THREE.Group>(null);
+  useFrame(({ clock: visualClock }) => {
+    const stage = useDigitalTwinStore.getState().stages.find((s) => s.id === stageId);
+    const severity = clock.current.alarm.stageAlarms[stageId]?.severity ?? "normal";
+    const active = severity === "critical" ? 0 : severity === "warning" || stage?.status === "blocked" || clock.current.alarm.lineStopped ? 1 : stage?.status === "running" ? 2 : -1;
+    const pulse = severity === "normal" ? 0.8 : alarmPulse(severity, visualClock.elapsedTime, clock.current.reducedMotion);
+    lamps.current?.children.forEach((object, i) => {
+      const material = (object as THREE.Mesh).material as THREE.MeshStandardMaterial;
+      material.emissiveIntensity = i === active ? 1.2 * pulse : 0;
+      material.color.set(i === active ? [ALARM_LIGHT_COLORS.critical, ALARM_LIGHT_COLORS.warning, "#63d9b5"][i] : ["#683b38", "#6a5938", "#315b4a"][i]);
+    });
+  });
   return <group position={at}>
     <Cylinder at={[0, 0.25, 0]} radius={0.035} height={0.5} color={METAL.dark} />
-    {["#aa6058", "#bca566", color].map((c, i) => <mesh key={i} position={[0, 0.56 + i * 0.13, 0]}><cylinderGeometry args={[0.09, 0.09, 0.1, 12]} /><meshStandardMaterial color={c} emissive={i === 2 ? c : "#000000"} emissiveIntensity={i === 2 ? 0.7 : 0} /></mesh>)}
+    <group ref={lamps}>{[ALARM_LIGHT_COLORS.critical, ALARM_LIGHT_COLORS.warning, "#63d9b5"].map((c, i) => <mesh key={i} position={[0, 0.56 + (2 - i) * 0.13, 0]}><cylinderGeometry args={[0.09, 0.09, 0.1, 12]} /><meshStandardMaterial color={c} emissive={c} emissiveIntensity={0} roughness={0.35} /></mesh>)}</group>
   </group>;
 }
 

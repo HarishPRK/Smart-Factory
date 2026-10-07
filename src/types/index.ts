@@ -114,6 +114,9 @@ export type PLCParameter = {
   status: "normal" | "warning" | "critical";
   // Whether this is a placeholder
   placeholder?: boolean;
+  /** Browser receipt time of this physical channel; retained partial frames
+   * keep the original timestamp so unrelated traffic cannot make it fresh. */
+  receivedAt?: number;
 };
 
 // ── OEE Types ──────────────────────────────────────────

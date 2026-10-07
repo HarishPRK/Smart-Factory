@@ -1,5 +1,4 @@
 import type { ComponentType } from 'react';
-import './ServiceOfferings.css';
 import { Link } from '../components/offerings/OfferingNavigation';
 import { PageHeader } from '../components/PageHeader';
 import { Card } from '../components/Card';

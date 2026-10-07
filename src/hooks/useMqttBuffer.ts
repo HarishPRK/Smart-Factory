@@ -10,6 +10,7 @@
 import { useRef, useCallback, useMemo } from "react";
 import type { PLCParameter } from "../types";
 import type { PLCOutputs } from "../services/plcService";
+import { isReceivedParameter } from "../services/receivedTelemetry";
 
 export interface BufferEntry {
   timestamp: number;
@@ -28,6 +29,7 @@ function extractValues(params: PLCParameter[], outputs: PLCOutputs): Record<stri
   const values: Record<string, number> = {};
 
   for (const p of params) {
+    if (!isReceivedParameter(p)) continue;
     if (p.kind === "analog" && p.value !== undefined) {
       values[p.id] = p.value;
       if (p.id === "ph") values.pH = p.value;
@@ -37,20 +39,16 @@ function extractValues(params: PLCParameter[], outputs: PLCOutputs): Record<stri
   }
 
   // Relays
-  for (let i = 0; i < outputs.relay.length; i++) {
-    values[`relay_ch${i}`] = outputs.relay[i] ? 1 : 0;
-  }
-
-  // Alerts
-  for (let i = 0; i < outputs.alerts.length; i++) {
-    values[`alert_${i}`] = outputs.alerts[i] ? 1 : 0;
+  const known = (id: string) => params.some((p) => p.id === id && isReceivedParameter(p));
+  if (known("relay")) {
+    for (let i = 0; i < outputs.relay.length; i++) values[`relay_ch${i}`] = outputs.relay[i] ? 1 : 0;
+    for (let i = 0; i < outputs.alerts.length; i++) values[`alert_${i}`] = outputs.alerts[i] ? 1 : 0;
+    values.motor = outputs.motorFanOn ? 1 : 0;
   }
 
   // Motor & emergency
-  values.motor = outputs.motorFanOn ? 1 : 0;
-  values.photoE_sensor = outputs.photoESensor ? 1 : 0;
-  values.metal_sensor = outputs.metalSensor ? 1 : 0;
-  values.push_button = outputs.pushButton ? 1 : 0;
+  if (known("photoE")) values.photoE_sensor = outputs.photoESensor ? 1 : 0;
+  if (known("metal")) values.metal_sensor = outputs.metalSensor ? 1 : 0;
 
   return values;
 }

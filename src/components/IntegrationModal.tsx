@@ -33,6 +33,16 @@ interface FullscreenStyleSnapshot {
   overflow: string;
 }
 
+async function exitOwnedFullscreen(target: HTMLElement | null) {
+  if (!target || document.fullscreenElement !== target || !document.exitFullscreen) return;
+  try {
+    await document.exitFullscreen();
+  } catch {
+    // A hidden or detached document can reject exit even after ownership was checked.
+    // The modal still restores its own CSS presentation and closes normally.
+  }
+}
+
 /**
  * Full-screen overlay modal that hosts an integration page (Dynamic Path
  * Selection / Video Analytics). The body is wrapped in `.integration-scope`
@@ -115,9 +125,7 @@ const IntegrationModal: React.FC<IntegrationModalProps> = ({
 
   const closeModal = useCallback(() => {
     const target = getFullscreenTarget();
-    if (document.fullscreenElement === target) {
-      void document.exitFullscreen();
-    }
+    void exitOwnedFullscreen(target);
     restoreFullscreenPresentation();
     setIsFullscreen(false);
     onClose();
@@ -132,10 +140,8 @@ const IntegrationModal: React.FC<IntegrationModalProps> = ({
       // Escape should leave fullscreen first, then close the modal on a
       // second press. This also covers the CSS fallback below.
       const target = getFullscreenTarget();
-      if (isFullscreen || document.fullscreenElement === target) {
-        if (document.fullscreenElement === target) {
-          void document.exitFullscreen();
-        }
+      if (isFullscreen || (target && document.fullscreenElement === target)) {
+        void exitOwnedFullscreen(target);
         restoreFullscreenPresentation();
         setIsFullscreen(false);
         return;
@@ -151,7 +157,7 @@ const IntegrationModal: React.FC<IntegrationModalProps> = ({
   useEffect(() => {
     const onFullscreenChange = () => {
       const target = getFullscreenTarget();
-      const active = document.fullscreenElement === target;
+      const active = !!target && document.fullscreenElement === target;
       if (!active) restoreFullscreenPresentation();
       setIsFullscreen(active);
     };
@@ -163,20 +169,21 @@ const IntegrationModal: React.FC<IntegrationModalProps> = ({
   useEffect(() => {
     if (open) return;
 
-    if (document.fullscreenElement === getFullscreenTarget()) {
-      void document.exitFullscreen();
-    }
+    void exitOwnedFullscreen(getFullscreenTarget() ?? fullscreenStyleRef.current?.element ?? null);
     restoreFullscreenPresentation();
   }, [getFullscreenTarget, open, restoreFullscreenPresentation]);
+
+  useEffect(() => () => {
+    void exitOwnedFullscreen(fullscreenStyleRef.current?.element ?? null);
+    restoreFullscreenPresentation();
+  }, [restoreFullscreenPresentation]);
 
   const toggleFullscreen = async () => {
     const target = getFullscreenTarget();
     if (!target) return;
 
     if (isFullscreen) {
-      if (document.fullscreenElement === target) {
-        await document.exitFullscreen();
-      }
+      await exitOwnedFullscreen(target);
       restoreFullscreenPresentation();
       setIsFullscreen(false);
       return;

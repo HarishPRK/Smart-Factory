@@ -1,4 +1,4 @@
-@import "tailwindcss";
+/* Shared Tailwind utilities are emitted by utility-base.css. */
 
 /* Geist Sans — Vercel's modern geometric sans */
 @font-face {

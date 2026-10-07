@@ -1,5 +1,6 @@
 import { CatmullRomCurve3, Vector3 } from "three";
 import type { StageId } from "../../types/digitalTwin";
+import type { TwinAlarmSummary } from "./twinAlarmState";
 export type V3 = [number, number, number];
 export const CYCLE_SECONDS = 96;
 export const PRODUCT_COUNT = 8;
@@ -34,8 +35,12 @@ export function stationPhase(time: number, stage: StageId): number | null {
   for (let i = 0; i < PRODUCT_COUNT; i++) { const age = productAge(time, i); if (age >= start && age < end) return (age - start) / (end - start); }
   return null;
 }
-export function advanceProcessClock(time: number, delta: number, active: boolean, speed: number) {
-  return active ? (time + Math.min(delta, 0.1) * Math.max(0, speed) * PROCESS_RATE) % CYCLE_SECONDS : time;
+export function advanceProcessClock(time: number, delta: number, active: boolean, speed: number, alarm?: Pick<TwinAlarmSummary, "lineStopped" | "speedLimit">, userSpeedMultiplier = 1) {
+  if (!active || alarm?.lineStopped || !Number.isFinite(delta) || !Number.isFinite(speed)) return time;
+  // The shared simulation already applies its .8 slowdown. Cap it rather than
+  // multiplying a second time, while preserving the operator's speed override.
+  const responseSpeed = alarm?.speedLimit === 0.8 ? Math.min(speed, Math.max(0, userSpeedMultiplier) * 0.8) : speed;
+  return (time + Math.max(0, Math.min(delta, 0.1)) * Math.max(0, responseSpeed) * PROCESS_RATE) % CYCLE_SECONDS;
 }
 
 /** Coordinates are relative to the packaging cell. The product and gripper use this exact path. */

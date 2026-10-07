@@ -38,7 +38,6 @@ import {
   type HardwareAnomalyPoint,
   type HardwareAnomalySource,
 } from '../ui/useHardwareAnomalies';
-import './HardwareAnomalies.css';
 
 const RANGE_OPTIONS = [
   { key: '1h', label: '1 hour', shortLabel: '1h', start: '-1h', window: '1m' },

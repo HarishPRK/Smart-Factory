@@ -1,3 +1,5 @@
+"use no memo";
+// The twin mutates stage arrays in place; each subscribed tick must read a fresh snapshot.
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { Html } from "@react-three/drei";
 import * as THREE from "three";
@@ -12,6 +14,8 @@ import { STAGE_NAMES, TWIN_STATUS_COLORS } from "./twinPresentation";
 import IndustrialMachine from "./IndustrialMachines";
 import FactoryFloor from "./FactoryFloor";
 import { Block, Cylinder, MACHINE_PAINT, METAL, Pallet, Pipe, type Point3 } from "./industrialPrimitives";
+import { HallAlarmLight, MachineAlarmFeedback, MaintenanceDispatch } from "./TwinAlarmPresentation";
+import { readTwinAlarmState } from "./twinAlarmState";
 
 const STAGES: StageId[] = ["intake", "forming", "mixing", "curing", "quality", "packaging", "dispatch"];
 const FOOTPRINTS: Record<StageId, [number, number]> = { intake: [7.5, 6], forming: [7.8, 4.8], mixing: [7.1, 7], curing: [7.6, 4.8], quality: [6.5, 4.5], packaging: [7.7, 6.5], dispatch: [7.3, 6.2] };
@@ -101,25 +105,29 @@ function ConveyorSection({ curve, caseInfeed = false }: { curve: THREE.CatmullRo
 function ProductionCell({ id, index }: { id: StageId; index: number }) {
   const [x, , z] = STAGE_POSITIONS[id];
   const status = useDigitalTwinStore((s) => s.stages.find((stage) => stage.id === id)?.status ?? "idle");
+  useDigitalTwinStore((s) => s.tick);
+  const response = readTwinAlarmState();
+  const alarm = response.stageAlarms[id];
   const selected = useSceneSelectionStore((s) => s.selectedStageId === id);
   const hasSelection = useSceneSelectionStore((s) => s.selectedStageId !== null);
   const select = useSceneSelectionStore((s) => s.select);
   const labels = useSceneSettingsStore((s) => s.labelsVisible);
   const [w, d] = FOOTPRINTS[id];
-  const color = TWIN_STATUS_COLORS[status];
+  const color = alarm?.severity === "critical" ? "#ff837a" : alarm?.severity === "warning" || response.lineStopped ? "#ffca78" : TWIN_STATUS_COLORS[status];
+  const stateLabel = alarm?.stopRequired ? "Fault · line stopped" : alarm?.severity === "critical" ? "Critical reading" : response.lineStopped ? "Paused · line interlock" : alarm?.severity === "warning" ? "Warning" : status;
   useEffect(() => () => { document.body.style.cursor = ""; }, []);
   return <group position={[x, 0.08, z]}>
     <Block at={[0, 0, -0.5]} size={[w, 0.055, d]} color={selected ? "#435b63" : "#374347"} metal={0} roughness={1} environmentIntensity={0} />
     <Block at={[0, 0.037, d / 2 - 0.52]} size={[w - 0.15, 0.018, 0.15]} color={MACHINE_PAINT[id]} metal={0} roughness={0.95} environmentIntensity={0} />
     {[-1, 1].map((s) => <group key={s}><Block at={[0, 0.035, s * d / 2 - 0.5]} size={[w, 0.018, 0.045]} color={selected ? "#72d1f4" : "#b6a476"} metal={0} /><Block at={[s * w / 2, 0.035, -0.5]} size={[0.045, 0.018, d]} color={selected ? "#72d1f4" : "#b6a476"} metal={0} /></group>)}
     <group onClick={(e) => { e.stopPropagation(); select(id); }} onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = "pointer"; }} onPointerOut={() => { document.body.style.cursor = ""; }}>
-      <IndustrialMachine stageId={id} />
+      <MachineAlarmFeedback stageId={id} footprint={[w, d]}><IndustrialMachine stageId={id} /></MachineAlarmFeedback>
     </group>
     <FloorMark at={[-w / 2 + 0.55, 0.065, d / 2 - 0.9]} text={String(index + 1).padStart(2, "0")} width={0.6} />
-    {labels && (!hasSelection || selected) && <Html position={[0, LABEL_HEIGHT[id], -0.5]} center zIndexRange={[8, 1]}><button className={`plant-label${selected ? " is-selected" : ""}`} onClick={() => select(id)}><span>{String(index + 1).padStart(2, "0")}</span><strong>{STAGE_NAMES[id]}</strong><i style={{ background: color }} /></button></Html>}
+    {labels && (!hasSelection || selected) && <Html position={[0, LABEL_HEIGHT[id], -0.5]} center zIndexRange={[8, 1]}><button className={`plant-label${selected ? " is-selected" : ""}`} data-alarm={alarm?.severity ?? "normal"} aria-label={`${STAGE_NAMES[id]} · ${stateLabel}. Inspect machine`} onClick={() => select(id)}><span>{String(index + 1).padStart(2, "0")}</span><strong>{STAGE_NAMES[id]}</strong><i style={{ background: color }} /></button></Html>}
   </group>;
 }
 
 export default function ProductionPlant() {
-  return <LineClock><group><PlantBuilding />{LINE_PATHS.map((curve, i) => <ConveyorSection key={i} curve={curve} caseInfeed={i === 4} />)}{STAGES.map((id, index) => <ProductionCell key={id} id={id} index={index} />)}<LineProcess /></group></LineClock>;
+  return <LineClock><group><PlantBuilding />{LINE_PATHS.map((curve, i) => <ConveyorSection key={i} curve={curve} caseInfeed={i === 4} />)}{STAGES.map((id, index) => <ProductionCell key={id} id={id} index={index} />)}<LineProcess /><HallAlarmLight /><MaintenanceDispatch /></group></LineClock>;
 }

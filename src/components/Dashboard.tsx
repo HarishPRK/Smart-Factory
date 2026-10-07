@@ -1,7 +1,6 @@
 import React, { useRef, useState, useEffect, Suspense, lazy } from "react";
 import KPIBar from "./KPIBar";
 import { Activity, Bell, Bot, Box, ChartNoAxesCombined, Network, Sparkles, Gauge, ArrowUpRight, PanelRight, ChevronRight } from "lucide-react";
-import "./langgraph-entry.css";
 import { usePLCContext } from "../context/PLCContext";
 import capgeminiLogo from "../assets/capgemini-logo.jpeg";
 // Weather component available for future use but not shown in header
@@ -85,7 +84,7 @@ const GatewaySourceSelector: React.FC<{
   </div>
 );
 
-const Dashboard: React.FC = () => {
+const Dashboard: React.FC<{ headerSlot?: React.ReactNode }> = ({ headerSlot }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [aiChatOpen, setAiChatOpen] = useState(false);
   const [langgraphOpen, setLanggraphOpen] = useState(false);
@@ -137,6 +136,7 @@ const Dashboard: React.FC = () => {
       <header className="operations-header">
         <div className="operations-brand"><span>Manufacturing</span><ChevronRight size={14} /><span className="workspace-name">Plant workspace</span></div>
         <div className="operations-header__actions">
+          {headerSlot}
           <time>{currentTime.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })}</time>
           <button aria-label="Open Aituzero Smart Meter" title="Smart meter" onClick={() => setSmartMeterOpen(true)}><Gauge size={18} /></button>
           <button aria-label="UNS Explorer" title="UNS Explorer" onClick={() => setUnsOpen(true)}><Network size={18} /></button>

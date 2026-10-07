@@ -5,13 +5,17 @@ import { usePLCContext } from "../context/PLCContext";
 import { usePLCStore } from "../stores/plcStore";
 import ThreePhaseMotorWidget from "./ThreePhaseMotorWidget";
 import ParameterMicroviz from "./ParameterMicroviz";
-import "../plc-instruments.css";
+import { readSensorPLCChannel } from "../services/receivedTelemetry";
 
 type FlashDir = "up" | "down" | null;
 function useChangeFlash(value: number, range: number, threshold = 0.03): FlashDir {
   const [flash, setFlash] = useState<FlashDir>(null);
   const prevRef = useRef(value);
   useEffect(() => {
+    if (!Number.isFinite(value) || !Number.isFinite(prevRef.current)) {
+      prevRef.current = value;
+      return;
+    }
     const delta = value - prevRef.current;
     const significant = range > 0 ? Math.abs(delta) / range > threshold : Math.abs(delta) > 0.5;
     if (significant) {
@@ -60,38 +64,38 @@ function hasReading(param: PLCParameter) {
   return !param.placeholder && typeof param.value === "number" && Number.isFinite(param.value);
 }
 
-function ControllerMap({ connected, hasSamples }: { connected: boolean; hasSamples: boolean }) {
+function ControllerMap({ connected, hasSamples, analog, digital, receivedAt }: { connected: boolean; hasSamples: boolean; analog: boolean[]; digital: boolean[]; receivedAt: number | null }) {
   return <div className="pi-controller" data-connected={connected}>
-    <svg viewBox="0 0 260 80" role="img" aria-label="Controller telemetry map: analog sensors, digital I/O and three-phase power">
-      <path className="pi-controller__rail" d="M10 23h32m-32 34h32M104 39h37m0-24v49m0-49h27m-27 24h27m-27 25h27" />
-      <path className="pi-controller__link" d="M10 39h32" />
-      <circle className="pi-controller__terminal" cx="10" cy="39" r="3" />
-      <rect className="pi-controller__case" x="42" y="9" width="62" height="62" rx="5" />
-      <path className="pi-controller__vent" d="M51 15h44M51 65h44M52 21v7m7-7v7m7-7v7m7-7v7m7-7v7m7-7v7m7-7v7" />
-      <text className="pi-controller__name" x="55" y="48">PLC</text>
-      <circle className="pi-controller__led" cx="91" cy="43" r="2.5" />
-      <path className="pi-controller__vent" d="M52 55v5m7-5v5m7-5v5m7-5v5m7-5v5m7-5v5m7-5v5" />
-      {[15, 39, 64].map((y) => <circle key={y} className="pi-controller__terminal" cx="168" cy={y} r="3" />)}
-      <text x="180" y="18">Analog inputs</text><text x="180" y="42">Digital I/O</text><text x="180" y="67">3-phase power</text>
+    <svg viewBox="0 0 64 64" aria-hidden="true">
+      <rect className="pi-controller__case" x="11" y="7" width="42" height="50" rx="5" />
+      <path className="pi-controller__vent" d="M18 14h28M18 50h28M18 19v5m7-5v5m7-5v5m7-5v5m7-5v5M18 43v4m7-4v4m7-4v4m7-4v4m7-4v4" />
+      <path className="pi-controller__rail" d="M3 19h8m-8 13h8m-8 13h8m42-26h8m-8 13h8m-8 13h8" />
+      <text className="pi-controller__name" x="18" y="38">PLC</text>
+      <circle className="pi-controller__led" cx="45" cy="34" r="2" />
     </svg>
-    <div className="pi-controller__caption"><span>{connected ? "Controller connected" : "Hardware link unavailable"}</span><span>{hasSamples ? connected ? "Latest values" : "Last received" : "Awaiting payload"}</span></div>
+    <div className="pi-controller__summary"><strong>{connected ? "Receiving controller inputs" : hasSamples ? "Retained PLC readings" : "Waiting for the controller"}</strong><span>{hasSamples && receivedAt !== null ? `Last frame ${new Date(receivedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}` : "Received values only · no model data"}</span>
+      <div className="pi-controller__coverage" aria-label="Received input coverage">
+        <span>Analog<span className="pi-controller__slots">{analog.map((received, index) => <i key={index} data-received={received} />)}</span></span>
+        <span>Digital<span className="pi-controller__slots">{digital.map((received, index) => <i key={index} data-received={received} />)}</span></span>
+      </div>
+    </div>
   </div>;
 }
 
-export function AnalogCard({ param }: { param: PLCParameter }) {
+export function AnalogCard({ param, current = true }: { param: PLCParameter; current?: boolean }) {
   const valid = hasReading(param);
   const value = valid ? param.value! : 0;
   const min = param.min ?? 0, max = param.max ?? 100;
   const range = max - min;
   const pct = range > 0 ? Math.max(0, Math.min(1, (value - min) / range)) : 0;
   const nominal = param.nominal !== undefined && range > 0 ? Math.max(0, Math.min(1, (param.nominal - min) / range)) : null;
-  const flash = useChangeFlash(value, range);
+  const flash = useChangeFlash(valid && current ? value : Number.NaN, range);
   const formattedValue = valid ? value.toFixed(param.decimals ?? 1) : "—";
-  return <div className="card-inner pi-reading" data-channel={param.id} data-state={valid ? param.status : "unavailable"} data-change={flash} data-long-value={formattedValue.length > 5}>
+  return <div className="card-inner pi-reading" data-channel={param.id} data-state={valid ? current ? param.status : "stale" : "unavailable"} data-change={flash} data-long-value={formattedValue.length > 5}>
     <div className="pi-reading__top"><span className="pi-reading__label" title={param.label}>{LABELS[param.id] ?? param.label}</span><span className="pi-signal" aria-hidden="true"><i /></span></div>
     <div className="pi-reading__face">
       <div className="pi-reading__amount"><strong>{formattedValue}</strong><span>{param.unit}</span></div>
-      <div className="pi-reading__visual"><ParameterMicroviz param={param} /><span className="pi-reading__status">{valid ? STATUS[param.status] : "No reading"}</span></div>
+      <div className="pi-reading__visual"><ParameterMicroviz param={param} /><span className="pi-reading__status">{valid ? current ? STATUS[param.status] : "Last received" : "No reading"}</span></div>
     </div>
     <div className="pi-range" title={`Range ${min}–${max} ${param.unit ?? ""}${param.nominal === undefined ? "" : ` · Nominal ${param.nominal}`}`}>
       {valid && <span style={{ width: `${pct * 100}%` }} />}{nominal !== null && <i style={{ left: `${nominal * 100}%` }} />}
@@ -100,48 +104,54 @@ export function AnalogCard({ param }: { param: PLCParameter }) {
   </div>;
 }
 
-function DigitalCard({ param, onToggle }: { param: PLCParameter; onToggle?: () => void }) {
+function DigitalCard({ param, current, onToggle }: { param: PLCParameter; current: boolean; onToggle?: () => void }) {
   const available = !param.placeholder && typeof param.active === "boolean";
   const active = available && param.active;
   const Tag = onToggle ? "button" : "div";
   return <Tag className="pi-digital" data-channel={param.id} data-active={active} onClick={onToggle} {...(onToggle ? { type: "button" as const, "aria-label": `Toggle ${param.label}`, "aria-pressed": active } : {})}>
-    <Radio size={15} aria-hidden="true" /><span>{LABELS[param.id] ?? param.label}</span><strong>{available ? active ? "ON" : "OFF" : <><span className="sr-only">No reading</span>—</>}</strong>{onToggle && <ArrowUpRight size={13} aria-hidden="true" />}
+    <Radio size={15} aria-hidden="true" /><span>{LABELS[param.id] ?? param.label}</span><strong>{available && !current && <small>Last received</small>}{available ? active ? "ON" : "OFF" : <><span className="sr-only">No reading</span>—</>}</strong>{onToggle && <ArrowUpRight size={13} aria-hidden="true" />}
   </Tag>;
 }
-function RelayCard({ param }: { param: PLCParameter }) {
+function RelayCard({ param, current }: { param: PLCParameter; current: boolean }) {
   const health = param.placeholder ? "No reading" : param.status === "critical" ? "Alarm" : param.status === "warning" ? "Warning" : param.accentHex === "#10b981" ? "Healthy" : "Idle";
-  return <div className="pi-digital pi-relay" data-health={health}><CircuitBoard size={16} aria-hidden="true" /><span>{param.label}<small>8-channel relay · RS485</small></span><strong><i />{health}</strong></div>;
+  return <div className="pi-digital pi-relay" data-health={current ? health : "stale"} title={!current && !param.placeholder ? `Last received relay status: ${health}` : undefined}><CircuitBoard size={16} aria-hidden="true" /><span>{param.label}<small>8-channel relay · RS485</small></span><strong><i />{!param.placeholder && !current ? "Last received" : health}</strong></div>;
 }
 
 export default function PLCParametersWidget({ className = "" }: { className?: string }) {
   const params = usePLCStore((s) => s.params);
-  const liveRfid = usePLCStore((s) => s.rfidAuthorized);
-  const rfidOverride = usePLCStore((s) => s.rfidOverride);
-  const setRfidOverride = usePLCStore((s) => s.setRfidOverride);
-  const rfidAuthorized = rfidOverride === null ? liveRfid : rfidOverride;
-  const isOverridden = rfidOverride !== null;
+  const telemetrySource = usePLCStore((s) => s.telemetrySource);
+  const receivedAt = usePLCStore((s) => s.lastReceivedAt);
+  const receivedHistories = usePLCStore((s) => s.receivedHistories);
   const { isConnected, sendCommand } = usePLCContext(false);
-  const displayParams = ORDER.flatMap((id) => { const param = params.find((p) => p.id === id); return param ? [param] : []; });
+  const connected = telemetrySource === "plc" && isConnected;
+  const receivedParams = telemetrySource === "plc" ? params : [];
+  const plc = { params, telemetrySource, lastReceivedAt: receivedAt, receivedHistories };
+  const rfid = readSensorPLCChannel("operator_rfid", plc);
+  const rfidAvailable = rfid.available;
+  const rfidAuthorized = rfidAvailable && rfid.value === 1;
+  const rfidCurrent = connected && rfid.state === "live";
+  const displayParams = ORDER.flatMap((id) => { const param = receivedParams.find((p) => p.id === id); return param ? [param] : []; });
   const analog = EXPECTED_ANALOG.map((expected) => displayParams.find((p) => p.id === expected.id && p.kind === "analog") ?? expected);
+  const analogCurrent = analog.map((param) => connected && readSensorPLCChannel(param.id, plc).state === "live");
   const digital = EXPECTED_DIGITAL.map((expected) => displayParams.find((p) => p.id === expected.id && p.kind === expected.kind) ?? expected);
+  const digitalCurrent = digital.map((param) => connected && readSensorPLCChannel(param.id, plc).state === "live");
   const digitalSampleCount = digital.filter((param) => !param.placeholder && typeof param.active === "boolean").length;
   const sampleCount = analog.filter(hasReading).length;
   const hasSamples = sampleCount > 0 || digital.some((param) => !param.placeholder && typeof param.active === "boolean");
   return <section className={`card plc-console plc-instruments ${className}`} aria-label="PLC telemetry">
-    <header className="pi-heading"><h3>PLC telemetry</h3><span className="pi-link-state" data-connected={isConnected}><i />{isConnected ? "Connected" : "Offline"}</span></header>
-    <ControllerMap connected={isConnected} hasSamples={hasSamples} />
-    <section className="pi-access" data-authorized={rfidAuthorized}>
-      <div className="pi-access__identity">{rfidAuthorized ? <BadgeCheck size={18} aria-hidden="true" /> : <LockKeyhole size={18} aria-hidden="true" />}<div><h4>Operator access</h4><span>{rfidAuthorized ? "Authorized · Intake unlocked" : "Locked · Awaiting badge"}</span></div></div>
-      <button type="button" className="pi-test-control" onClick={() => { if (rfidOverride === null) setRfidOverride(true); else if (rfidOverride === true) setRfidOverride(false); else setRfidOverride(null); }} title={isOverridden ? "Click to cycle test state (next: OFF or LIVE)" : "Override the RFID state for testing"}>{isOverridden ? `Test: ${rfidOverride ? "On" : "Off"}` : "Test gate"}</button>
-      <p>{isOverridden ? "Test override active · Simulation gate" : "RFID badge authorization"}</p>
+    <header className="pi-heading"><h3><CircuitBoard size={20} aria-hidden="true" />PLC telemetry</h3><span className="pi-link-state" data-connected={connected}><i />{connected ? "Connected" : hasSamples ? "Stale" : "Offline"}</span></header>
+    <ControllerMap connected={connected} hasSamples={hasSamples} analog={analog.map(hasReading)} digital={digital.map((param) => !param.placeholder && typeof param.active === "boolean")} receivedAt={receivedAt} />
+    <section className="pi-access" data-authorized={rfidAuthorized && rfidCurrent} data-available={rfidAvailable}>
+      <div className="pi-access__identity">{rfidAuthorized ? <BadgeCheck size={18} aria-hidden="true" /> : <LockKeyhole size={18} aria-hidden="true" />}<div><h4>Operator access</h4><span>{!rfidAvailable ? "Awaiting RFID input" : !rfidCurrent ? `Last received: ${rfidAuthorized ? "authorized" : "locked"}` : rfidAuthorized ? "Badge authorized" : "Locked · Awaiting badge"}</span></div></div>
+      <span className="pi-access__source">RFID</span>
     </section>
     <div className="pi-instruments-body">
       <div className="pi-section-title"><h4>Analog sensors</h4><span>{sampleCount} / {analog.length} received</span></div>
-      <div className="pi-analog-grid" aria-label="Supported analog channels">{analog.map((param) => <AnalogCard key={param.id} param={param} />)}</div>
-      <div className="pi-reading-key"><span><i />{sampleCount ? isConnected ? "Latest PLC readings" : "Last received PLC readings" : "No readings received"}</span><span><i />Nominal</span></div>
-      <div className="pi-section-title"><h4><Radio size={14} aria-hidden="true" />Digital I/O</h4><span>{digitalSampleCount} / {digital.length} received</span></div><div className="pi-digital-list" aria-label="Supported digital channels">{digital.map((param) => param.kind === "relay" ? <RelayCard key={param.id} param={param} /> : <DigitalCard key={param.id} param={param} onToggle={!param.placeholder && typeof param.active === "boolean" ? () => sendCommand(param.id, { action: "toggle" }) : undefined} />)}</div>
+      <div className="pi-analog-grid" aria-label="Supported analog channels">{analog.map((param, index) => <AnalogCard key={param.id} param={param} current={analogCurrent[index]} />)}</div>
+      <div className="pi-reading-key"><span><i />{sampleCount ? connected ? "Latest PLC readings" : "Last received PLC readings" : "No readings received"}</span><span><i />Nominal</span></div>
+      <div className="pi-section-title"><h4><Radio size={14} aria-hidden="true" />Digital I/O</h4><span>{digitalSampleCount} / {digital.length} received</span></div><div className="pi-digital-list" aria-label="Supported digital channels">{digital.map((param, index) => param.kind === "relay" ? <RelayCard key={param.id} param={param} current={digitalCurrent[index]} /> : <DigitalCard key={param.id} param={param} current={digitalCurrent[index]} onToggle={digitalCurrent[index] && !param.placeholder && typeof param.active === "boolean" ? () => sendCommand(param.id, { action: "toggle" }) : undefined} />)}</div>
       <div className="pi-section-title"><h4>Power monitor</h4><span>3-phase</span></div>
-      <ThreePhaseMotorWidget connected={isConnected} />
+      <ThreePhaseMotorWidget connected={connected} />
     </div>
     <footer className="pi-footer"><span>Modbus RTU / RS485</span><span>8-ch relay</span></footer>
   </section>;

@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import "./workspace-details.css";
 import { usePLCContext, useMqttBufferContext } from "../context/PLCContext";
 import CountUp from "./CountUp";
 import type { TimeRange } from "../types";

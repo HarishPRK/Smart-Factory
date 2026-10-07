@@ -9,9 +9,14 @@
  */
 import { create } from "zustand";
 import type { PLCParameter } from "../types";
+import { isReceivedParameter, type TelemetrySource } from "../services/receivedTelemetry";
 
-interface PLCStore {
+export interface PLCStore {
   params: PLCParameter[];
+  telemetrySource: TelemetrySource;
+  lastReceivedAt: number | null;
+  /** Histories contain only finite received controller values, never model ticks. */
+  receivedHistories: Record<string, number[]>;
   motorFanOn: boolean;
   emergencyLightOn: boolean;
   photoESensor: boolean;
@@ -42,13 +47,16 @@ interface PLCStore {
     pushButton: boolean;
     relay: boolean[];
     alerts: boolean[];
-  }) => void;
+  }, metadata?: { source: TelemetrySource; receivedAt: number | null }) => void;
   setRfidOverride: (v: boolean | null) => void;
   updateHistory: (hV: number[], hC: number[], hP: number[], hT: number[]) => void;
 }
 
 export const usePLCStore = create<PLCStore>((set) => ({
   params: [],
+  telemetrySource: "none",
+  lastReceivedAt: null,
+  receivedHistories: {},
   motorFanOn: false,
   emergencyLightOn: false,
   photoESensor: false,
@@ -63,16 +71,40 @@ export const usePLCStore = create<PLCStore>((set) => ({
   historyPH: [],
   historyTemp: [],
 
-  updateFromPLC: (params, outputs) => set({
-    params,
-    motorFanOn: outputs.motorFanOn,
-    emergencyLightOn: outputs.emergencyLightOn,
-    photoESensor: outputs.photoESensor,
-    metalSensor: outputs.metalSensor,
-    rfidAuthorized: outputs.rfidAuthorized,
-    pushButton: outputs.pushButton,
-    relays: outputs.relay ?? [],
-    alerts: outputs.alerts ?? [],
+  updateFromPLC: (params, outputs, metadata = { source: "plc", receivedAt: Date.now() }) => set((previous) => {
+    const sameSource = previous.telemetrySource === metadata.source;
+    const receivedHistories = sameSource ? { ...previous.receivedHistories } : {};
+    const genuineReceipt = metadata.source === "plc" && metadata.receivedAt !== null &&
+      (!sameSource || metadata.receivedAt !== previous.lastReceivedAt || params !== previous.params);
+    if (genuineReceipt) {
+      for (const param of params) {
+        if (!isReceivedParameter(param)) continue;
+        const previousParam = sameSource ? previous.params.find((candidate) => candidate.id === param.id) : undefined;
+        const channelAt = param.receivedAt ?? metadata.receivedAt;
+        const previousAt = previousParam?.receivedAt ?? previous.lastReceivedAt;
+        if (previousParam && isReceivedParameter(previousParam) && channelAt === previousAt &&
+          previousParam.value === param.value && previousParam.active === param.active) continue;
+        const value = param.kind === "analog" ? param.value! : param.active ? 1 : 0;
+        receivedHistories[param.id] = [...(receivedHistories[param.id] ?? []), value].slice(-100);
+      }
+    }
+    return {
+      params, telemetrySource: metadata.source,
+      lastReceivedAt: metadata.source === "plc" ? metadata.receivedAt : null,
+      receivedHistories,
+      historyVoltage: receivedHistories.voltage ?? [],
+      historyCurrent: receivedHistories.current ?? [],
+      historyPH: receivedHistories.ph ?? [],
+      historyTemp: receivedHistories.temperature ?? [],
+      motorFanOn: outputs.motorFanOn,
+      emergencyLightOn: outputs.emergencyLightOn,
+      photoESensor: outputs.photoESensor,
+      metalSensor: outputs.metalSensor,
+      rfidAuthorized: outputs.rfidAuthorized,
+      pushButton: outputs.pushButton,
+      relays: outputs.relay ?? [],
+      alerts: outputs.alerts ?? [],
+    };
   }),
 
   setRfidOverride: (v) => set({ rfidOverride: v }),

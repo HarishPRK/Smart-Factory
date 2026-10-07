@@ -1,0 +1,55 @@
+.ui-version-switch {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--ind-edge, #2e4553);
+  border-radius: 8px;
+  background: var(--ind-bg-0, #0d151c);
+  font-family: var(--font-sans, system-ui);
+  isolation: isolate;
+}
+.ui-version-switch > button {
+  min-height: 28px;
+  padding: 5px 9px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--color-text-secondary, #a7bbc6);
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.2;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 160ms ease-out, color 160ms ease-out;
+}
+.ui-version-switch > button:hover { background: var(--ind-surface-2, #1d2d38); color: var(--ind-text, #eef5f7); }
+.ui-version-switch > button[aria-pressed="true"] { background: #43d8f1; color: #08212a; }
+html[data-ui-version="classic"] .ui-version-switch > button[aria-pressed="true"] { background: #7ab4ee; color: #0b0c1a; }
+.ui-version-switch > button:focus-visible { outline: 2px solid var(--ind-accent, #43d8f1); outline-offset: 2px; }
+.ui-version-fallback { min-height: 100dvh; padding: 24px; background: var(--ind-bg-0); color: var(--ind-text); font-family: var(--font-sans); }
+.ui-version-fallback p { margin-top: 24px; }
+@media (max-width: 600px) {
+  .ui-version-switch > button { min-height: 36px; padding-inline: 8px; }
+  html[data-ui-version="new"] .plant-console .operations-header {
+    flex-wrap: wrap;
+    height: auto;
+    flex-basis: auto;
+    min-height: 50px;
+    padding-block: 12px;
+    gap: 8px;
+  }
+  html[data-ui-version="new"] .plant-console .operations-header__actions {
+    flex-wrap: wrap;
+    width: 100%;
+    margin-left: 0;
+    padding-right: 0;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+  html[data-ui-version="classic"] .smart-factory-ui > header { flex-wrap: wrap; }
+  html[data-ui-version="classic"] .smart-factory-ui > header > div:last-child { flex-wrap: wrap; gap: 8px; }
+}
+@media (prefers-reduced-motion: reduce) { .ui-version-switch > button { transition: none; } }

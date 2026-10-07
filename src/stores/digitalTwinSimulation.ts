@@ -9,10 +9,12 @@ import { useDigitalTwinStore, pushSensorHistory, commitTick } from "./digitalTwi
 import { STAGE_CONFIGS } from "../components/factory3d/digitalTwinLayout";
 import type { PLCParameter } from "../types";
 import type { PLCOutputs } from "../services/plcService";
+import type { TelemetrySource } from "../services/receivedTelemetry";
 import type {
   ManufacturingStage,
   ProductOnBelt,
   SensorReading,
+  SensorConfig,
   OutputDeviceState,
   StageStatus,
   StageId,
@@ -31,7 +33,9 @@ function drift(current: number, nominal: number, min: number, max: number, volat
   return clamp(current + pull + noise, min, max);
 }
 
-function sensorStatus(value: number, config: { warningThreshold: number; criticalThreshold: number; nominal: number }): "normal" | "warning" | "critical" {
+function sensorStatus(value: number, config: SensorConfig): "normal" | "warning" | "critical" {
+  // Authentication events are informational; an idle scanner is not an alarm.
+  if (config.type === "fingerprint") return "normal";
   const { warningThreshold, criticalThreshold, nominal } = config;
   if (criticalThreshold > nominal) {
     if (value >= criticalThreshold) return "critical";
@@ -562,6 +566,7 @@ function isEffectTriggered(
   sc: typeof STAGE_CONFIGS[number]["sensorConfigs"][number],
   effect: ThresholdEffect,
 ): boolean {
+  if (sc.type === "fingerprint") return false;
   // Single-config evaluation — caller passes the already-looked-up sensor
   // config. Previously walked all of STAGE_CONFIGS per call which was
   // ~64 redundant iterations per tick on the hot path.
@@ -705,6 +710,15 @@ const scenarioFns: Record<string, ScenarioFn> = {
     }
 
     return elapsed >= 10;
+  },
+
+  // Offline-only demonstration of a persistent, serviceable pressure fault.
+  // Never override or relabel live PLC readings to illustrate a maintenance visit.
+  forming_pressure_fault: (elapsed, dt) => {
+    if (plcFeed.active) return true;
+    if (elapsed > 1 && elapsed < 30) forceTo("forming_pressure", 22, 0, 200, 3.0, dt);
+    if (elapsed >= 30 && elapsed < 36) forceTo("forming_pressure", 65, 0, 200, 3.0, dt);
+    return elapsed >= 36;
   },
 
   chemical_spill: (elapsed, dt) => {
@@ -952,6 +966,7 @@ export function stopDigitalTwinSim() {
 }
 
 export function runDigitalTwinScenario(name: string) {
+  if (name === "forming_pressure_fault" && plcFeed.active) return;
   activeScenario = name;
   scenarioStartTime = Date.now();
   useDigitalTwinStore.setState({ activeScenario: name });
@@ -960,10 +975,12 @@ export function runDigitalTwinScenario(name: string) {
 export function setDigitalTwinPLCFeed(
   params: PLCParameter[],
   outputs: PLCOutputs,
+  source?: TelemetrySource,
 ) {
-  const isLivePayload =
+  const isLivePayload = source === undefined ?
     params.length > 6 ||
-    params.some((param) => param.id === "temperature" || !CORE_PLC_IDS.has(param.id));
+    params.some((param) => param.id === "temperature" || !CORE_PLC_IDS.has(param.id))
+    : source === "plc";
 
   if (!isLivePayload) {
     if (plcFeed.active) {
@@ -994,6 +1011,11 @@ export function setDigitalTwinPLCFeed(
     outputs,
   };
 
+  if (plcFeed.active && activeScenario === "forming_pressure_fault") {
+    activeScenario = null;
+    useDigitalTwinStore.setState({ activeScenario: null });
+  }
+
   digitalTwinDebug("PLC feed snapshot applied to digital twin", {
     paramCount: Object.keys(paramValues).length,
     sampleParams: Object.entries(paramValues)
@@ -1012,6 +1034,7 @@ export function isDigitalTwinRunning() {
 
 export const DT_SCENARIOS = [
   { id: "normal_production", label: "Normal Production",  duration: "30s", color: "#22c55e", description: "Steady manufacturing — all sensors nominal" },
+  { id: "forming_pressure_fault", label: "Pressure fault (model only)", duration: "36s", color: "#ef4444", description: "Stop the illustrated line, inspect the molding cell, then recover; unavailable with live PLC input" },
   { id: "chemical_spill",    label: "Chemical Spill",     duration: "25s", color: "#f59e0b", description: "pH & ORP spike at mixing stage" },
   { id: "gas_leak",          label: "Gas Leak",           duration: "20s", color: "#ef4444", description: "MQ gas rises at curing stage" },
   { id: "quality_failure",   label: "Quality Failure",    duration: "28s", color: "#8b5cf6", description: "LiDAR & turbidity drift at QC" },

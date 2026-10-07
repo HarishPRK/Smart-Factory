@@ -1,0 +1,111 @@
+/**
+ * Global Theme — Spatial Industrial Design System
+ * Modern tokens: refined glassmorphism, depth planes, premium typography
+ */
+
+:root {
+  /* ─── Surface & Depth Planes ─── */
+  --color-panel-bg: #1a1830;
+  --color-panel-edge: #2d2952;
+  --color-panel-highlight: rgba(130, 180, 240, 0.05);
+
+  /* Text hierarchy */
+  --color-text-primary: #f4f2ff;
+  --color-text-secondary: #c4bfde;
+  --color-text-muted: #8b84ab;
+  --color-text-dim: #5f587a;
+
+  /* Track & input backgrounds */
+  --color-track-bg: rgba(130, 180, 240, 0.08);
+
+  /* Primary accent — refined blue */
+  --color-primary: #7ab4ee;
+  --color-primary-light: #a4cef5;
+  --color-primary-glow: rgba(122, 180, 238, 0.16);
+
+  /* ISA-101 status — Success */
+  --color-status-success: #4aba78;
+  --color-status-success-light: #6ed89a;
+
+  /* ISA-101 status — Warning */
+  --color-status-warning: #d4921e;
+  --color-status-warning-light: #ebb44d;
+
+  /* ISA-101 status — Alarm */
+  --color-status-danger: #ee3040;
+  --color-status-danger-light: #f06070;
+
+  /* ─── Typography ─── */
+  --font-sans: 'Geist', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Geist Mono', 'JetBrains Mono', monospace;
+
+  --font-size-2xs: 0.6875rem;  /* 11px */
+  --font-size-xs: 0.75rem;     /* 12px */
+  --font-size-sm: 0.875rem;    /* 14px */
+  --font-size-base: 1rem;      /* 16px */
+  --font-size-lg: 1.125rem;    /* 18px */
+  --font-size-xl: 1.5rem;      /* 24px */
+  --font-size-2xl: 2rem;       /* 32px */
+  --font-size-3xl: 2.5rem;     /* 40px */
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --letter-spacing-tight: -0.02em;
+  --letter-spacing-normal: 0;
+  --letter-spacing-wide: 0.06em;
+  --letter-spacing-wider: 0.12em;
+  --letter-spacing-widest: 0.2em;
+
+  --line-height-none: 1;
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+
+  /* ─── Spacing ─── */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 24px;
+  --spacing-2xl: 32px;
+  --spacing-3xl: 48px;
+
+  /* ─── Border Radius (unified rounding) ─── */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+
+  /* ─── Shadows (depth system) ─── */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35), 0 1px 4px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-glow: 0 0 20px rgba(122, 180, 238, 0.12), 0 0 40px rgba(122, 180, 238, 0.06);
+
+  /* ─── Transitions ─── */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-smooth: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
+}
+
+/*
+ * Capture mode — strips heavy effects for screen-sharing
+ */
+body.capture-mode *,
+body.capture-mode *::before,
+body.capture-mode *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+body.capture-mode .glass,
+body.capture-mode .card {
+  box-shadow: none !important;
+}

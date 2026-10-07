@@ -10,12 +10,21 @@ import { useSceneSelectionStore } from "../../stores/sceneSelectionStore";
 import { STAGE_POSITIONS } from "./digitalTwinLayout";
 import { Block } from "./industrialPrimitives";
 import RawMaterialFeed from "./RawMaterialFeed";
+import { readTwinAlarmState, summarizeTwinAlarm } from "./twinAlarmState";
 
-const ClockContext = createContext({ current: { time: 0 } });
+const ClockContext = createContext({ current: { time: 0, alarm: summarizeTwinAlarm([]), reducedMotion: false } });
 export function useLineClock() { return useContext(ClockContext); }
 export function LineClock({ children }: { children: ReactNode }) {
-  const clock = useRef({ time: 0 });
-  useFrame((_, delta) => { const s = useDigitalTwinStore.getState(); clock.current.time = advanceProcessClock(clock.current.time, delta, s.simulationActive && !window.matchMedia("(prefers-reduced-motion: reduce)").matches, s.conveyorSpeedMultiplier); }, -2);
+  const clock = useRef({ time: 0, alarm: summarizeTwinAlarm([]), reducedMotion: false });
+  const motionPreference = useMemo(() => window.matchMedia("(prefers-reduced-motion: reduce)"), []);
+  useFrame((_, delta) => {
+    const s = useDigitalTwinStore.getState();
+    clock.current.alarm = readTwinAlarmState();
+    clock.current.reducedMotion = motionPreference.matches;
+    clock.current.time = advanceProcessClock(clock.current.time, delta,
+      s.simulationActive && !clock.current.reducedMotion,
+      s.conveyorSpeedMultiplier, clock.current.alarm, s.userSpeedMultiplier);
+  }, -2);
   return <ClockContext.Provider value={clock}>{children}</ClockContext.Provider>;
 }
 
@@ -86,7 +95,7 @@ export function ProcessReadout() {
     const [start, end] = STATION_WINDOWS[selected];
     const product = phase === null ? null : sampleProduct(start + phase * (end - start));
     const progress = product?.phase === "Liquid filling" ? product.fill : product?.phase === "Stretch & blow" ? product.expansion : product?.phase === "Cooling / conditioning" ? product.cooled : null;
-    label.current.textContent = selected === "intake" ? "PET resin / metered feed" : product ? `${product.phase}${progress === null ? "" : ` · ${Math.round(progress * 100)}%`}` : "Waiting for next item";
+    label.current.textContent = clock.current.alarm.lineStopped ? "Production paused · threshold interlock" : selected === "intake" ? "PET resin / metered feed" : product ? `${product.phase}${progress === null ? "" : ` · ${Math.round(progress * 100)}%`}` : "Waiting for next item";
   });
   if (!selected) return null;
   const [x, , z] = STAGE_POSITIONS[selected];

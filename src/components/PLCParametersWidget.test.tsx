@@ -39,6 +39,7 @@ beforeEach(() => {
   vi.stubGlobal("cancelAnimationFrame", vi.fn());
   usePLCStore.setState({
     params: [voltageParam(1.1)],
+    telemetrySource: "plc", lastReceivedAt: Date.now(), receivedHistories: {},
     rfidAuthorized: false,
     rfidOverride: null,
   });
@@ -60,8 +61,8 @@ describe("PLCParametersWidget live values", () => {
     expect(within(channels).getAllByText("—")).toHaveLength(8);
     expect(within(channels).getAllByText("No reading")).toHaveLength(8);
     expect(screen.getByText("0 / 8 received")).toBeTruthy();
-    expect(screen.getByText("Awaiting payload")).toBeTruthy();
-    expect(screen.getByText("Hardware link unavailable")).toBeTruthy();
+    expect(screen.getByText("Waiting for the controller")).toBeTruthy();
+    expect(screen.getByText("Received values only · no model data")).toBeTruthy();
     expect(screen.queryByText("Latest PLC readings")).toBeNull();
     const digital = screen.getByLabelText("Supported digital channels");
     expect(within(digital).getByText("Relay")).toBeTruthy();
@@ -97,15 +98,13 @@ describe("PLCParametersWidget live values", () => {
     expect(within(card).queryByText("0.0")).toBeNull();
   });
 
-  it("labels and preserves the complete RFID simulation override cycle", () => {
+  it("keeps the RFID simulation override out of received telemetry", () => {
+    usePLCStore.setState({ params: [{ id: "operator_rfid", label: "RFID authorization", kind: "digital", active: false, placeholder: false, status: "normal", accentHex: "#43d8f1" }], rfidOverride: true });
     render(<PLCParametersWidget />);
-    fireEvent.click(screen.getByRole("button", { name: "Test gate" }));
+    expect(screen.getByText("Locked · Awaiting badge")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Test gate" })).toBeNull();
+    expect(screen.queryByText("Badge authorized")).toBeNull();
     expect(usePLCStore.getState().rfidOverride).toBe(true);
-    expect(screen.getByText("Test override active · Simulation gate")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Test: On" }));
-    expect(usePLCStore.getState().rfidOverride).toBe(false);
-    fireEvent.click(screen.getByRole("button", { name: "Test: Off" }));
-    expect(usePLCStore.getState().rfidOverride).toBeNull();
   });
 
   it("keeps absent digital readings unavailable and preserves real toggle commands", () => {
@@ -129,6 +128,26 @@ describe("PLCParametersWidget live values", () => {
     expect(screen.getByText("1.1")).toBeTruthy();
     expect(screen.getByText("Last received PLC readings")).toBeTruthy();
     expect(screen.queryByText("Latest PLC readings")).toBeNull();
+  });
+
+  it("rejects simulation parameters even if a service reports connected", () => {
+    usePLCStore.setState({ params: [voltageParam(5.5)], telemetrySource: "simulation", lastReceivedAt: null });
+    render(<PLCParametersWidget />);
+    expect(screen.queryByText("5.5")).toBeNull();
+    expect(screen.getByText("0 / 8 received")).toBeTruthy();
+    expect(screen.getByText("Offline")).toBeTruthy();
+    expect(screen.getByText("Awaiting RFID input")).toBeTruthy();
+  });
+
+  it("marks a silent channel stale while other controller inputs stay connected", () => {
+    usePLCStore.setState({ params: [{ ...voltageParam(4.3), receivedAt: Date.now() - 20_000 }], lastReceivedAt: Date.now() });
+    render(<PLCParametersWidget />);
+    const card = screen.getByText("Voltage").closest(".pi-reading");
+    if (!(card instanceof HTMLElement)) throw new Error("Voltage card not found");
+    expect(within(card).getByText("4.3")).toBeTruthy();
+    expect(within(card).getByText("Last received")).toBeTruthy();
+    expect(within(card).queryByText("Normal")).toBeNull();
+    expect(screen.getByText("Connected")).toBeTruthy();
   });
 
   it("distinguishes live relay alarms from connection loss", () => {

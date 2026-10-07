@@ -1,6 +1,8 @@
 import type { PLCParameter } from "../types";
 import { plcParameters } from "../data/mockData";
+import type { TelemetrySource } from "./receivedTelemetry";
 import { latencyMonitor } from "./latencyMonitor";
+import { fireSensorStatus } from "./safetyThresholds";
 
 /* ── PLC telemetry topics ────────────────────────────────
  * The PLC publishes its data split across per-source subtopics of this base
@@ -162,7 +164,14 @@ export interface RawPLCPayload {
  * broadcast the raw object to any interested subscriber before the sensor
  * parser reduces it to typed PLCParameter rows. Used by the OEE dashboard.
  */
-type RawPLCPayloadListener = (payload: RawPLCPayload) => void;
+export interface RawPLCReceipt {
+  source: "plc";
+  /** Time of the incoming transport slice, not a new sample for every cached key. */
+  receivedAt: number;
+  /** Receipt time of each physical raw field in the persistent merged payload. */
+  keyReceivedAt: Readonly<Record<string, number>>;
+}
+type RawPLCPayloadListener = (payload: RawPLCPayload, receipt?: RawPLCReceipt) => void;
 const rawPLCPayloadListeners = new Set<RawPLCPayloadListener>();
 
 export function subscribeRawPLCPayload(cb: RawPLCPayloadListener): () => void {
@@ -172,8 +181,8 @@ export function subscribeRawPLCPayload(cb: RawPLCPayloadListener): () => void {
   };
 }
 
-function emitRawPLCPayload(payload: RawPLCPayload) {
-  for (const cb of rawPLCPayloadListeners) cb(payload);
+function emitRawPLCPayload(payload: RawPLCPayload, receipt: RawPLCReceipt) {
+  for (const cb of rawPLCPayloadListeners) cb(payload, receipt);
 }
 
 /* ── KOS topic broadcaster ───────────────────────────────
@@ -261,6 +270,9 @@ export interface PLCOutputs {
 export interface PLCState {
   params: PLCParameter[];
   outputs: PLCOutputs;
+  /** Receipt provenance is set by the transport, never inferred from channel count. */
+  source?: TelemetrySource;
+  receivedAt?: number;
 }
 
 export const DEFAULT_OUTPUTS: PLCOutputs = {
@@ -453,6 +465,8 @@ function analogParam(config: {
   warningFrac?: number;
   /** Optional override for the critical trigger. Default 0.4. */
   criticalFrac?: number;
+  /** Explicit semantics for inputs that are not symmetric deviations from nominal. */
+  status?: PLCParameter["status"];
 }): PLCParameter {
   return {
     id: config.id,
@@ -466,7 +480,7 @@ function analogParam(config: {
     decimals: config.decimals,
     accentHex: config.accentHex,
     status: config.hasReal
-      ? deriveStatus(
+      ? config.status ?? deriveStatus(
           config.value,
           config.nominal,
           config.min,
@@ -518,8 +532,42 @@ export function isRawPLCPayload(data: unknown): data is RawPLCPayload {
   ].some((key) => raw[key] !== undefined);
 }
 
-/** Map the raw MQTT JSON from plc/data into our frontend PLCState. */
-export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLCState {
+const PARAM_PAYLOAD_KEYS: Record<string, string[]> = {
+  voltage: ["boardA_voltage_pot_1", "voltage_pot"],
+  current: ["boardA_current_pot", "current_pot"],
+  temperature: ["boardA_temperature", "boardB_esp32_temperature", "temperature"],
+  ph: ["boardA_ph_sensor", "pH"],
+  mixing_ph: ["boardA_ph_sensor", "pH"],
+  photoE: ["boardA_photoelectric_sensor", "photoE_sensor"],
+  metal: ["boardA_metal_sensor", "boardB_io_metal_sensor", "metal_sensor"],
+  operator_rfid: ["boardA_rfid_authorized_user", "rfid_authorized_user", "rfid_authorized", "rfid_authorised", "rfidAuthorized", "rfid", "authorized", "badge"],
+  system_emergency_stop: ["system_was_in_emergency_stop_state"],
+  relay: ["boardA_relay_motor", "boardA_relay_alarm", "boardA_alert_relays_red", "boardB_io_output_red", "boardA_alert_relays_yellow", "boardB_io_output_yellow", "boardA_alert_relays_green", "boardB_io_output_green", "boardA_alert_relays_buzzer", "boardB_io_output_buzzer"],
+  forming_pressure: ["boardA_pressure_sensor", "boardB_esp32_pressure"],
+  pkg_pressure: ["boardA_pressure_sensor", "boardB_esp32_pressure"],
+  curing_motion: ["boardA_microwave_motion_sensor", "boardB_esp32_touch_event"],
+  pkg_motion: ["boardA_microwave_motion_sensor", "boardB_esp32_touch_event"],
+  mixing_mq: ["boardA_metaloxide_sensor", "boardB_esp32_bme_gas", "boardB_esp32_voc", "boardB_esp32_co", "boardB_esp32_no2", "boardB_esp32_alcohol"],
+  curing_mq: ["boardA_metaloxide_sensor", "boardB_esp32_bme_gas", "boardB_esp32_voc", "boardB_esp32_co", "boardB_esp32_no2", "boardB_esp32_alcohol"],
+  mixing_turbidity: ["boardA_turbidity_sensor"],
+  quality_turbidity: ["boardA_turbidity_sensor"],
+  forming_light: ["boardA_light_sensor"],
+  quality_light: ["boardA_light_sensor"],
+  mixing_orp: ["boardA_orp_sensor"],
+  curing_o2: ["boardB_esp32_oxygen_percent"],
+  quality_lidar: ["boardB_esp32_distance_cm"],
+  intake_lidar: ["boardB_esp32_distance_cm"],
+  intake_fingerprint: ["boardB_esp32_finger_match", "boardB_esp32_finger_conf", "boardB_esp32_finger_id"],
+  dispatch_fingerprint: ["boardB_esp32_finger_match", "boardB_esp32_finger_conf", "boardB_esp32_finger_id"],
+  pkg_water: ["boardB_analog_8ch_b_water_leakage_sensor", "boardB_esp32_water"],
+  fire: ["boardB_analog_8ch_b_fire_sensor"],
+  intake_gps: ["boardA_voltage_pot_2"],
+  dispatch_gps: ["boardA_voltage_pot_2"],
+};
+
+/** Map the raw MQTT JSON from plc/data into our frontend PLCState. Transport
+ * key timestamps preserve source freshness while partial board frames merge. */
+export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null, receipt?: { keyReceivedAt: Record<string, number> }): PLCState {
   const prevState = prev ?? null;
   const debugEvents: string[] = [];
 
@@ -583,9 +631,12 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
       "authorized",
       "badge",
     ],
-    prevState?.outputs.rfidAuthorized ?? false,
-    prevState?.outputs.rfidAuthorized !== undefined,
+    prevBit(prevState, "operator_rfid", false),
+    prevKnown(prevState, "operator_rfid"),
   );
+  // Preserve received badge feedback for telemetry. The existing operational
+  // latch below remains separate and continues to govern the twin unchanged.
+  const receivedRfidAuthorization = { ...rfidAuthorized };
   // Latch logic is applied below (after alert/buzzer reads) so an explicit
   // operator E-stop can still clear authorization. The firmware transiently
   // republishes rfid_authorized=0 when the physical green start button is
@@ -814,8 +865,8 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
     prevKnown(prevState, "pkg_water"),
     (value) => (value <= 1 ? value : scaleLinear(value, 0, 5000, 0, 1)),
   );
-  // Fire / smoke detector (boardB_analog_8ch_b_fire_sensor). Raw ADC on a
-  // 12-bit channel — values ≥ ~3000 indicate smoke / flame.
+  // Fire / smoke detector: high = safe, low = hazard. Normalize the 12-bit
+  // ADC to 0–100 before applying <=50 hazard / <=60 warning boundaries.
   const fire = readScaledSignal(
     raw,
     ["boardB_analog_8ch_b_fire_sensor"],
@@ -1027,6 +1078,13 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
       hasReal: systemEmergencyStop.hasReal,
       accentHex: "#ef4444",
     }),
+    digitalParam({
+      id: "operator_rfid",
+      label: "Operator RFID",
+      active: receivedRfidAuthorization.value,
+      hasReal: receivedRfidAuthorization.hasReal,
+      accentHex: "#43d8f1",
+    }),
     analogParam({
       id: "temperature",
       label: "Temperature",
@@ -1236,15 +1294,11 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
       unit: "",
       min: 0,
       max: 100,
-      // Inverted semantics: high reading = safe, low reading = smoke / flame.
-      // Nominal sits near the top of the range and the wide tolerance keeps
-      // the param GREEN in the normal "no fire" band; readings only flag
-      // critical once they drop below ~60 (i.e. real smoke detection).
+      // High is safe; use explicit inclusive thresholds instead of deviation.
       nominal: 95,
       decimals: 0,
       accentHex: "#ef4444",
-      warningFrac: 0.20,
-      criticalFrac: 0.35,
+      status: fireSensorStatus(fire.value),
     }),
     analogParam({
       id: "intake_gps",
@@ -1293,6 +1347,8 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
       nominal: 1,
       decimals: 1,
       accentHex: "#10b981",
+      // Zero means no scan yet, not a production or safety fault.
+      status: "normal",
     }),
     analogParam({
       id: "dispatch_fingerprint",
@@ -1305,6 +1361,7 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
       nominal: 1,
       decimals: 1,
       accentHex: "#10b981",
+      status: "normal",
     }),
   ];
 
@@ -1324,6 +1381,21 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
   }
 
   const now = Date.now();
+  for (const param of params) {
+    if (param.placeholder) continue;
+    const keys = PARAM_PAYLOAD_KEYS[param.id] ?? [];
+    const receivedKeys = keys.filter((key) => {
+      const value = scalar(raw[key]);
+      return value !== null && value !== -1;
+    });
+    const selectedKey = receivedKeys[0];
+    // Relay feedback is an aggregate of independent bits; any real bit can
+    // refresh that aggregate. Scalar channels retain parser key priority.
+    const receivedAt = param.id === "relay" && receipt && receivedKeys.length > 0
+      ? Math.max(...receivedKeys.map((key) => receipt.keyReceivedAt[key] ?? 0))
+      : selectedKey ? receipt?.keyReceivedAt[selectedKey] ?? (receipt ? undefined : now) : undefined;
+    param.receivedAt = receivedAt ?? prevParam(prevState, param.id)?.receivedAt;
+  }
   if (PLC_DEBUG && now - lastPLCParseLogAt > 1000) {
     lastPLCParseLogAt = now;
     plcDebug("Parsed plc/data payload", {
@@ -1354,6 +1426,8 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
 
   return {
     params,
+    source: "plc",
+    receivedAt: now,
     outputs: {
       motorFanOn: motorRelay.value,
       emergencyLightOn:
@@ -1374,6 +1448,7 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
 /* ── Interface ─────────────────────────────────────────── */
 
 export interface PLCService {
+  readonly telemetrySource?: TelemetrySource;
   subscribe(onUpdate: (state: PLCState) => void): () => void;
   sendCommand(deviceId: string, command: Record<string, unknown>): Promise<void>;
   fetchCurrentState(): Promise<PLCState>;
@@ -1382,6 +1457,7 @@ export interface PLCService {
 /* ── Mock implementation ──────────────────────────────── */
 
 export class MockPLCService implements PLCService {
+  readonly telemetrySource = "simulation" as const;
   private params: PLCParameter[] = plcParameters.map((p) => ({ ...p }));
   private outputs: PLCOutputs = {
     ...DEFAULT_OUTPUTS,
@@ -1442,7 +1518,7 @@ export class MockPLCService implements PLCService {
   }
 
   private getState(): PLCState {
-    return { params: [...this.params], outputs: { ...this.outputs } };
+    return { params: [...this.params], outputs: { ...this.outputs }, source: "simulation" };
   }
 
   private notify() {
@@ -1454,6 +1530,7 @@ export class MockPLCService implements PLCService {
 /* ── IoT Core Direct (browser → MQTT/WSS → IoT Core) ── */
 
 export class IoTCorePLCService implements PLCService {
+  readonly telemetrySource = "plc" as const;
   private client: import("mqtt").MqttClient | null = null;
   private listeners: Set<(state: PLCState) => void> = new Set();
   private lastState: PLCState | null = null;
@@ -1464,6 +1541,7 @@ export class IoTCorePLCService implements PLCService {
   // fallbacks (MQ gas, pressure) then alternate between different physical
   // sensors on every message.
   private mergedRaw: RawPLCPayload = {};
+  private rawReceivedAt: Record<string, number> = {};
   private hasUnflushed = false;
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly endpoint: string;
@@ -1573,6 +1651,8 @@ export class IoTCorePLCService implements PLCService {
       this.client.on("message", (topic: string, payload: Buffer) => {
         try {
           const incoming = JSON.parse(payload.toString()) as RawPLCPayload;
+          const receivedAt = Date.now();
+          for (const key of Object.keys(incoming)) this.rawReceivedAt[key] = receivedAt;
           emitAnyMessage(topic, incoming);
           // Fold this slice into the persistent union. Fresh object each time
           // so subscribers holding the previous frame never see it mutate.
@@ -1592,7 +1672,7 @@ export class IoTCorePLCService implements PLCService {
           // KPI tiles) before the sensor parser reduces it. plc/data carries the
           // shift-rollup OEE fields alongside the sensor channels, so this must
           // fire on the IoTCore path too — not just the Mosquitto bridge path.
-          emitRawPLCPayload(this.mergedRaw);
+          emitRawPLCPayload(this.mergedRaw, { source: "plc", receivedAt, keyReceivedAt: { ...this.rawReceivedAt } });
 
           // Coalesce ~20 ms of arrivals into one parse/render — bounded, so no
           // perceptible delay is added; matches the Mosquitto bridge path.
@@ -1601,7 +1681,7 @@ export class IoTCorePLCService implements PLCService {
               this.flushTimer = null;
               if (!this.hasUnflushed) return;
               this.hasUnflushed = false;
-              const state = parsePLCPayload(this.mergedRaw, this.lastState);
+              const state = parsePLCPayload(this.mergedRaw, this.lastState, { keyReceivedAt: this.rawReceivedAt });
               this.lastState = state;
               this.listeners.forEach((cb) => cb(state));
             }, 20);
@@ -1709,6 +1789,7 @@ function toHex(buf: Uint8Array): string {
 /* ── AWS implementation (API Gateway + IoT Core) ──────── */
 
 export class AWSPLCService implements PLCService {
+  readonly telemetrySource = "plc" as const;
   private ws: WebSocket | null = null;
   private listeners: Set<(state: PLCState) => void> = new Set();
   private lastState: PLCState | null = null;
@@ -1765,7 +1846,7 @@ export class AWSPLCService implements PLCService {
     if (!res.ok) {
       throw new Error(`Fetch state failed: ${res.status}`);
     }
-    return res.json();
+    return { ...(await res.json() as PLCState), source: "plc", receivedAt: Date.now() };
   }
 
   private connect() {
@@ -1784,7 +1865,7 @@ export class AWSPLCService implements PLCService {
             if (!this.pendingData) return;
             const state = this.pendingIsRaw
               ? parsePLCPayload(this.pendingData as RawPLCPayload, this.lastState)
-              : this.pendingData as PLCState;
+              : { ...(this.pendingData as PLCState), source: "plc" as const, receivedAt: Date.now() };
             this.pendingData = null;
             this.lastState = state;
             this.listeners.forEach((cb) => cb(state));
@@ -1835,6 +1916,7 @@ function createCommandRequestId(): string {
 }
 
 export class MosquittoPLCService implements PLCService {
+  readonly telemetrySource = "plc" as const;
   private ws: WebSocket | null = null;
   private listeners: Set<(state: PLCState) => void> = new Set();
   private lastState: PLCState | null = null;
@@ -1844,6 +1926,7 @@ export class MosquittoPLCService implements PLCService {
   // IoTCorePLCService.mergedRaw. Resetting this per flush made cross-board
   // fallback signals (MQ gas, pressure) alternate between physical sensors.
   private mergedRaw: RawPLCPayload = {};
+  private rawReceivedAt: Record<string, number> = {};
   private hasUnflushed = false;
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private pendingCommands = new Map<
@@ -1979,6 +2062,8 @@ export class MosquittoPLCService implements PLCService {
         }
 
         if (!msg.topic || !isPLCDataTopic(msg.topic)) return;
+        const receivedAt = Date.now();
+        for (const key of Object.keys(msg.payload as RawPLCPayload)) this.rawReceivedAt[key] = receivedAt;
 
         // Latency measurement: the bridge stamps `publishedAt` (epoch ms) on
         // the WS envelope when it forwards PLC data. Gives the local
@@ -1993,7 +2078,7 @@ export class MosquittoPLCService implements PLCService {
 
         // Broadcast the raw payload to non-sensor subscribers (OEE dashboard,
         // KPI tiles) before the sensor parser reduces it.
-        emitRawPLCPayload(this.mergedRaw);
+        emitRawPLCPayload(this.mergedRaw, { source: "plc", receivedAt, keyReceivedAt: { ...this.rawReceivedAt } });
 
         // Flush within ~20 ms. Intentionally aggressive — PLCContext has its
         // own rAF coalesce layer above this that bundles rapid successive
@@ -2006,7 +2091,7 @@ export class MosquittoPLCService implements PLCService {
             this.flushTimer = null;
             if (!this.hasUnflushed) return;
             this.hasUnflushed = false;
-            const state = parsePLCPayload(this.mergedRaw, this.lastState);
+            const state = parsePLCPayload(this.mergedRaw, this.lastState, { keyReceivedAt: this.rawReceivedAt });
             this.lastState = state;
             this.listeners.forEach((cb) => cb(state));
           }, 20);
