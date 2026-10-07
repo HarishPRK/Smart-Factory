@@ -4,6 +4,7 @@ import type { PLCParameter } from "../types";
 import { usePLCContext } from "../context/PLCContext";
 import { usePLCStore } from "../stores/plcStore";
 import ThreePhaseMotorWidget from "./ThreePhaseMotorWidget";
+import ParameterMicroviz from "./ParameterMicroviz";
 import "../plc-instruments.css";
 
 type FlashDir = "up" | "down" | null;
@@ -77,7 +78,7 @@ function ControllerMap({ connected, hasSamples }: { connected: boolean; hasSampl
   </div>;
 }
 
-function AnalogCard({ param }: { param: PLCParameter }) {
+export function AnalogCard({ param }: { param: PLCParameter }) {
   const valid = hasReading(param);
   const value = valid ? param.value! : 0;
   const min = param.min ?? 0, max = param.max ?? 100;
@@ -85,9 +86,13 @@ function AnalogCard({ param }: { param: PLCParameter }) {
   const pct = range > 0 ? Math.max(0, Math.min(1, (value - min) / range)) : 0;
   const nominal = param.nominal !== undefined && range > 0 ? Math.max(0, Math.min(1, (param.nominal - min) / range)) : null;
   const flash = useChangeFlash(value, range);
-  return <div className="card-inner pi-reading" data-channel={param.id} data-state={valid ? param.status : "unavailable"} data-change={flash}>
-    <div className="pi-reading__top"><span className="pi-reading__label" title={param.label}>{LABELS[param.id] ?? param.label}</span><span className="pi-signal" title={valid ? STATUS[param.status] : "No reading"}><i /><span className={valid ? undefined : "sr-only"}>{valid ? STATUS[param.status] : "No reading"}</span></span></div>
-    <div className="pi-reading__amount"><strong>{valid ? value.toFixed(param.decimals ?? 1) : "—"}</strong><span>{param.unit}</span></div>
+  const formattedValue = valid ? value.toFixed(param.decimals ?? 1) : "—";
+  return <div className="card-inner pi-reading" data-channel={param.id} data-state={valid ? param.status : "unavailable"} data-change={flash} data-long-value={formattedValue.length > 5}>
+    <div className="pi-reading__top"><span className="pi-reading__label" title={param.label}>{LABELS[param.id] ?? param.label}</span><span className="pi-signal" aria-hidden="true"><i /></span></div>
+    <div className="pi-reading__face">
+      <div className="pi-reading__amount"><strong>{formattedValue}</strong><span>{param.unit}</span></div>
+      <div className="pi-reading__visual"><ParameterMicroviz param={param} /><span className="pi-reading__status">{valid ? STATUS[param.status] : "No reading"}</span></div>
+    </div>
     <div className="pi-range" title={`Range ${min}–${max} ${param.unit ?? ""}${param.nominal === undefined ? "" : ` · Nominal ${param.nominal}`}`}>
       {valid && <span style={{ width: `${pct * 100}%` }} />}{nominal !== null && <i style={{ left: `${nominal * 100}%` }} />}
     </div>

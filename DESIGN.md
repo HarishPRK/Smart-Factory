@@ -80,9 +80,9 @@ typography:
     letterSpacing: "0.01em"
   measurement:
     fontFamily: "'Inter Variable', Inter, system-ui, sans-serif"
-    fontSize: "24px"
-    fontWeight: 500
-    lineHeight: 1
+    fontSize: "26px"
+    fontWeight: 550
+    lineHeight: 1.2
     letterSpacing: "-0.025em"
   inspector-reading:
     fontFamily: "'Geist Mono', 'JetBrains Mono', monospace"
@@ -169,8 +169,9 @@ components:
     rounded: "{rounded.control}"
     padding: "0 9px"
   sensor-face:
-    backgroundColor: "transparent"
-    padding: "9px 10px 6px"
+    backgroundColor: "#152731"
+    rounded: "{rounded.card}"
+    padding: "12px 11px 11px"
   button-langgraph:
     backgroundColor: "#18333e"
     textColor: "{colors.primary-hover}"
@@ -256,7 +257,7 @@ Cyan indicates interaction; neutral slate supports dense information; status and
 - **Body:** compact explanations and source disclosures use the `body` scale. Launcher descriptions remain in title tooltips.
 - **Label:** KPI and workspace names share the 11px, weight-650 `metric-label` role. LoRaWAN readings use 12px at weight 550; state and source metadata generally uses 9–11px.
 - **Metric:** KPI values use the 24px, weight-600 `metric` role at every breakpoint.
-- **Measurement:** analog sensor values use `measurement`. Power monitor values use Inter at 17px for primary phase values, 11px for additional V/A/W readings, and 20px for totals.
+- **Measurement:** analog sensor values use the full-width, tabular 26px `measurement` role with separate 10px units. Formatted readings longer than five characters reduce to 22px. Power monitor values use Inter at 17px for primary phase values, 11px for additional V/A/W readings, and 20px for totals.
 - **Inspector reading:** the existing compact mono reading uses `inspector-reading`.
 
 **The Stable Reading Rule.** Use tabular numerals, keep units separate, and display missing measurements as unavailable rather than zero.
@@ -282,10 +283,12 @@ Analytics is a bounded dialog up to 1220px wide, with independently scrolling co
 
 ## Elevation & Depth
 
-Ordinary instruments are flat, with surface shifts and fine borders. Hover brightens a card and its border without a lift. Floating labels, settings, dialogs, and drawers use soft black shadows; docked inspectors remove their overlay shadow.
+KPI cards and ordinary containers are flat, with surface shifts and fine borders. Hover brightens a card and its border without a lift. Analog sensor tiles use a restrained beveled surface and recessed reading face; their hover preserves the same surface and position. Floating labels, settings, dialogs, and drawers use soft black shadows; docked inspectors remove their overlay shadow.
 
 ### Shadow Vocabulary
 
+- **Analog tile bevel:** `inset 0 1px 0 #ffffff0a, 0 3px 7px #05121924`.
+- **Recessed analog face:** `inset 0 2px 4px #0310164d, inset 0 -1px 0 #ffffff0a`.
 - **Machine label:** `0 3px 10px #00000040`.
 - **Floating settings / inspector:** `0 9px 28px #00000040`.
 - **Analytics dialog:** `0 22px 76px #0008`.
@@ -293,11 +296,11 @@ Ordinary instruments are flat, with surface shifts and fine borders. Hover brigh
 
 The model uses cast shadows, local environment reflections on equipment, warm key light, and restrained cool fill to preserve painted colors. Floor, slab edges, and stage pads are fully matte: metalness 0, roughness 1, and environment-map intensity 0. The charcoal floor uses a deterministic 256px aggregate color-and-bump texture pair, repeated 12 by 8 with bump scale 0.018, plus flush low-contrast control joints. It has no environment reflection, while contact shadows remain. Powder-coated machine paint uses MeshStandardMaterial with metalness 0.05, roughness at least 0.72, environment intensity 0.35, and no clearcoat. Exposed neutral steel has a satin finish with roughness around 0.46–0.58. Repeated hardware and flooring retain standard materials; small hardware is instanced. High and Ultra quality add N8AO contact depth, ACES tone mapping, and SMAA. Balanced and Efficient omit that postprocessing stack. High uses half-resolution AO; Ultra uses full-resolution, higher-quality AO.
 
-**The Physical Depth Rule.** Let lighting explain machinery, keep concrete matte, and reserve interface shadows for floating layers.
+**The Physical Depth Rule.** Let lighting explain machinery, keep concrete matte, and reserve prominent interface shadows for floating layers.
 
 ## Shapes
 
-Major KPI cards, actuator cards, the twin, and docked inspectors use 12px corners. PLC containers and Analytics use 14px; analog grids use 8px; the power monitor uses 9px. Controls and badges use smaller 4–7px corners. Analog instruments share a bounded two-column grid, expanding to four columns between 600px and 960px, while digital I/O uses separated rows.
+Major KPI cards, actuator cards, analog sensor tiles, the twin, and docked inspectors use 12px corners. PLC containers and Analytics use 14px; the power monitor uses 9px. Controls and badges use smaller 4–7px corners. Analog instruments are individual tiles with 10px gaps in two columns, expanding to four columns only between 720px and 960px. Their recessed reading faces use 7px corners; digital I/O retains separated rows.
 
 The factory remains a cutaway slab with machine pads, rear service wall, utility racks, safety fences, and conveyor geometry. The former floor title and header PET tag are removed. Colored equipment is authored geometry, not a raster replacement. Service panels, louvers, guard frames, bolted flanges, anchor feet, fan grilles, and hoses add physical specificity while keeping process internals visible.
 
@@ -319,7 +322,11 @@ Metric instruments pair a 24px tinted icon tile with a title and change chip, th
 
 Workspace launchers share the KPI surface, 24px tinted icon tile, and 11px title scale. Each tool places a word-free 112px by 28px destination diagram at the lower left and a 22px tinted launch affordance at the lower right. These static diagrams explain the destination without claiming counts, activity, or telemetry. Functional descriptions stay in title tooltips. All thirteen actions remain available, including LangGraph AI. LoRaWAN uses a static 40px by 28px radio drawing beside its 12px reading: reported average moisture, reported average temperature, or device count. It excludes values flagged as simulated gap fills. Before the first packet, its reading is Awaiting data and its status is Waiting; received packets use Received, while an actual battery reading below 3.3V uses Low battery. Its custom accessible label retains the full source-qualified values and units, and the card opens the full drawer.
 
-PLC telemetry begins with a controller-link schematic and explicit connected, unavailable, awaiting-payload, or last-received wording. Operator access, analog sensors, digital I/O, and a full-width three-phase power monitor follow. Eight supported analog faces remain visible: voltage, current, pH, pressure, MQ gas, turbidity, light, and ORP. Channel-colored labels and 5px square swatches remain visible offline, and range tracks mix the channel color at 38% with #263d49. Unavailable readings show neutral #93aebb dashes; scales and nominal markers are configuration rather than samples. Warning and critical fills stay separate from channel identity. The received count and key explain availability. The power monitor includes a phase schematic and per-phase V/A/W readings. Last received values are identified when disconnected. Hardware command handlers remain intact; RFID testing stays labeled as a test override.
+PLC telemetry begins with a controller-link schematic and explicit connected, unavailable, awaiting-payload, or last-received wording. Operator access, analog sensors, digital I/O, and a full-width three-phase power monitor follow. Eight supported analog faces remain visible before data arrives: voltage, current, pH, pressure, MQ gas, turbidity, light, and ORP. Relay, photoelectric, and metal-detection rows also remain present without received values. Channel-colored labels and 5px square swatches remain visible offline, and 3px range tracks mix the channel color at 26% with #263d49. Unavailable analog and digital readings show neutral dashes; the relay explicitly shows No reading. Known normal analog readings display Normal; Normal, warning/critical, and No reading labels sit below the value beside the instrument graphic. Scales, nominal markers, and visible nominal numbers (for example, 5 nom) remain configuration rather than samples. Relay Alarm remains distinct from an unavailable hardware link. Warning and critical fills stay separate from channel identity. The received count and key explain availability. The power monitor includes a phase schematic and per-phase V/A/W readings. Last received values are identified when disconnected. Hardware telemetry starts unknown, and hardware hooks and snapshot fallbacks supply no sample telemetry. Hardware command handlers remain intact; RFID testing stays labeled as a test override.
+
+Each analog tile uses a recessed full-width numeric face over a 58px by 36px dimensional SVG instrument: extruded voltage bars, current rails, calibrated pH tiles, a pressure dial, gas beads, a turbidity vessel, a light lens, or bipolar ORP. The latest valid sample controls position within its configured range; these graphics do not depict history. Instrument shapes and configured references remain visible when unavailable, with no sample fill or marker. Minimum, nominal, and maximum labels anchor the range below. CSS shading and SVG faces provide the requested physical depth within the dark cyan system, without WebGL or new dependencies.
+
+The meter dialog is titled Aituzero Smart Meter, without an unconditional Simulation label. It embeds `/widgets/aituzero-meter/index.html` explicitly so the meter entry document loads instead of the dashboard SPA fallback.
 
 The Sensor monitor is visible by default in the existing sidebar above PLC telemetry. Its named toggle lives in the twin heading and exposes the current expanded state. The panel contains 34 sensor readings across seven stage groups, in rows at least 44px high, inside an independently scrolling area capped at 460px on desktop and 360px at 700px and below. Sim identifies modeled values and Live identifies PLC input; missing values use neutral dashes and no source badge. The 48px by 18px trends use the most recent 24 stored history samples, break across invalid values, and show a neutral rule when fewer than two valid samples exist. Process interlocks separately report Clear, Triggered, or neutral Unavailable with Sim, Live, or Mixed source qualification when known. Selecting a reading focuses its station and replaces the monitor with the stage inspector; returning to the whole line restores the monitor. Closing the monitor returns keyboard focus to its toggle. If no sidebar inspector host is available, the panel uses a bounded overlay inside the twin.
 

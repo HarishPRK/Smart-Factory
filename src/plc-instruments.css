@@ -41,8 +41,9 @@
 .plc-instruments .pi-section-title h4 { display: flex; gap: 7px; align-items: center; margin: 0; font-size: 12px; font-weight: 600; color: #dbe8ee; }
 .plc-instruments .pi-section-title h4 svg { color: #9cb4c2; }
 .plc-instruments .pi-section-title > span { color: #aec3ce; font-size: 9px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.plc-instruments .pi-analog-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 0; border: 1px solid #3a5260; border-radius: 8px; overflow: hidden; background: #11212a; }
-.plc-instruments .pi-reading.card-inner { --pi-channel: #43d8f1; padding: 9px 10px 6px; border: 0; border-radius: 0; background: transparent; box-shadow: none; min-width: 0; position: relative; }
+.plc-instruments .pi-analog-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+.plc-instruments .pi-reading.card-inner { --pi-channel: #43d8f1; padding: 12px 11px 11px; border: 1px solid color-mix(in srgb, var(--pi-channel) 19%, #263d49); border-radius: 12px; background: linear-gradient(145deg, color-mix(in srgb, var(--pi-channel) 7%, #21323d), #152731 65%); box-shadow: inset 0 1px 0 #ffffff0a, 0 3px 7px #05121924; min-width: 0; position: relative; }
+.plc-instruments .pi-reading.card-inner:hover { transform: none; border-color: color-mix(in srgb, var(--pi-channel) 19%, #263d49); background: linear-gradient(145deg, color-mix(in srgb, var(--pi-channel) 7%, #21323d), #152731 65%); box-shadow: inset 0 1px 0 #ffffff0a, 0 3px 7px #05121924; }
 /* Channel identity stays visible before telemetry arrives; alarm colors remain separate. */
 .plc-instruments .pi-reading[data-channel="voltage"] { --pi-channel: #f2ad67; }
 .plc-instruments .pi-reading[data-channel="current"] { --pi-channel: #43d8f1; }
@@ -52,30 +53,46 @@
 .plc-instruments .pi-reading[data-channel="mixing_turbidity"] { --pi-channel: #56cbbb; }
 .plc-instruments .pi-reading[data-channel="forming_light"] { --pi-channel: #e5d476; }
 .plc-instruments .pi-reading[data-channel="mixing_orp"] { --pi-channel: #a0d891; }
-.plc-instruments .pi-reading:nth-child(odd) { border-right: 1px solid #344c59; }
-.plc-instruments .pi-reading:nth-child(n+3) { border-top: 1px solid #344c59; }
 .plc-instruments .pi-reading::before, .plc-instruments .pi-reading::after { display: none; }
-.plc-instruments .pi-reading__top { display: flex; gap: 5px; align-items: center; justify-content: space-between; font-size: 10px; line-height: 1.2; color: #c7dce5; }
+.plc-instruments .pi-reading__top { display: flex; gap: 5px; align-items: center; justify-content: space-between; font-size: 11px; line-height: 1.4; color: #c7dce5; }
+.plc-instruments .pi-reading__face { position: relative; isolation: isolate; margin: 12px 0; padding: 8px 0 3px; }
+.plc-instruments .pi-reading__face::before { content: ""; position: absolute; z-index: -1; inset: 0 -5px; background: linear-gradient(160deg, #0c1b24, #132630); border-radius: 7px; box-shadow: inset 0 2px 4px #0310164d, inset 0 -1px 0 #ffffff0a; }
 .plc-instruments .pi-reading__label { display: inline-flex; align-items: center; gap: 5px; color: var(--pi-channel); }
 .plc-instruments .pi-reading__label::before { content: ""; width: 5px; height: 5px; flex-shrink: 0; border-radius: 1px; background: currentColor; }
 .plc-instruments .pi-signal { display: inline-flex; align-items: center; gap: 4px; font-size: 8px; color: #a2e6c4; }
 .plc-instruments [data-state="warning"] .pi-signal { color: #ffd58b; }
 .plc-instruments [data-state="critical"] .pi-signal { color: #ffa6a6; }
 .plc-instruments [data-state="unavailable"] .pi-signal i { background: transparent; border: 1px solid #809ca9; }
-.plc-instruments .pi-reading__amount { display: flex; gap: 5px; align-items: baseline; margin: 6px 0 5px; }
-.plc-instruments .pi-reading__amount strong { color: var(--pi-channel); font: 500 24px/1 var(--font-sans); letter-spacing: -.025em; font-variant-numeric: tabular-nums; }
-.plc-instruments .pi-reading__amount > span { color: #b5ccd6; font-size: 9px; }
+.plc-instruments .pi-reading__amount { display: flex; gap: 5px; align-items: baseline; margin: 0 0 8px; min-height: 32px; white-space: nowrap; }
+.plc-instruments .pi-reading__amount strong { color: #eef5f7; font: 550 26px/1.2 var(--font-sans); letter-spacing: -.025em; font-variant-numeric: tabular-nums; }
+.plc-instruments .pi-reading__amount > span { color: #b5ccd6; font-size: 10px; }
+.plc-instruments .pi-reading[data-long-value="true"] .pi-reading__amount strong { font-size: 22px; }
 .plc-instruments [data-state="unavailable"] .pi-reading__amount strong { color: #93aebb; }
-.plc-instruments .pi-range { position: relative; height: 2px; background: color-mix(in srgb, var(--pi-channel) 38%, #263d49); margin-bottom: 4px; }
+.plc-instruments .pi-reading__visual { display: flex; align-items: center; justify-content: space-between; gap: 5px; min-height: 36px; }
+.plc-instruments .pi-reading__status { font-size: 8px; line-height: 1.3; color: #a2e6c4; white-space: nowrap; }
+.plc-instruments [data-state="warning"] .pi-reading__status { color: #ffd58b; }
+.plc-instruments [data-state="critical"] .pi-reading__status { color: #ffa6a6; }
+.plc-instruments [data-state="unavailable"] .pi-reading__status { color: #adc4cf; }
+.plc-instruments .pmv { width: 58px; height: 36px; flex: 0 1 58px; min-width: 42px; color: var(--pi-channel); overflow: visible; }
+.plc-instruments .pmv-track { stroke: currentColor; stroke-opacity: .3; fill: none; }
+.plc-instruments .pmv-fill { fill: currentColor; stroke: none; }
+.plc-instruments .pmv-mark { stroke: currentColor; fill: currentColor; }
+.plc-instruments .pmv-nominal { stroke: #adc4cf; fill: none; }
+.plc-instruments .pmv-zero { stroke: #adc4cf; fill: none; }
+.plc-instruments .pmv-side { fill: currentColor; fill-opacity: .15; stroke: currentColor; stroke-opacity: .22; }
+.plc-instruments .pmv-face { fill: currentColor; fill-opacity: .07; stroke: currentColor; stroke-opacity: .45; }
+.plc-instruments .pmv-highlight { stroke: currentColor; stroke-opacity: .7; fill: none; }
+.plc-instruments .pmv[data-available="false"] { color: color-mix(in srgb, var(--pi-channel) 45%, #adc4cf); }
+.plc-instruments .pi-range { position: relative; height: 3px; border-radius: 2px; background: color-mix(in srgb, var(--pi-channel) 26%, #263d49); margin-bottom: 8px; }
 .plc-instruments .pi-range > span { position: absolute; inset: 0 auto 0 0; background: var(--pi-channel); max-width: 100%; }
 .plc-instruments .pi-range > i { position: absolute; width: 1px; height: 6px; top: -2px; background: #b9d2de; }
 .plc-instruments [data-state="warning"] .pi-range > span { background: #efb95f; }
 .plc-instruments [data-state="critical"] .pi-range > span { background: #f08787; }
-.plc-instruments .pi-reading__scale { display: flex; justify-content: space-between; gap: 5px; color: #a4bdca; font-size: 8px; line-height: 1; font-variant-numeric: tabular-nums; }
+.plc-instruments .pi-reading__scale { display: flex; justify-content: space-between; gap: 4px; color: #a4bdca; font-size: 8px; line-height: 1.2; font-variant-numeric: tabular-nums; }
 .plc-instruments .pi-reading__nominal { color: var(--pi-channel); white-space: nowrap; }
 .plc-instruments .pi-reading[data-change="up"] .pi-reading__amount strong { color: #a2e6c4; }
 .plc-instruments .pi-reading[data-change="down"] .pi-reading__amount strong { color: #ffd58b; }
-.plc-instruments .pi-reading-key { display: flex; justify-content: space-between; align-items: center; gap: 6px; color: #adc4cf; font-size: 9px; margin-top: 7px; }
+.plc-instruments .pi-reading-key { display: flex; justify-content: space-between; align-items: center; gap: 6px; color: #adc4cf; font-size: 9px; margin-top: 12px; }
 .plc-instruments .pi-reading-key span { display: inline-flex; align-items: center; gap: 4px; }
 .plc-instruments .pi-reading-key i { width: 4px; height: 4px; border: 1px solid #adc4cf; border-radius: 50%; }
 .plc-instruments .pi-reading-key span:last-child i { height: 7px; width: 1px; border: 0; border-radius: 0; background: #adc4cf; }
@@ -140,10 +157,7 @@
 .plant-console .pi-actuator-action { display: flex; justify-content: space-between; align-items: center; gap: 5px; border: 1px solid #4b7f8c; border-radius: 5px; background: #23414b; padding: 8px; color: #a2edf7; font-size: 10px; font-weight: 550; }
 .plant-console .plc-actuator--emergency .pi-actuator-action { color: #ffd0ca; background: #3d3036; border-color: #815b60; }
 @media (min-width: 600px) and (max-width: 960px) {
-  .plc-instruments .pi-analog-grid { grid-template-columns: repeat(4, minmax(0,1fr)); }
-  .plc-instruments .pi-reading:nth-child(n) { border: 0; border-right: 1px solid #344c59; }
-  .plc-instruments .pi-reading:nth-child(4n) { border-right: 0; }
-  .plc-instruments .pi-reading:nth-child(n+5) { border-top: 1px solid #344c59; }
   .plc-instruments .pi-controller svg { max-width: 300px; margin: 0 auto; }
 }
+@media (min-width: 720px) and (max-width: 960px) { .plc-instruments .pi-analog-grid { grid-template-columns: repeat(4, minmax(0,1fr)); } }
 @media (prefers-reduced-motion: reduce) { .plc-instruments *, .plc-actuator, .plc-actuator * { transition: none !important; animation: none !important; } }
