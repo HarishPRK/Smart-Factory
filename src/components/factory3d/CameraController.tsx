@@ -1,9 +1,26 @@
 "use no memo";
-import { useEffect } from "react";
+/* eslint-disable react-refresh/only-export-components -- The scene's existing imperative camera API is shared by controls and stage selection. */
+import { useEffect, useRef } from "react";
 import { useThree, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three/examples/jsm/controls/OrbitControls.js";
 import { STAGE_POSITIONS } from "./digitalTwinLayout";
+
+// Frame the equipment footprint, including the foreground intake, rather than
+// the center of the surrounding floor slab. Retain the three-quarter angle.
+export const OVERVIEW_POSITION: [number, number, number] = [-23.5, 23.29, 32.96];
+export const OVERVIEW_TARGET: [number, number, number] = [-2, 0.5, 2];
+let overviewScale = 1;
+
+export function setOverviewAspect(aspect: number) {
+  overviewScale = Math.max(1, 1.45 / Math.max(aspect, 0.4));
+}
+
+export function getOverviewPosition(): [number, number, number] {
+  return OVERVIEW_POSITION.map((value, axis) => (
+    OVERVIEW_TARGET[axis] + (value - OVERVIEW_TARGET[axis]) * overviewScale
+  )) as [number, number, number];
+}
 
 interface FlyTarget {
   position: THREE.Vector3;
@@ -21,7 +38,7 @@ const TOUR_STOPS: {
   dwell: number;
   label: string;
 }[] = [
-  { position: [-17.64, 11.72, 19.63], lookAt: [-3.08, -2.43, -1.14], dwell: 3, label: "Overview" },
+  { position: OVERVIEW_POSITION, lookAt: OVERVIEW_TARGET, dwell: 3, label: "Overview" },
   {
     position: [STAGE_POSITIONS.intake[0] - 6, 3, STAGE_POSITIONS.intake[2] + 5],
     lookAt: STAGE_POSITIONS.intake,
@@ -102,14 +119,13 @@ export function setCameraTarget(
 
 export function resetCameraView() {
   _autoTourActive = false;
-  setCameraTarget([-17.64, 11.72, 19.63], [-3.08, -2.43, -1.14]);
+  setCameraTarget(getOverviewPosition(), OVERVIEW_TARGET);
 }
 
 export function startAutoTour() {
   _autoTourActive = true;
   _autoTourStep = 0;
-  const stop = TOUR_STOPS[0];
-  setCameraTarget(stop.position, stop.lookAt);
+  setCameraTarget(getOverviewPosition(), OVERVIEW_TARGET);
 }
 
 export function stopAutoTour() {
@@ -127,8 +143,7 @@ export function getAutoTourLabel(): string {
 
 const CameraController: React.FC = () => {
   const { camera, controls } = useThree();
-  const lerpSpeed = 0.035;
-  const dwellTimerRef = { current: 0 };
+  const dwellTimerRef = useRef(0);
 
   // DEV camera-capture helper: orbit/pan/zoom to the framing you want, then
   // press "C" to log + copy the current camera position and orbit target.
@@ -149,7 +164,6 @@ const CameraController: React.FC = () => {
       const fmt = (v: THREE.Vector3) =>
         `[${v.x.toFixed(2)}, ${v.y.toFixed(2)}, ${v.z.toFixed(2)}]`;
       const out = `position: ${fmt(camera.position)}  target: ${fmt(t)}`;
-      // eslint-disable-next-line no-console
       console.log("[camera]", out);
       navigator.clipboard?.writeText(out).catch(() => {});
     };
@@ -167,12 +181,13 @@ const CameraController: React.FC = () => {
           dwellTimerRef.current = 0;
           _autoTourStep = (_autoTourStep + 1) % TOUR_STOPS.length;
           const next = TOUR_STOPS[_autoTourStep];
-          setCameraTarget(next.position, next.lookAt);
+          setCameraTarget(_autoTourStep === 0 ? getOverviewPosition() : next.position, next.lookAt);
         }
       }
       return;
     }
 
+    const lerpSpeed = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 1 : 1 - Math.exp(-5 * delta);
     camera.position.lerp(_flyTarget.position, lerpSpeed);
 
     const orbitControls = controls as unknown as OrbitControlsImpl | null;

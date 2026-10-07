@@ -226,17 +226,17 @@ const IntegrationModal: React.FC<IntegrationModalProps> = ({
           left: dialogFullscreen ? 0 : immersive ? "clamp(24px, 3vw, 56px)" : undefined,
           right: dialogFullscreen ? 0 : immersive ? "clamp(24px, 3vw, 56px)" : undefined,
           maxWidth: dialogFullscreen || immersive ? "none" : undefined,
-          background: "linear-gradient(180deg, rgba(16, 12, 38, 0.96), rgba(10, 8, 24, 0.98))",
-          border: "1px solid rgba(124, 255, 212, 0.18)",
-          boxShadow: "0 24px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(0, 92, 185, 0.15)",
+          background: "var(--ind-bg-1)",
+          border: "1px solid var(--ind-edge)",
+          boxShadow: "0 24px 80px rgba(0, 0, 0, 0.5)",
         }}
       >
-        {/* Header strip with Pepsi tri-color top accent */}
+        {/* Workspace header */}
         <div
           className="flex items-center justify-between px-5 py-3 border-b"
           style={{
-            borderColor: "rgba(255, 255, 255, 0.08)",
-            background: "linear-gradient(180deg, rgba(0, 92, 185, 0.10), transparent)",
+            borderColor: "var(--ind-edge)",
+            background: "var(--ind-surface)",
           }}
         >
           <div className="flex flex-col">
@@ -257,8 +257,8 @@ const IntegrationModal: React.FC<IntegrationModalProps> = ({
                 title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
                 className="w-8 h-8 rounded-lg flex items-center justify-center border transition-all hover:bg-white/[0.08] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
                 style={{
-                  borderColor: isFullscreen ? "rgba(124, 255, 212, 0.45)" : "rgba(124, 255, 212, 0.25)",
-                  background: isFullscreen ? "rgba(124, 255, 212, 0.12)" : "rgba(124, 255, 212, 0.06)",
+                  borderColor: isFullscreen ? "rgba(67, 216, 241, 0.45)" : "rgba(67, 216, 241, 0.25)",
+                  background: isFullscreen ? "rgba(67, 216, 241, 0.12)" : "rgba(67, 216, 241, 0.06)",
                   color: "#cbd5e1",
                 }}
               >
@@ -279,8 +279,8 @@ const IntegrationModal: React.FC<IntegrationModalProps> = ({
               aria-label="Close"
               className="w-8 h-8 rounded-lg flex items-center justify-center border transition-all hover:bg-white/[0.08] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
               style={{
-                borderColor: "rgba(124, 255, 212, 0.25)",
-                background: "rgba(124, 255, 212, 0.06)",
+                borderColor: "rgba(67, 216, 241, 0.25)",
+                background: "rgba(67, 216, 241, 0.06)",
                 color: "#cbd5e1",
               }}
             >

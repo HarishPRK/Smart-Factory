@@ -64,6 +64,30 @@ describe("parsePLCPayload operator precision", () => {
   });
 });
 
+describe("parsePLCPayload relay availability", () => {
+  it("does not treat analog-only frames as relay feedback, including subsequent frames", () => {
+    const first = parsePLCPayload({ boardA_voltage_pot_1: 4.31 });
+    const second = parsePLCPayload({ boardA_current_pot: 4.01 }, first);
+    for (const state of [first, second]) {
+      expect(state.params.find((param) => param.id === "relay")?.placeholder).toBe(true);
+    }
+  });
+
+  it("recognizes real OFF feedback and retains it across unrelated payloads", () => {
+    const first = parsePLCPayload({ boardA_relay_motor: 0 });
+    const second = parsePLCPayload({ boardA_voltage_pot_1: 4.31 }, first);
+    for (const state of [first, second]) {
+      expect(state.params.find((param) => param.id === "relay")?.placeholder).toBe(false);
+      expect(state.outputs.motorFanOn).toBe(false);
+    }
+  });
+
+  it("leaves unset relay sentinels unavailable", () => {
+    const state = parsePLCPayload({ boardA_relay_motor: -1, boardA_alert_relays_green: -1 });
+    expect(state.params.find((param) => param.id === "relay")?.placeholder).toBe(true);
+  });
+});
+
 describe("MosquittoPLCService command publishing", () => {
   function connectedService() {
     const service = new MosquittoPLCService("ws://bridge.test/ws");

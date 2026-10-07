@@ -29,6 +29,13 @@ export interface MeterTelemetry {
   alarms: MeterFault[]
 }
 
+/** Live packets may omit measurements. Null means unavailable, never zero. */
+export type MeterReading = {
+  [Key in keyof MeterTelemetry]: Key extends 'timestamp' ? number : MeterTelemetry[Key] | null
+} & {
+  activePowerSource?: 'reported' | 'calculated'
+}
+
 export interface MeterControls {
   loadAmps: number
   powerFactor: number

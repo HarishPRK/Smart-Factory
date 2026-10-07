@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import type { PLCParameter } from "../types";
 import type { PLCService, PLCOutputs } from "../services/plcService";
 import { DEFAULT_OUTPUTS } from "../services/plcService";
-import { plcParameters } from "../data/mockData";
 
 export interface UsePLCLiveResult {
   params: PLCParameter[];
@@ -13,14 +12,14 @@ export interface UsePLCLiveResult {
 }
 
 export function usePLCLive(service: PLCService): UsePLCLiveResult {
-  const [params, setParams] = useState<PLCParameter[]>(plcParameters.map((p) => ({ ...p })));
+  // Telemetry begins unknown. Mock mode supplies its own samples through the
+  // same subscription; hardware modes must never inherit demo nominal values.
+  const [params, setParams] = useState<PLCParameter[]>([]);
   const [outputs, setOutputs] = useState<PLCOutputs>({ ...DEFAULT_OUTPUTS });
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setError(null);
-
     const unsubscribe = service.subscribe((state) => {
       setParams(state.params);
       setOutputs(state.outputs);

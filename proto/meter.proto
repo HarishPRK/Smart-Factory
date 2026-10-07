@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package metering;
+
+message MeterData {
+  double voltage = 1;
+  double frequency = 2;
+  double power_factor = 3;
+  double current = 4;
+}

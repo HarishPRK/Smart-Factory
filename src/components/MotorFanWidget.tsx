@@ -78,7 +78,7 @@ interface MotorFanWidgetProps {
 }
 
 const MotorFanWidget: React.FC<MotorFanWidgetProps> = ({ className = "" }) => {
-  const { sendCommand } = usePLCContext(false);
+  const { sendCommand, isConnected } = usePLCContext(false);
   const motorFanOn = usePLCStore((s) => s.motorFanOn);
   const [manualOn, setManualOn] = useState<boolean | null>(null);
   const [commandState, setCommandState] = useState<
@@ -176,7 +176,7 @@ const MotorFanWidget: React.FC<MotorFanWidgetProps> = ({ className = "" }) => {
   return (
     <button
       type="button"
-      className={`card w-full appearance-none text-left p-3 flex flex-col gap-2 animate-fade-in delay-4 cursor-pointer active:scale-[0.97] transition-all duration-300 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 disabled:cursor-wait disabled:opacity-90 ${className}`}
+      className={`card plc-actuator plc-actuator--motor w-full appearance-none text-left p-3 flex flex-col gap-2 animate-fade-in delay-4 cursor-pointer active:scale-[0.97] transition-all duration-300 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 disabled:cursor-wait disabled:opacity-90 ${className}`}
       onClick={handleToggle}
       disabled={commandPending}
       aria-label={
@@ -195,14 +195,14 @@ const MotorFanWidget: React.FC<MotorFanWidgetProps> = ({ className = "" }) => {
       {/* Header */}
       <div className="flex justify-between items-center flex-none">
         <div className="flex items-center gap-1.5">
-          <div className="w-5 h-5 bg-gradient-to-br from-indigo-500/[0.12] to-blue-500/[0.06] rounded-md flex items-center justify-center border border-indigo-400/[0.12]">
+          <div className="w-5 h-5 bg-cyan-500/[0.08] rounded-md flex items-center justify-center border border-cyan-400/[0.18]">
             <svg width="9" height="9" viewBox="0 0 16 16" fill="none" className="opacity-65">
               <path d="M8 2C5.8 3.2 5 6 6.5 7.5C5 5.8 2 6 2 8C2 10.2 5.2 11 6.5 9.5C5.3 11 6 14 8 14C10.2 12.8 11 10 9.5 8.5C11 10.2 14 10 14 8C14 5.8 10.8 5 9.5 6.5C10.7 5 10 2 8 2Z" stroke="white" strokeWidth="1.1" fill="none" strokeLinejoin="round" />
               <circle cx="8" cy="8" r="1.5" fill="white" opacity="0.55" />
             </svg>
           </div>
           <h3 className="text-[11px] font-semibold text-white/75 uppercase tracking-[0.14em]">
-            Motor
+            Motor fan
           </h3>
         </div>
         <span
@@ -230,7 +230,9 @@ const MotorFanWidget: React.FC<MotorFanWidgetProps> = ({ className = "" }) => {
                 ? manualOn
                   ? "Start sent"
                   : "Stop sent"
-              : isOn
+              : !isConnected
+                ? "No feedback"
+                : isOn
                 ? "Running"
                 : "Standby"}
         </span>
@@ -331,6 +333,8 @@ const MotorFanWidget: React.FC<MotorFanWidgetProps> = ({ className = "" }) => {
           </svg>
         </div>
       </div>
+
+      <span className="pi-actuator-action">{commandPending ? "Publishing…" : requestedOn ? "Stop motor" : "Start motor"}<svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
 
       {/* Motor fan banner — portaled to top of page */}
       {createPortal(

@@ -29,7 +29,7 @@ interface KpiCardProps
   selected?: boolean;
   status?: ReactNode;
   statusTone?: KpiCardStatusTone;
-  visualization?: ReactNode;
+  visual?: ReactNode;
   variant?: "metric" | "module" | "live";
 }
 
@@ -50,9 +50,8 @@ const LaunchArrow = ({ external }: { external: boolean }) => (
 /**
  * Shared chrome for the KPI rail.
  *
- * The rail contains three different kinds of information—measurements,
- * launchers, and live feeds—so the component keeps their structure consistent
- * while the `variant` changes the reading hierarchy.
+ * Measurements expose their reading. Launchers and live feeds expose their
+ * name and essential status; the destination carries the detailed content.
  */
 const KpiCard = ({
   accent,
@@ -70,12 +69,10 @@ const KpiCard = ({
   statusTone = "neutral",
   style,
   type = "button",
+  visual,
   variant = "module",
-  visualization,
   ...buttonProps
 }: KpiCardProps) => {
-  const hasReading = primary != null || secondary != null;
-  const hasVisualization = visualization != null;
   const cardStyle: KpiCardStyle = {
     "--kpi-accent": accent,
     "--kpi-accent-rgb": accentRgb,
@@ -109,16 +106,11 @@ const KpiCard = ({
             {status}
           </span>
         ) : null}
+
       </span>
 
-      <span
-        className={`kpi-card__body${
-          hasVisualization && !hasReading
-            ? " kpi-card__body--visual-only"
-            : ""
-        }`}
-      >
-        {hasReading ? (
+      {variant === "metric" ? (
+        <span className="kpi-card__body">
           <span className="kpi-card__reading">
             {primary !== undefined && primary !== null ? (
               <span className="kpi-card__primary">{primary}</span>
@@ -127,18 +119,15 @@ const KpiCard = ({
               <span className="kpi-card__secondary">{secondary}</span>
             ) : null}
           </span>
-        ) : null}
-
-        {hasVisualization ? (
-          <span aria-hidden="true" className="kpi-card__visual">
-            {visualization}
-          </span>
-        ) : variant !== "metric" ? (
-          <span aria-hidden="true" className="kpi-card__launch">
-            <LaunchArrow external={actionCue === "external"} />
-          </span>
-        ) : null}
-      </span>
+          {visual ? <span aria-hidden="true" className="kpi-card__visual">{visual}</span> : null}
+        </span>
+      ) : (
+        <span className="kpi-card__workspace-body">
+          {primary !== undefined && primary !== null ? <span className="kpi-card__workspace-reading">{primary}{secondary ? <small>{secondary}</small> : null}</span> : null}
+          {visual ? <span className="kpi-card__workspace-visual" aria-hidden="true">{visual}</span> : null}
+          <span aria-hidden="true" className="kpi-card__launch"><LaunchArrow external={actionCue === "external"} /></span>
+        </span>
+      )}
     </button>
   );
 };

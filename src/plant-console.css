@@ -1,0 +1,192 @@
+/* The production workspace: a fixed tool rail, continuous instruments, and a large model viewport. */
+.plant-console {
+  --font-sans: 'Inter Variable', Inter, system-ui, sans-serif;
+  --ind-bg-0: #0e131b;
+  --ind-surface: #171f2a;
+  --ind-edge: #2a3544;
+  --ind-accent: #8ac8ff;
+  --color-primary: #8ac8ff;
+  --color-primary-light: #b9dfff;
+  --color-primary-glow: #8ac8ff18;
+  background: #101720;
+  padding: 0 20px 18px 98px;
+  font-family: var(--font-sans);
+  letter-spacing: -0.015em;
+}
+.plant-console button:focus-visible, .plant-console a:focus-visible, .plant-console select:focus-visible { outline-color: #a4d7ff; }
+.plant-console ::selection { background: #3277a5; }
+.operations-rail { position: absolute; left: 0; top: 0; bottom: 0; width: 76px; background: #0b1119; border-right: 1px solid #253040; display: flex; align-items: center; flex-direction: column; z-index: 20; }
+.rail-brand { display: grid; place-items: center; width: 76px; height: 68px; flex-shrink: 0; border-bottom: 1px solid #253040; }
+.rail-brand img { width: 34px; height: 34px; border-radius: 50%; }
+.plant-console .operations-nav { flex-direction: column; height: auto; align-self: auto; width: 100%; gap: 12px; padding: 29px 9px; }
+.plant-console .operations-nav > button { flex-direction: column; justify-content: center; gap: 8px; width: 57px; height: 59px; border: 1px solid transparent; border-radius: 8px; padding: 0; color: #92a2b7; font-size: 9px; font-weight: 500; }
+.plant-console .operations-nav > button.is-current { background: #20384d; color: #b4dcff; border-color: #355671; }
+.plant-console .operations-nav > button:hover { background: #1b2939; color: #eaf3fb; }
+.rail-footnote { margin-top: auto; margin-bottom: 27px; writing-mode: vertical-rl; transform: rotate(180deg); color: #657b91; font-size: 9px; letter-spacing: 0.18em; }
+.plant-console .operations-header { flex-basis: 68px; height: 68px; gap: 20px; border-color: #293341; }
+.plant-console .operations-brand { min-width: 0; gap: 13px; color: #9aa9ba; }
+.plant-console .operations-brand > span { font-size: 13px; font-weight: 600; letter-spacing: -0.01em; }
+.plant-console .operations-brand .workspace-name { font-weight: 400; color: #8292a8; }
+.plant-console .operations-header__actions { gap: 14px; padding-right: 52px; }
+.plant-console .operations-header__actions .operations-assistant { color: #c2e2ff; border-color: #3f5268; height: 32px; border-radius: 5px; font-size: 11px; }
+.plant-console .lg-agent-trigger { top: 16px !important; right: 20px !important; width: 36px !important; height: 36px !important; background: #24384a !important; border-color: #607e94 !important; box-shadow: none !important; }
+.plant-console .lg-agent-trigger > svg { width: 29px; height: 29px; }
+.plant-console .operations-titlebar { flex-basis: 91px; gap: 15px; }
+.plant-console .operations-titlebar h1 { font-size: 26px; font-weight: 550; letter-spacing: -0.035em; display: flex; align-items: center; gap: 15px; }
+.workspace-tag { font-size: 10px; font-weight: 450; color: #9bb1c3; border: 1px solid #344354; padding: 5px 7px; border-radius: 4px; letter-spacing: 0; }
+.plant-console .operations-titlebar p { color: #8f9eb1; font-size: 11px; margin-top: 8px; }
+.plant-console .operations-titlebar__status { gap: 13px; font-size: 10px; }
+.plant-console .operations-titlebar__status button { background: #1c2938; border-color: #344458; border-radius: 5px; color: #ccdae8; padding: 8px 10px; font-size: 11px; }
+.plant-console .connection-state { margin-right: 6px; color: #c6ae85; }
+.plant-console .operations-grid { grid-template-columns: minmax(0, 1fr) 295px; gap: 16px; }
+.plant-console .operations-main { gap: 14px; }
+.plant-console.is-model-focused .operations-grid { grid-template-columns: minmax(0, 1fr); }
+.plant-console.is-model-focused .operations-sidebar { display: none; }
+.plant-console .kpi-deck { padding: 0; gap: 0; background: #171f2a; border: 1px solid #2a3544; border-radius: 8px; overflow: hidden; }
+.plant-console .kpi-deck__toolbar { min-height: 38px; padding: 0 14px; border-bottom: 1px solid #293543; }
+.plant-console .kpi-deck__tabs { align-self: stretch; gap: 19px; }
+.plant-console .kpi-deck__tab { padding: 8px 0; font-size: 10px; margin: 0; }
+.plant-console .kpi-deck__tab[aria-selected="true"] { color: #cbe7ff; border-color: #8ac8ff; }
+.plant-console .kpi-deck__tab-count { font-size: 9px; background: transparent; margin-left: 0; padding: 1px 3px; color: #859bb0; }
+.plant-console .operations-zones button { font-size: 9px !important; padding: 4px 7px; }
+.plant-console .operations-zones button[aria-pressed="true"] { background: #2a3c4e; color: #b9dfff; }
+.plant-console .kpi-rail__viewport { gap: 0; padding: 0; scroll-padding-left: 0; }
+.plant-console .kpi-card { flex: 1 0 146px; min-width: 146px; height: 83px; border: 0; border-right: 1px solid #2c3948; border-radius: 0; background: transparent; padding: 12px 14px; gap: 10px; }
+.plant-console .kpi-card:last-child { border-right: 0; }
+.plant-console .kpi-card:hover { background: #202f40; border-color: #344457; }
+.plant-console .kpi-card.is-selected { background: #243a4f; border-color: #344457; }
+.plant-console .kpi-card__icon { display: none; }
+.plant-console .kpi-card__label { font-size: 10px; color: #aab9c9; }
+.plant-console .kpi-card__status { font-size: 9px; }
+.plant-console .kpi-card__primary, .plant-console .kpi-card--metric .kpi-card__primary { font-size: 23px; font-family: var(--font-sans); font-weight: 500; letter-spacing: -0.035em; }
+.plant-console .kpi-card__secondary { font-size: 9px; margin-left: 4px; }
+.plant-console .kpi-card__visual { width: 40px; flex-basis: 40px; height: 25px; opacity: 0.7; }
+.plant-console .operations-twin { border-radius: 8px; border-color: #354658; background: #1b2c39; min-height: 470px; }
+.plant-console .twin-heading { height: 46px; background: #182331; border-color: #344354; padding: 0 16px; }
+.plant-console .twin-heading h2 { font-size: 12px; font-weight: 550; }
+.plant-console .twin-heading__identity { gap: 9px; }
+.plant-console .twin-heading__identity > svg { color: #97c9ec; width: 16px; }
+.plant-console .twin-version { font-size: 8px; border: 0; color: #829ab0; letter-spacing: 0.06em; padding: 0 0 0 5px; }
+.plant-console .twin-heading__meta { font-size: 9px; color: #a6b8c7; }
+.plant-console .twin-canvas { top: 46px; bottom: 86px; }
+.plant-console .twin-toolbar { top: 60px; left: 14px; right: 14px; }
+.plant-console .twin-view-switch, .plant-console .twin-tool-group { background: #172330f5; border: 1px solid #425a6f; border-radius: 6px; padding: 3px; }
+.plant-console .twin-view-switch button { height: 28px; font-size: 10px; color: #b3c8d8; padding: 0 9px; }
+.plant-console .twin-view-switch button[aria-pressed="true"], .plant-console .twin-tool-group button[aria-pressed="true"] { background: #b8d9f0; color: #193445; }
+.twin-model-modes { position: absolute; top: 111px; left: 14px; display: flex; flex-direction: column; gap: 5px; z-index: 13; }
+.twin-model-modes button { display: flex; align-items: center; gap: 7px; height: 31px; border: 1px solid #41586a; border-radius: 5px; padding: 0 10px; color: #c0d1df; background: #162534f2; font-size: 10px; }
+.twin-model-modes button[aria-pressed="true"] { color: #162f43; background: #b4dcf6; border-color: #b4dcf6; }
+.plant-label { display: flex; align-items: center; gap: 7px; white-space: nowrap; border: 1px solid #5d788b; border-radius: 4px; background: #162a3af5; color: #eef5fb; padding: 6px 8px; box-shadow: 0 3px 10px #07111a40; }
+.plant-label span { color: #96bed8; font: 9px var(--font-mono); }
+.plant-label strong { font-size: 10px; font-weight: 450; }
+.plant-label i { width: 5px; height: 5px; border-radius: 50%; }
+.plant-label.is-selected { border-color: #b5e0ff; background: #315c7a; }
+.plant-console .twin-scene-footer { bottom: 99px; left: 14px; right: 14px; }
+.plant-console .twin-legend, .plant-console .twin-fit { background: #172736ed; border-color: #466074; color: #c4d6e4; }
+.plant-console .twin-process { height: 86px; background: #152130; border-color: #344658; }
+.plant-console .twin-process__heading { height: 27px; font-size: 9px; color: #89a2b9; }
+.plant-console .twin-process__stages { padding: 0 9px 6px; gap: 1px; }
+.plant-console .twin-process__stages > button { padding: 7px 7px; gap: 6px; border-radius: 4px; }
+.plant-console .twin-process__stages > button[aria-pressed="true"] { background: #284560; border-color: #6097bf; }
+.plant-console .twin-process__name { font-size: 9px; }
+.plant-console .twin-process__name small { margin-top: 6px; font-size: 8px; }
+.plant-console .twin-process__number { font-size: 8px; color: #7693ac; }
+.plant-console .twin-settings, .plant-console .twin-inspector { background: #172736fa; border-color: #476177; top: 106px; max-height: calc(100% - 220px); border-radius: 6px; }
+.plant-console .operations-sidebar { gap: 12px; }
+.plant-console .operations-plc.plc-console { background: #18222f; border-color: #2c3b4c; border-radius: 8px; padding: 17px 15px 12px; }
+.plant-console .plc-console h3 { color: #dae6ef; font-size: 13px !important; font-weight: 550; }
+.plant-console .plc-gate { padding: 11px 9px; border-radius: 5px; background: #26272b; border-color: #534633; }
+.plant-console .plc-gate > div:first-child { gap: 6px; }
+.plant-console .plc-gate span { letter-spacing: 0 !important; }
+.plant-console .plc-console__section { color: #8299ae; font-size: 9px; letter-spacing: 0.02em; padding: 10px 0; }
+.plant-console .plc-reading.card-inner { min-height: 59px; border-color: #2e3d4e; }
+.plant-console .plc-reading__name > span:first-child { color: #ccd9e4; }
+.plant-console .plc-reading__value strong { color: #e9f3fd; font-size: 20px; }
+.plant-console .plc-reading__range { background: #334455; max-width: 53px; }
+.plant-console .plc-reading__range > span { background: #7dacca; }
+.plant-console .plc-digital-grid { gap: 6px; }
+.plant-console .plc-digital-grid > * { background: #202d3c; border-color: #34475a; border-radius: 5px; min-height: 91px; }
+.plant-console .operations-actuators { flex-basis: 107px; gap: 8px; }
+.plant-console .operations-actuators > * { border-radius: 8px; background: #18222f; border-color: #2c3b4c; }
+.plant-console .operations-actuators h3 { font-size: 9px !important; letter-spacing: 0; }
+
+@media (min-width: 1700px) {
+  .plant-console { padding-right: 26px; padding-left: 106px; }
+  .plant-console .operations-grid { grid-template-columns: minmax(0, 1fr) 330px; gap: 20px; }
+  .plant-console .kpi-card { height: 90px; }
+  .plant-console .kpi-card__primary { font-size: 26px; }
+  .plant-label strong { font-size: 12px; }
+  .plant-console .twin-process__name { font-size: 11px; }
+  .plant-console .twin-process__name small { font-size: 9px; }
+}
+@media (max-width: 1200px) {
+  .plant-console { padding-left: 85px; padding-right: 14px; }
+  .operations-rail { width: 68px; }
+  .rail-brand { width: 68px; }
+  .plant-console .operations-nav { padding: 24px 6px; }
+  .plant-console .operations-grid { grid-template-columns: minmax(0, 1fr) 278px; gap: 12px; }
+  .plant-console .operations-titlebar h1 { font-size: 23px; }
+  .plant-console .operations-titlebar__status { gap: 7px; }
+  .plant-console .workspace-tag, .plant-console .workspace-name { display: none; }
+  .plant-console .operations-brand > svg { display: none; }
+  .plant-console .kpi-card { min-width: 145px; flex-basis: 145px; }
+  .plant-console .twin-process__stages > button { min-width: 90px; }
+  .plant-console .twin-process__number { display: none; }
+}
+@media (max-width: 960px) {
+  .plant-console { height: auto; }
+  .plant-console .operations-grid { grid-template-columns: minmax(0, 1fr); }
+  .plant-console .operations-twin { height: 650px; }
+  .plant-console .operations-sidebar { display: grid; grid-template-columns: minmax(0, 1fr) 210px; }
+  .plant-console .operations-actuators { flex-direction: column; }
+  .plant-console .focus-model { display: none; }
+  .plant-console .plc-reading__range { max-width: 130px; }
+}
+@media (max-width: 640px) {
+  .plant-console { padding: 0 10px 20px; }
+  .operations-rail { position: relative; width: calc(100% + 20px); height: 56px; margin: 0 -10px; flex-direction: row; border-right: 0; border-bottom: 1px solid #283849; }
+  .rail-brand { width: 54px; height: 56px; border: 0; }
+  .rail-brand img { width: 27px; height: 27px; }
+  .plant-console .operations-nav { width: auto; margin: 0; padding: 0 7px; flex-direction: row; gap: 9px; flex: 1; height: 46px; }
+  .plant-console .operations-nav > button { flex: 1; width: auto; height: 43px; font-size: 8px; gap: 4px; }
+  .plant-console .operations-nav > button svg { width: 16px; height: 16px; }
+  .rail-footnote { display: none; }
+  .plant-console .operations-header { height: 50px; min-height: 50px; flex-basis: 50px; padding: 0; flex-wrap: nowrap; }
+  .plant-console .operations-brand > span { font-size: 11px; }
+  .plant-console .operations-header__actions { padding-right: 38px; gap: 10px; }
+  .plant-console .operations-header__actions .operations-assistant { width: 29px; padding: 0; height: 29px; }
+  .plant-console .lg-agent-trigger { top: 66px !important; right: 11px !important; width: 30px !important; height: 30px !important; }
+  .plant-console .lg-agent-trigger > svg { width: 24px; height: 24px; }
+  .plant-console .operations-titlebar { flex-basis: 87px; }
+  .plant-console .operations-titlebar h1 { font-size: 24px; }
+  .plant-console .operations-titlebar p { font-size: 10px; max-width: 180px; line-height: 1.5; margin-top: 5px; }
+  .plant-console .operations-titlebar__status { gap: 7px; font-size: 9px; }
+  .plant-console .operations-titlebar__status button { padding: 6px; font-size: 9px; }
+  .plant-console .connection-state { margin: 0; }
+  .plant-console .kpi-deck__toolbar { padding: 0 10px; gap: 0; min-height: 60px; }
+  .plant-console .kpi-deck__tabs { height: 29px; }
+  .plant-console .kpi-deck__tab { padding: 5px 0; }
+  .plant-console .operations-zones { padding-bottom: 4px; }
+  .plant-console .kpi-card { height: 76px; min-width: 154px; flex-basis: 154px; padding: 10px 13px; }
+  .plant-console .operations-twin { height: 585px; min-height: 585px; }
+  .plant-console .twin-heading { padding: 0 10px; }
+  .plant-console .twin-heading h2 { font-size: 11px; }
+  .plant-console .twin-version, .plant-console .twin-heading__identity > svg { display: none; }
+  .plant-console .twin-heading__meta { font-size: 8px; }
+  .plant-console .twin-toolbar { left: 9px; right: 9px; top: 57px; flex-wrap: nowrap; gap: 8px; }
+  .plant-console .twin-view-switch button { padding: 0 6px; font-size: 9px; height: 26px; }
+  .plant-console .twin-tool-group button { width: 24px; height: 26px; }
+  .twin-model-modes { top: 104px; left: 9px; gap: 4px; }
+  .twin-model-modes button { height: 27px; padding: 0 7px; font-size: 9px; }
+  .plant-label { padding: 4px 5px; gap: 4px; }
+  .plant-label strong { font-size: 8px; }
+  .plant-label span { display: none; }
+  .plant-label i { width: 4px; height: 4px; }
+  .plant-console .twin-scene-footer { left: 9px; right: 9px; bottom: 99px; }
+  .plant-console .twin-legend { font-size: 8px; }
+  .plant-console .twin-process__name { font-size: 10px; }
+  .plant-console .twin-settings, .plant-console .twin-inspector { top: 100px; right: 9px; max-height: 345px; }
+  .plant-console .operations-sidebar { display: flex; }
+  .plant-console .operations-actuators { flex-direction: row; flex-basis: 112px; }
+  .plant-console .plc-digital-grid { grid-template-columns: 1fr 1fr; }
+}

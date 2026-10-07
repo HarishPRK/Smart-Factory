@@ -8,6 +8,7 @@ const outDir = resolve(root, '../public/widgets/aituzero-meter')
 
 export default defineConfig({
   root,
+  envDir: resolve(root, '..'),
   base: '/widgets/aituzero-meter/',
   publicDir: resolve(root, 'public'),
   plugins: [react()],

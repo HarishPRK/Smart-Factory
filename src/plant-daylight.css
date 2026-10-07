@@ -1,0 +1,185 @@
+/* Cyan operations: charcoal instruments with precise cyan interaction accents. */
+.plant-console {
+  --ind-accent: #43d8f1;
+  --color-primary: #43d8f1;
+  --color-primary-light: #7deafb;
+  --color-primary-glow: #43d8f114;
+  background: #1d2d38;
+  color: #eef5f7;
+  padding-bottom: 20px;
+}
+.plant-console button:focus-visible, .plant-console a:focus-visible, .plant-console select:focus-visible { outline-color: #d7e6ed; }
+.plant-console ::selection { color: #17232d; background: #d7e6ed; }
+.plant-console .operations-rail { background: #15222c; border-color: #2e4553; }
+.plant-console .rail-brand { border-color: #203440; }
+.plant-console .operations-nav > button { color: #a7bbc6; }
+.plant-console .operations-nav > button.is-current { background: #203440; color: #d7e6ed; border-color: #203440; }
+.plant-console .operations-nav > button:hover { background: #1d2d38; color: #d7e6ed; }
+.plant-console .rail-footnote { color: #90aab7; }
+.plant-console .operations-header { border-color: #2e4553; height: 62px; flex-basis: 62px; }
+.plant-console .operations-brand { color: #d7e6ed; }
+.plant-console .operations-brand > span { font-size: 13px; }
+.plant-console .operations-brand .workspace-name { color: #a7bbc6; }
+.plant-console .operations-header__actions time, .plant-console .operations-header__actions > button { color: #a7bbc6; }
+.plant-console .operations-header__actions > button:hover { background: #203440; color: #d7e6ed; }
+.plant-console .operations-header__actions .operations-assistant { background: #1d2d38; color: #d7e6ed; border-color: #2e4553; }
+.plant-console .lg-agent-trigger { top: 13px !important; background: #2e4553 !important; border-color: #497080 !important; }
+.plant-console .operations-titlebar { flex-basis: 98px; }
+.plant-console .operations-titlebar h1 { color: #eef5f7; font-size: 29px; font-weight: 550; letter-spacing: -0.035em; }
+.plant-console .operations-titlebar p { color: #a7bbc6; font-size: 12px; }
+.plant-console .workspace-tag { background: #203440; color: #d7e6ed; border-color: #2e4553; }
+.plant-console .operations-titlebar__status button { background: #1d2d38; color: #d7e6ed; border-color: #2e4553; }
+.plant-console .operations-titlebar__status button:last-child { color: #d7e6ed; background: #203440; border-color: #203440; }
+.plant-console .connection-state { color: #e9bd70; }
+.plant-console .connection-state.is-connected { color: #6ed6a2; }
+.plant-console .kpi-deck { background: #17232d; border-color: #2e4553; border-radius: 12px; }
+.plant-console .kpi-deck__toolbar { border-color: #2e4553; padding-left: 17px; padding-right: 17px; }
+.plant-console .kpi-deck__tab { font-size: 11px; color: #a7bbc6; }
+.plant-console .kpi-deck__tab[aria-selected="true"] { color: #d7e6ed; border-color: #d7e6ed; font-weight: 600; }
+.plant-console .kpi-deck__tab-count { color: #a7bbc6; }
+.plant-console .operations-zones button { color: #a7bbc6; }
+.plant-console .operations-zones button[aria-pressed="true"] { background: #203440; color: #d7e6ed; }
+.plant-console .kpi-card { border-color: #203440; padding: 13px 17px; height: 92px; }
+.plant-console .kpi-card:hover { background: #1d2d38; border-color: #2e4553; }
+.plant-console .kpi-card.is-selected { background: #203440; border-color: #2e4553; }
+.plant-console .kpi-card__label { font-size: 11px; color: #a7bbc6; font-weight: 550; }
+.plant-console .kpi-card__primary, .plant-console .kpi-card--metric .kpi-card__primary { color: #eef5f7; font-size: 26px; font-weight: 550; }
+.plant-console .kpi-card__secondary { color: #a7bbc6; font-size: 10px; }
+.plant-console .kpi-card__status--positive { color: #6ed6a2; }
+.plant-console .kpi-card__status--critical { color: #f18b82; }
+.plant-console .kpi-rail__control { color: #d7e6ed; }
+.plant-console .kpi-rail__fade { display: none; }
+.plant-console .operations-twin { background: #203440; border-color: #2e4553; border-radius: 12px; }
+.plant-console .twin-heading { background: #15222c; border-color: #2e4553; height: 49px; }
+.plant-console .twin-heading h2 { color: #eef5f7; font-size: 13px; }
+.plant-console .twin-heading__identity > svg { color: #a7bbc6; }
+.plant-console .twin-version { color: #a7bbc6; }
+.plant-console .twin-heading__meta { color: #a7bbc6; }
+.plant-console .twin-source > span { background: #a7bbc6; }
+.plant-console .twin-canvas { top: 49px; }
+.plant-console .twin-workbench { background: #203440; }
+.plant-console .twin-view-switch, .plant-console .twin-tool-group { background: #17232ded; border-color: #497080; padding: 4px; }
+.plant-console .twin-view-switch button, .plant-console .twin-tool-group button { color: #a7bbc6; }
+.plant-console .twin-view-switch button[aria-pressed="true"], .plant-console .twin-tool-group button[aria-pressed="true"] { background: #203440; color: #d7e6ed; }
+.plant-console .twin-view-switch button:hover, .plant-console .twin-tool-group button:hover { background: #203440; color: #d7e6ed; }
+.plant-console .twin-model-modes button { background: #1d2d38ed; border-color: #497080; color: #d7e6ed; }
+.plant-console .twin-model-modes button[aria-pressed="true"] { background: #203440; color: #d7e6ed; border-color: #203440; }
+.plant-console .plant-label { background: #17232def; border-color: #90aab7; color: #d7e6ed; box-shadow: 0 3px 10px #00000040; }
+.plant-console .plant-label strong { font-weight: 550; }
+.plant-console .plant-label span { color: #a7bbc6; }
+.plant-console .plant-label.is-selected { background: #203440; border-color: #497080; color: #d7e6ed; }
+.plant-console .plant-label.is-selected span { color: #a7bbc6; }
+.plant-console .twin-navigation-hint { color: #d7e6ed; }
+.plant-console .twin-legend, .plant-console .twin-fit { background: #17232deb; border-color: #90aab7; color: #d7e6ed; }
+.plant-console .twin-legend .is-running { background: #6ed6a2; }
+.plant-console .twin-legend .is-attention { background: #e9bd70; }
+.plant-console .twin-process { background: #1d2d38; border-color: #2e4553; }
+.plant-console .twin-process__heading, .plant-console .twin-process__heading > span:first-child { color: #a7bbc6; }
+.plant-console .twin-process__stages > button { color: #d7e6ed; }
+.plant-console .twin-process__stages > button:hover { background: #203440; }
+.plant-console .twin-process__stages > button[aria-pressed="true"] { background: #d7e6ed; color: #1d2d38; border-color: #d7e6ed; }
+.plant-console .twin-process__stages > button[aria-pressed="true"] small { color: #2e4553; }
+.plant-console .twin-process__number { color: #a7bbc6; }
+.plant-console .twin-process__name small { color: #a7bbc6; }
+.plant-console .twin-process__arrow { color: #a7bbc6; }
+.plant-console .operations-sidebar { overflow-y: auto; padding-bottom: 2px; }
+.plant-console .operations-plc.plc-console { background: #17232d; border-color: #2e4553; border-radius: 12px; flex: 0 0 auto; max-height: none; }
+.plant-console .plc-sensor-list { overflow: visible; }
+.plant-console .plc-console h3 { color: #d7e6ed; font-size: 14px !important; }
+.plant-console .plc-console > div:first-child span { color: #a7bbc6; background: #203440; border-color: #2e4553; }
+.plant-console .plc-gate { background: #342e20; border-color: #675535; }
+.plant-console .plc-gate span, .plant-console .plc-gate svg { color: #efca80; }
+.plant-console .plc-gate button { color: #efca80; background: #423720; border-color: #675535; }
+.plant-console .plc-console__section { color: #a7bbc6; font-size: 10px; }
+.plant-console .plc-reading.card-inner { border-color: #203440; min-height: 58px; }
+.plant-console .plc-reading__name > span:first-child { color: #d7e6ed; font-size: 12px !important; }
+.plant-console .plc-reading__name > span:last-child { color: #a7bbc6; }
+.plant-console .plc-reading__value strong { color: #d7e6ed; font-size: 20px; }
+.plant-console .plc-reading__value > span { color: #a7bbc6; }
+.plant-console .plc-reading__range { background: #2e4553; }
+.plant-console .plc-reading__range > span { background: #90aab7; }
+.plant-console .plc-reading__dot { background: #6ed6a2; }
+.plant-console .plc-reading__dot.is-warning { background: #e9bd70; }
+.plant-console .plc-reading__dot.is-critical { background: #f18b82; }
+.plant-console .plc-digital-grid > *, .plant-console .plc-digital-grid .card-inner { background: #203440 !important; border-color: #2e4553 !important; }
+.plant-console .plc-digital-grid .plc-device-label { color: #a7bbc6; }
+.plant-console .plc-digital-grid .font-semibold { color: #a7bbc6 !important; }
+.plant-console .plc-digital-state { color: #d7e6ed !important; }
+.plant-console .plc-digital-card[data-active="true"] .plc-digital-state { color: #6ed6a2 !important; }
+.plant-console .plc-digital-grid .text-blue-200\/60 { color: #a7bbc6; }
+.plant-console .plc-digital-grid .text-\[9px\], .plant-console .plc-digital-grid .text-\[10px\] { color: #a7bbc6; }
+.plant-console .plc-console > div:last-child { border-color: #2e4553; }
+.plant-console .plc-console > div:last-child > span { color: #a7bbc6; }
+.plc-empty { padding: 17px 0 8px; color: #a7bbc6; font-size: 11px; }
+.plc-empty strong { font-size: 12px; font-weight: 500; }
+.plc-empty p { color: #a7bbc6; line-height: 1.5; margin-top: 6px; }
+.plant-console .operations-actuators { flex: 0 0 108px; }
+.plant-console .operations-actuators > * { background: #17232d; border-color: #2e4553; border-radius: 12px; }
+.plant-console .operations-actuators h3 { color: #d7e6ed; }
+.plant-console .operations-actuators [role="status"] { color: #a7bbc6; border-color: #2e4553; background: #1d2d38; }
+.plant-console .twin-settings, .plant-console .twin-inspector { background: #17232dfa; border-color: #497080; color: #d7e6ed; box-shadow: 0 9px 28px #00000040; }
+.plant-console .twin-panel-title h3 { color: #d7e6ed; font-size: 17px; }
+.plant-console .twin-panel-title button { color: #a7bbc6; }
+.plant-console .twin-panel-title button:hover { background: #203440; }
+.plant-console .twin-inspector > p, .plant-console .twin-settings p { color: #a7bbc6; }
+.plant-console .twin-inspector__sensors > div { border-color: #203440; color: #a7bbc6; padding: 11px 0; }
+.plant-console .twin-inspector__sensors strong { color: #d7e6ed; font-size: 14px; }
+.plant-console .twin-inspector__sensors small, .plant-console .twin-inspector__devices { color: #a7bbc6; }
+.plant-console .twin-return { background: #203440; border-color: #497080; color: #d7e6ed; }
+.plant-console .twin-settings label, .plant-console .twin-settings__lighting { color: #a7bbc6; }
+.plant-console .twin-settings select { background: #1d2d38; border-color: #497080; color: #d7e6ed; }
+.plant-console .twin-settings__lighting button { background: #203440; border-color: #497080; color: #a7bbc6; }
+.plant-console .twin-settings__lighting button[aria-pressed="true"] { background: #d7e6ed; color: #1d2d38; }
+.plant-console .twin-simulation-settings summary { color: #d7e6ed; }
+.plant-console .twin-settings__toggles, .plant-console .twin-simulation-settings { border-color: #2e4553; }
+.twin-inspector-slot:empty { display: none; }
+.plant-console .twin-inspector-slot { flex: 0 0 auto; }
+.plant-console .twin-inspector-slot .twin-inspector { position: relative; inset: auto; width: 100%; max-height: none; box-shadow: none; border-radius: 12px; padding: 19px 16px; }
+.plant-console .twin-inspector__status > span:first-child { color: #6ed6a2 !important; }
+.plant-console .twin-inspector[data-status="warning"] .twin-inspector__status > span:first-child, .plant-console .twin-inspector[data-status="blocked"] .twin-inspector__status > span:first-child { color: #e9bd70 !important; }
+.plant-console .twin-inspector[data-status="faulted"] .twin-inspector__status > span:first-child { color: #f18b82 !important; }
+.plant-console .twin-inspector__status > span:first-child i { background: currentColor !important; }
+@media (max-width: 960px) {
+  .plant-console .operations-sidebar { overflow: visible; }
+}
+@media (max-width: 640px) {
+  .plant-console .operations-header { height: 50px; flex-basis: 50px; }
+  .plant-console .lg-agent-trigger { top: 66px !important; }
+  .plant-console .operations-titlebar { flex-basis: 98px; }
+  .plant-console .operations-titlebar h1 { font-size: 27px; }
+  .plant-console .operations-titlebar p { font-size: 11px; }
+  .plant-console .kpi-card { height: 85px; padding: 12px 14px; }
+  .plant-console .kpi-card__primary, .plant-console .kpi-card--metric .kpi-card__primary { font-size: 25px; }
+  .plant-console .twin-heading h2 { font-size: 12px; }
+  .plant-console .twin-inspector-slot { display: none; }
+}
+
+/* The scene owns the space previously occupied by the removed sequence. */
+.plant-console .twin-canvas { bottom: 0; }
+.plant-console .twin-scene-footer { bottom: 15px; }
+.plant-console .operations-nav > button.is-current { border-color: #2e4553; }
+.plant-console .operations-titlebar__status button:last-child { border-color: #2e4553; }
+.plant-console .twin-view-switch button[aria-pressed="true"], .plant-console .twin-tool-group button[aria-pressed="true"] { box-shadow: inset 0 0 0 1px #2e4553; }
+.plant-console .plant-label.is-selected { border-color: #497080; }
+.plant-process-readout { display: flex; align-items: center; gap: 7px; white-space: nowrap; background: #17232df2; border: 1px solid #2e4553; border-radius: 7px; padding: 8px 12px; color: #d7e6ed; font-size: 12px; box-shadow: 0 3px 12px #21576b18; }
+.plant-process-readout i { width: 5px; height: 5px; border-radius: 50%; background: #a7bbc6; }
+@media (max-width: 640px) {
+  .plant-console .twin-scene-footer { bottom: 12px; }
+  .plant-console .twin-toolbar { flex-wrap: wrap; }
+  .plant-console .twin-tool-group { margin-left: auto; }
+  .plant-console .operations-sidebar { display: flex; }
+}
+
+.plant-console .plc-digital-grid > button span, .plant-console .plc-digital-grid > button > div:last-child { color: #a7bbc6 !important; }
+
+@media (max-width: 640px) {
+  .plant-console .operations-twin { height: 425px; min-height: 425px; }
+  .plant-console .twin-inspector-slot { display: block; }
+  .plant-console .twin-inspector-slot:empty { display: none; }
+}
+
+.plant-console .kpi-data-source { background: #1d2d38; color: #a7bbc6; border-radius: 4px; padding: 2px 5px; margin-left: 2px; font-size: 9px; font-weight: 450; }
+.plant-console .twin-inspector__source { display: flex; flex-direction: column; gap: 5px; padding: 10px 0 12px; color: #a7bbc6; font-size: 11px; line-height: 1.5; }
+.plant-console .twin-inspector__source strong { font-weight: 550; color: #d7e6ed; }
+.plant-console .twin-inspector__status { gap: 8px; flex-wrap: wrap; }
+.plant-console .twin-inspector__status > span:last-child { color: #a7bbc6; }

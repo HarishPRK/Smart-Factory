@@ -17,8 +17,8 @@ import pepsicoLogo from "../../assets/pepsico-logo.png";
  */
 
 const S = { metalness: 0.8, roughness: 0.2 };
-const DS = { color: "#374151", ...S };
-const LS = { color: "#9ca3af", ...S };
+const DS = { color: "#657782", metalness: 0.65, roughness: 0.35 };
+const LS = { color: "#c1cdd2", metalness: 0.75, roughness: 0.28 };
 const YELLOW = { color: "#fbbf24", roughness: 0.4, metalness: 0.3 };
 const PANEL = { color: "#1e293b", metalness: 0.3, roughness: 0.7 };
 
@@ -653,7 +653,7 @@ interface StageEquipment3DProps {
 const StageEquipment3D: React.FC<StageEquipment3DProps> = ({ stageId }) => {
   const Equipment = EQUIPMENT[stageId];
   if (!Equipment) return null;
-  return <Equipment />;
+  return <group scale={1.5} position={[0, 0.25, 0]}><Equipment /></group>;
 };
 
 export default StageEquipment3D;

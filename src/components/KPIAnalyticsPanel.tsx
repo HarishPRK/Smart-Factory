@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
+import "./workspace-details.css";
 import { usePLCContext, useMqttBufferContext } from "../context/PLCContext";
 import CountUp from "./CountUp";
 import type { TimeRange } from "../types";
@@ -24,24 +25,24 @@ interface PLCParam {
 }
 
 const ANALOG_PARAMS: PLCParam[] = [
-  { id: "voltage", label: "Voltage", unit: "V", color: "#f59e0b", min: 0, max: 12, nominal: 5.0, kind: "analog" },
-  { id: "current", label: "Current", unit: "A", color: "#06b6d4", min: 0, max: 10, nominal: 6.0, kind: "analog" },
-  { id: "pH", label: "pH", unit: "pH", color: "#8b5cf6", min: 0, max: 14, nominal: 7.0, kind: "analog" },
-  { id: "temperature", label: "Temperature", unit: "°C", color: "#ef4444", min: 0, max: 100, nominal: 25.0, kind: "analog" },
+  { id: "voltage", label: "Voltage", unit: "V", color: "#e9bd70", min: 0, max: 12, nominal: 5.0, kind: "analog" },
+  { id: "current", label: "Current", unit: "A", color: "#43d8f1", min: 0, max: 10, nominal: 6.0, kind: "analog" },
+  { id: "pH", label: "pH", unit: "pH", color: "#4ac2be", min: 0, max: 14, nominal: 7.0, kind: "analog" },
+  { id: "temperature", label: "Temperature", unit: "°C", color: "#f18b82", min: 0, max: 100, nominal: 25.0, kind: "analog" },
 ];
 
 const DIGITAL_PARAMS: PLCParam[] = [
-  { id: "photoE_sensor", label: "Photo-E Sensor", unit: "", color: "#10b981", min: 0, max: 1, nominal: 0, kind: "digital" },
+  { id: "photoE_sensor", label: "Photo-E Sensor", unit: "", color: "#6ed6a2", min: 0, max: 1, nominal: 0, kind: "digital" },
   { id: "metal_sensor", label: "Metal Detector", unit: "", color: "#3b82f6", min: 0, max: 1, nominal: 0, kind: "digital" },
-  { id: "motor", label: "Motor Fan", unit: "", color: "#06b6d4", min: 0, max: 1, nominal: 0, kind: "digital" },
-  { id: "push_button", label: "Push Button", unit: "", color: "#f59e0b", min: 0, max: 1, nominal: 0, kind: "digital" },
+  { id: "motor", label: "Motor Fan", unit: "", color: "#43d8f1", min: 0, max: 1, nominal: 0, kind: "digital" },
+  { id: "push_button", label: "Push Button", unit: "", color: "#e9bd70", min: 0, max: 1, nominal: 0, kind: "digital" },
 ];
 
 const ALERT_PARAMS: PLCParam[] = [
-  { id: "alert_0", label: "Alert Ch-0", unit: "", color: "#ef4444", min: 0, max: 1, nominal: 0, kind: "digital" },
+  { id: "alert_0", label: "Alert Ch-0", unit: "", color: "#f18b82", min: 0, max: 1, nominal: 0, kind: "digital" },
   { id: "alert_1", label: "Alert Ch-1", unit: "", color: "#f97316", min: 0, max: 1, nominal: 0, kind: "digital" },
   { id: "alert_2", label: "Alert Ch-2", unit: "", color: "#eab308", min: 0, max: 1, nominal: 0, kind: "digital" },
-  { id: "alert_3", label: "Alert Ch-3 (Emergency)", unit: "", color: "#ec4899", min: 0, max: 1, nominal: 0, kind: "digital" },
+  { id: "alert_3", label: "Alert Ch-3 (Emergency)", unit: "", color: "#f18b82", min: 0, max: 1, nominal: 0, kind: "digital" },
 ];
 
 const ALL_PARAMS = [...ANALOG_PARAMS, ...DIGITAL_PARAMS];
@@ -90,6 +91,25 @@ function detectAnomalies(data: number[]): number[] {
 
 /* ── SVG Area Chart ──────────────────────────────────── */
 
+/** Match chart coordinates to CSS pixels so axes keep their size as panels resize. */
+function useChartWidth() {
+  const ref = useRef<SVGSVGElement>(null);
+  const [width, setWidth] = useState(500);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entry]) => {
+      const measured = Math.round(entry.contentRect.width);
+      if (measured > 0) setWidth(measured);
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  return { ref, width };
+}
+
 interface ChartProps {
   data: number[];
   color: string;
@@ -98,16 +118,16 @@ interface ChartProps {
   height?: number;
   unit?: string;
   nominal?: number;
-  /** When set, the line draws itself in and re-draws whenever this key changes. */
+  /** Identifies the selected parameter and range for the rendered path. */
   drawKey?: string;
 }
 
 const AreaChart: React.FC<ChartProps> = ({
   data, color, anomalies = [], timeRange, height = 160, unit, nominal, drawKey,
 }) => {
-  const W = 500;
+  const { ref, width: W } = useChartWidth();
   const H = height;
-  const pad = { top: 16, right: 12, bottom: 28, left: 44 };
+  const pad = { top: 16, right: 44, bottom: 28, left: unit ? 76 : 48 };
   const cw = W - pad.left - pad.right;
   const ch = H - pad.top - pad.bottom;
 
@@ -115,7 +135,7 @@ const AreaChart: React.FC<ChartProps> = ({
   const max = Math.max(...data) * 1.08;
   const range = max - min || 1;
 
-  const toX = (i: number) => pad.left + (i / (data.length - 1)) * cw;
+  const toX = (i: number) => pad.left + (i / Math.max(1, data.length - 1)) * cw;
   const toY = (v: number) => pad.top + ch - ((v - min) / range) * ch;
 
   const pts = data.map((v, i) => ({ x: toX(i), y: toY(v) }));
@@ -129,7 +149,7 @@ const AreaChart: React.FC<ChartProps> = ({
   const numTicks = Math.min(6, data.length);
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height }}>
+    <svg ref={ref} viewBox={`0 0 ${W} ${H}`} className="analytics-chart" style={{ height }}>
       <defs>
         <linearGradient id={`chart-fill-${color.replace("#", "")}`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.25" />
@@ -143,8 +163,8 @@ const AreaChart: React.FC<ChartProps> = ({
         const val = min + range * frac;
         return (
           <g key={frac}>
-            <line x1={pad.left} y1={y} x2={W - pad.right} y2={y} stroke="rgba(100,160,220,0.08)" strokeWidth="1" />
-            <text x={pad.left - 6} y={y + 3} textAnchor="end" fill="rgba(140,180,220,0.55)" fontSize="9" fontFamily="Inter">
+            <line x1={pad.left} y1={y} x2={W - pad.right} y2={y} stroke="#29414e" strokeWidth="1" />
+            <text x={pad.left - 8} y={y + 4} textAnchor="end" fill="#90aab7" fontSize="11" fontFamily="Inter">
               {val >= 100 ? Math.round(val) : val.toFixed(1)}{unit ? ` ${unit}` : ""}
             </text>
           </g>
@@ -157,9 +177,8 @@ const AreaChart: React.FC<ChartProps> = ({
           <line
             x1={pad.left} y1={toY(nominal)} x2={W - pad.right} y2={toY(nominal)}
             stroke={color} strokeWidth="1" strokeDasharray="6 4" opacity="0.4"
-            style={{ transition: "y1 0.8s ease, y2 0.8s ease" }}
           />
-          <text x={W - pad.right + 4} y={toY(nominal) + 3} fill={color} fontSize="8" fontFamily="Inter" opacity="0.6">
+          <text x={W - pad.right + 7} y={toY(nominal) + 4} fill={color} fontSize="11" fontFamily="Inter">
             nom
           </text>
         </g>
@@ -167,36 +186,26 @@ const AreaChart: React.FC<ChartProps> = ({
 
       {/* X-axis labels */}
       {Array.from({ length: numTicks }, (_, i) => {
-        const idx = Math.round((i / (numTicks - 1)) * (data.length - 1));
+        const idx = Math.round((i / Math.max(1, numTicks - 1)) * (data.length - 1));
         return (
-          <text key={i} x={toX(idx)} y={H - 4} textAnchor="middle" fill="rgba(140,180,220,0.55)" fontSize="9" fontFamily="Inter">
+          <text key={i} x={toX(idx)} y={H - 5} textAnchor="middle" fill="#90aab7" fontSize="11" fontFamily="Inter">
             {tcfg.tickFormat(idx, data.length)}
           </text>
         );
       })}
 
-      {/* Area fill + line — smooth transitions on data update */}
+      {/* Data geometry uses the measured plot width; no decorative motion. */}
       <path
         d={`${path} L${pts[pts.length - 1].x},${pad.top + ch} L${pts[0].x},${pad.top + ch} Z`}
         fill={`url(#chart-fill-${color.replace("#", "")})`}
-        style={{ transition: "d 0.8s cubic-bezier(0.4, 0, 0.2, 1)" }}
       />
       <path
         key={drawKey}
         d={path} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round"
-        pathLength={drawKey ? 1 : undefined}
-        style={{
-          transition: "d 0.8s cubic-bezier(0.4, 0, 0.2, 1)",
-          filter: `drop-shadow(0 0 4px ${color}66)`,
-          ...(drawKey ? { strokeDasharray: 1, animation: "oee-draw 1s ease-out both" } : {}),
-        }}
       />
       <circle
         cx={pts[pts.length - 1].x} cy={pts[pts.length - 1].y} r="3" fill={color}
-        style={{ transition: "cx 0.8s cubic-bezier(0.4, 0, 0.2, 1), cy 0.8s cubic-bezier(0.4, 0, 0.2, 1)", filter: `drop-shadow(0 0 4px ${color})` }}
-      >
-        <animate attributeName="r" values="3;4.5;3" dur="1.8s" repeatCount="indefinite" />
-      </circle>
+      />
 
       {/* Anomaly markers */}
       {anomalies.map((idx) => {
@@ -204,9 +213,9 @@ const AreaChart: React.FC<ChartProps> = ({
         const y = toY(data[idx]);
         return (
           <g key={`anom-${idx}`} style={{ transition: "transform 0.8s ease" }}>
-            <circle cx={x} cy={y} r="6" fill="rgba(239,68,68,0.15)" stroke="#ef4444" strokeWidth="1.5" style={{ transition: "cx 0.8s ease, cy 0.8s ease" }} />
-            <circle cx={x} cy={y} r="2.5" fill="#ef4444" style={{ transition: "cx 0.8s ease, cy 0.8s ease" }} />
-            <line x1={x} y1={y + 8} x2={x} y2={pad.top + ch} stroke="#ef4444" strokeWidth="1" strokeDasharray="3 3" opacity="0.3" style={{ transition: "x1 0.8s ease, y1 0.8s ease" }} />
+            <circle cx={x} cy={y} r="6" fill="rgba(239,68,68,0.15)" stroke="#f18b82" strokeWidth="1.5" style={{ transition: "cx 0.8s ease, cy 0.8s ease" }} />
+            <circle cx={x} cy={y} r="2.5" fill="#f18b82" style={{ transition: "cx 0.8s ease, cy 0.8s ease" }} />
+            <line x1={x} y1={y + 8} x2={x} y2={pad.top + ch} stroke="#f18b82" strokeWidth="1" strokeDasharray="3 3" opacity="0.3" style={{ transition: "x1 0.8s ease, y1 0.8s ease" }} />
           </g>
         );
       })}
@@ -403,6 +412,7 @@ const SensorCard: React.FC<{
 };
 
 const DigitalChannel: React.FC<{ param: PLCParam; timeRange: AnalyticsTimeRange }> = ({ param, timeRange }) => {
+  const { ref, width } = useChartWidth();
   const tcfg = TIME_CONFIGS[timeRange];
   const history = usePLCHistory(param, timeRange, tcfg.points);
   const digitalData = history.data.map((v) => (v >= 0.5 ? 1 : 0));
@@ -436,11 +446,11 @@ const DigitalChannel: React.FC<{ param: PLCParam; timeRange: AnalyticsTimeRange 
           }`}>{isOn ? "ON" : "OFF"}</span>
         </div>
       </div>
-      <svg viewBox="0 0 500 60" className="w-full" style={{ height: 60 }}>
+      <svg ref={ref} viewBox={`0 0 ${width} 60`} className="analytics-chart" style={{ height: 60 }}>
         {digitalData.map((v, i) => {
           if (i === 0) return null;
-          const x1 = 20 + ((i - 1) / (digitalData.length - 1)) * 460;
-          const x2 = 20 + (i / (digitalData.length - 1)) * 460;
+          const x1 = 56 + ((i - 1) / (digitalData.length - 1)) * (width - 68);
+          const x2 = 56 + (i / (digitalData.length - 1)) * (width - 68);
           const yPrev = digitalData[i - 1] === 1 ? 12 : 48;
           const y1 = v === 1 ? 12 : 48;
           return (
@@ -450,14 +460,15 @@ const DigitalChannel: React.FC<{ param: PLCParam; timeRange: AnalyticsTimeRange 
             </g>
           );
         })}
-        <text x="4" y="16" fill="rgba(140,180,220,0.4)" fontSize="8" fontFamily="Inter">ON</text>
-        <text x="2" y="52" fill="rgba(140,180,220,0.4)" fontSize="8" fontFamily="Inter">OFF</text>
+        <text x="4" y="16" fill="#90aab7" fontSize="11" fontFamily="Inter">ON</text>
+        <text x="2" y="52" fill="#90aab7" fontSize="11" fontFamily="Inter">OFF</text>
       </svg>
     </div>
   );
 };
 
 const AlertChannel: React.FC<{ param: PLCParam; timeRange: AnalyticsTimeRange }> = ({ param, timeRange }) => {
+  const { ref, width } = useChartWidth();
   const tcfg = TIME_CONFIGS[timeRange];
   const history = usePLCHistory(param, timeRange, tcfg.points);
   const alertData = history.data.map((v) => (v >= 0.5 ? 1 : 0));
@@ -473,8 +484,8 @@ const AlertChannel: React.FC<{ param: PLCParam; timeRange: AnalyticsTimeRange }>
             isActive ? "bg-red-500/15 border-red-500/25 shadow-[0_0_12px_rgba(239,68,68,0.15)]" : "bg-white/[0.03] border-white/[0.06]"
           }`}>
             <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
-              <path d="M10 2L1 18h18L10 2z" stroke={isActive ? param.color : "rgba(140,180,220,0.3)"} strokeWidth="1.5" strokeLinejoin="round" />
-              <path d="M10 8v4M10 14.5v.5" stroke={isActive ? param.color : "rgba(140,180,220,0.3)"} strokeWidth="1.5" strokeLinecap="round" />
+              <path d="M10 2L1 18h18L10 2z" stroke={isActive ? param.color : "#90aab7"} strokeWidth="1.5" strokeLinejoin="round" />
+              <path d="M10 8v4M10 14.5v.5" stroke={isActive ? param.color : "#90aab7"} strokeWidth="1.5" strokeLinecap="round" />
             </svg>
           </div>
           <div>
@@ -487,7 +498,7 @@ const AlertChannel: React.FC<{ param: PLCParam; timeRange: AnalyticsTimeRange }>
         <div className="flex items-center gap-4">
           <div className="text-center">
             <div className="text-[9px] text-sky-200/45 uppercase">Activations</div>
-            <div className="text-[16px] font-semibold" style={{ color: activations > 0 ? param.color : "rgba(140,180,220,0.5)" }}>{activations}</div>
+            <div className="text-[16px] font-semibold" style={{ color: activations > 0 ? param.color : "#90aab7" }}>{activations}</div>
           </div>
           <div className="text-center">
             <div className="text-[9px] text-sky-200/45 uppercase">Active</div>
@@ -498,11 +509,11 @@ const AlertChannel: React.FC<{ param: PLCParam; timeRange: AnalyticsTimeRange }>
           }`}>{isActive ? "TRIGGERED" : "CLEAR"}</span>
         </div>
       </div>
-      <svg viewBox="0 0 500 50" className="w-full" style={{ height: 50 }}>
+      <svg ref={ref} viewBox={`0 0 ${width} 50`} className="analytics-chart" style={{ height: 50 }}>
         {alertData.map((v, i) => {
           if (i === 0) return null;
-          const x1 = 20 + ((i - 1) / (alertData.length - 1)) * 460;
-          const x2 = 20 + (i / (alertData.length - 1)) * 460;
+          const x1 = 56 + ((i - 1) / (alertData.length - 1)) * (width - 68);
+          const x2 = 56 + (i / (alertData.length - 1)) * (width - 68);
           const yPrev = alertData[i - 1] === 1 ? 8 : 42;
           const y1 = v === 1 ? 8 : 42;
           return (
@@ -513,8 +524,8 @@ const AlertChannel: React.FC<{ param: PLCParam; timeRange: AnalyticsTimeRange }>
             </g>
           );
         })}
-        <text x="4" y="12" fill="rgba(239,68,68,0.4)" fontSize="8" fontFamily="Inter">ALERT</text>
-        <text x="2" y="46" fill="rgba(140,180,220,0.3)" fontSize="8" fontFamily="Inter">CLEAR</text>
+        <text x="4" y="12" fill="#f18b82" fontSize="11" fontFamily="Inter">ALERT</text>
+        <text x="2" y="46" fill="#90aab7" fontSize="11" fontFamily="Inter">CLEAR</text>
       </svg>
     </div>
   );
@@ -560,7 +571,7 @@ const SiteWiseMetricsCard: React.FC<{ param: PLCParam }> = ({ param }) => {
   const items = isAnalog
     ? [
         { label: "Avg (1h)", value: metrics?.avg_1h?.value, unit: param.unit, color: param.color },
-        { label: "Max (1h)", value: metrics?.max_1h?.value, unit: param.unit, color: "#ef4444" },
+        { label: "Max (1h)", value: metrics?.max_1h?.value, unit: param.unit, color: "#f18b82" },
       ]
     : [
         { label: "Toggles (1h)", value: metrics?.toggle_count_1h?.value, unit: "times", color: param.color },
@@ -613,8 +624,8 @@ const SiteWiseMetricsCard: React.FC<{ param: PLCParam }> = ({ param }) => {
 /* ── Shift Comparison ─────────────────────────────────── */
 
 const SHIFTS = [
-  { id: "day", label: "Day Shift", hours: [6, 14], color: "#f59e0b" },
-  { id: "evening", label: "Evening Shift", hours: [14, 22], color: "#8b5cf6" },
+  { id: "day", label: "Day Shift", hours: [6, 14], color: "#e9bd70" },
+  { id: "evening", label: "Evening Shift", hours: [14, 22], color: "#67d9eb" },
   { id: "night", label: "Night Shift", hours: [22, 6], color: "#3b82f6" },
 ] as const;
 
@@ -643,6 +654,7 @@ function getShiftBoundaries(shiftId: string, offset = 0) {
 }
 
 const ShiftComparisonSection: React.FC<{ param: PLCParam }> = ({ param }) => {
+  const { ref, width } = useChartWidth();
   const [selectedShift, setSelectedShift] = useState("day");
   const shift = SHIFTS.find((s) => s.id === selectedShift) ?? SHIFTS[0];
 
@@ -681,7 +693,7 @@ const ShiftComparisonSection: React.FC<{ param: PLCParam }> = ({ param }) => {
       </div>
 
       {/* Overlaid chart */}
-      <div className="card p-5">
+      <div className="card p-5 analytics-main-chart">
         <div className="flex items-center justify-between mb-3">
           <div>
             <h3 className="text-[14px] font-semibold text-cyan-50">{param.label} — {shift.label}</h3>
@@ -702,7 +714,7 @@ const ShiftComparisonSection: React.FC<{ param: PLCParam }> = ({ param }) => {
         </div>
 
         {/* Dual chart */}
-        <svg viewBox="0 0 500 200" className="w-full" style={{ height: 200 }}>
+        <svg ref={ref} viewBox={`0 0 ${width} 220`} className="analytics-chart" style={{ height: 220 }}>
           <defs>
             <linearGradient id="shift-fill-current" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={shift.color} stopOpacity="0.2" />
@@ -710,9 +722,9 @@ const ShiftComparisonSection: React.FC<{ param: PLCParam }> = ({ param }) => {
             </linearGradient>
           </defs>
           {(() => {
-            const pad = { top: 16, right: 12, bottom: 28, left: 44 };
-            const cw = 500 - pad.left - pad.right;
-            const ch = 200 - pad.top - pad.bottom;
+            const pad = { top: 16, right: 20, bottom: 28, left: 55 };
+            const cw = width - pad.left - pad.right;
+            const ch = 220 - pad.top - pad.bottom;
             const allVals = [...currentData, ...prevData];
             const min = Math.min(...allVals) * 0.92;
             const max = Math.max(...allVals) * 1.08;
@@ -740,8 +752,8 @@ const ShiftComparisonSection: React.FC<{ param: PLCParam }> = ({ param }) => {
                   const val = min + range * frac;
                   return (
                     <g key={frac}>
-                      <line x1={pad.left} y1={y} x2={500 - pad.right} y2={y} stroke="rgba(100,160,220,0.08)" strokeWidth="1" />
-                      <text x={pad.left - 6} y={y + 3} textAnchor="end" fill="rgba(140,180,220,0.5)" fontSize="9" fontFamily="Inter">
+                      <line x1={pad.left} y1={y} x2={width - pad.right} y2={y} stroke="#29414e" strokeWidth="1" />
+                      <text x={pad.left - 6} y={y + 3} textAnchor="end" fill="#90aab7" fontSize="11" fontFamily="Inter">
                         {val.toFixed(1)}
                       </text>
                     </g>
@@ -766,8 +778,8 @@ const ShiftComparisonSection: React.FC<{ param: PLCParam }> = ({ param }) => {
         {[
           { label: "Current Avg", value: currentAvg.toFixed(1), color: shift.color },
           { label: "Previous Avg", value: prevAvg.toFixed(1), color: `${shift.color}80` },
-          { label: "Delta", value: `${delta > 0 ? "+" : ""}${delta.toFixed(2)}`, color: improved ? "#10b981" : "#ef4444" },
-          { label: "Change", value: `${Number(deltaPct) > 0 ? "+" : ""}${deltaPct}%`, color: improved ? "#10b981" : "#ef4444" },
+          { label: "Delta", value: `${delta > 0 ? "+" : ""}${delta.toFixed(2)}`, color: improved ? "#6ed6a2" : "#f18b82" },
+          { label: "Change", value: `${Number(deltaPct) > 0 ? "+" : ""}${deltaPct}%`, color: improved ? "#6ed6a2" : "#f18b82" },
         ].map((s) => (
           <div key={s.label} className="card-inner p-3.5">
             <div className="text-[10px] text-sky-200/55 uppercase tracking-[0.12em] font-semibold">{s.label}</div>
@@ -785,7 +797,7 @@ const ShiftComparisonSection: React.FC<{ param: PLCParam }> = ({ param }) => {
           }`}>
             <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
               <path d={improved ? "M10 15V5M6 9l4-4 4 4" : "M10 5v10M6 11l4 4 4-4"}
-                stroke={improved ? "#10b981" : "#ef4444"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                stroke={improved ? "#6ed6a2" : "#f18b82"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
           <div>
@@ -847,6 +859,13 @@ const KPIAnalyticsPanel: React.FC<KPIAnalyticsPanelProps> = ({ open, onClose }) 
   const [localTimeRange, setLocalTimeRange] = useState<AnalyticsTimeRange>("1m");
   const [activeSection, setActiveSection] = useState<"trends" | "all-params" | "digital" | "alerts" | "shifts">("trends");
 
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, onClose]);
+
   const param = ALL_PARAMS.find((p) => p.id === selectedParam) ?? ANALOG_PARAMS[0];
   const tcfg = TIME_CONFIGS[localTimeRange];
 
@@ -868,80 +887,60 @@ const KPIAnalyticsPanel: React.FC<KPIAnalyticsPanelProps> = ({ open, onClose }) 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} style={{ animation: "fadeIn 0.25s ease" }} />
+    <div className="analytics-overlay">
+      <div className="analytics-backdrop" onClick={onClose} style={{ animation: "fadeIn 0.25s ease" }} />
 
       <div
-        className="relative w-[90vw] max-w-[1100px] max-h-[85vh] bg-[#0a1628]/95 backdrop-blur-2xl border border-cyan-300/12 rounded-2xl shadow-[0_20px_80px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden"
+        className="analytics-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label="PLC Analytics"
         style={{ animation: "modalIn 0.32s cubic-bezier(0.16, 1, 0.3, 1)" }}
       >
-        {/* Animated accent sweep along the top edge */}
-        <div className="absolute top-0 left-0 right-0 h-px overflow-hidden">
-          <div className="h-full w-1/3 bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent" style={{ animation: "oee-bar-shimmer 3.5s ease-in-out infinite" }} />
-        </div>
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-cyan-300/[0.08]">
-          <div>
-            <h2 className="text-[16px] font-semibold text-cyan-50 tracking-tight">PLC Analytics</h2>
-            <p className="text-[11px] text-sky-200/60 font-medium mt-0.5">
-              Historical trends, anomaly detection, and parameter insights from SiteWise
-            </p>
+        <header className="analytics-header">
+          <div className="analytics-title">
+            <h2>PLC Analytics</h2>
+            <p>Explore sensor history, events and shift performance.</p>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex gap-1 p-1 rounded-xl bg-white/[0.03] border border-cyan-300/[0.08]">
-              {(["trends", "all-params", "digital", "alerts", "shifts"] as const).map((sec) => (
-                <button
-                  key={sec}
-                  onClick={() => setActiveSection(sec)}
-                  className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all duration-200 ${
-                    activeSection === sec
-                      ? "bg-cyan-500/[0.12] text-cyan-100"
-                      : "text-sky-200/50 hover:text-sky-100/70"
-                  }`}
-                >
-                  {sec === "trends" ? "Trends" : sec === "all-params" ? "All Sensors" : sec === "digital" ? "Digital I/O" : sec === "alerts" ? "Alerts" : "Shift Compare"}
-                </button>
-              ))}
-            </div>
-            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/[0.06] text-cyan-100/50 hover:text-white transition-all">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
+          <div className="analytics-header-actions">
+            <span className="analytics-source" data-source={historyData.source}><i />{historyData.loading ? "Loading history" : historyData.source === "mqtt" ? "MQTT buffer" : historyData.source === "sitewise" ? "SiteWise history" : "Sample data"}</span>
+            <button className="workspace-close" aria-label="Close analytics" onClick={onClose}>
+              <svg width="17" height="17" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
             </button>
           </div>
-        </div>
+        </header>
+        <nav className="analytics-sections" aria-label="Analytics views">
+          {(["trends", "all-params", "digital", "alerts", "shifts"] as const).map((sec) => (
+            <button key={sec} onClick={() => setActiveSection(sec)} aria-current={activeSection === sec ? "page" : undefined}>
+              {sec === "trends" ? "Trends" : sec === "all-params" ? "All sensors" : sec === "digital" ? "Digital I/O" : sec === "alerts" ? "Alerts" : "Shift comparison"}
+            </button>
+          ))}
+        </nav>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="analytics-content">
           {/* ── Parameter Selector + Time Toggle ── */}
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex gap-2">
+          <div className="analytics-filters">
+            <div className="analytics-parameters">
               {(activeSection === "digital" ? DIGITAL_PARAMS : ANALOG_PARAMS).map((p) => (
                 <button
                   key={p.id}
                   onClick={() => setSelectedParam(p.id)}
-                  className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all duration-200 border flex items-center gap-2 ${
-                    selectedParam === p.id
-                      ? "bg-white/[0.08] border-white/[0.12] text-white"
-                      : "border-transparent text-sky-200/50 hover:text-sky-100/70 hover:bg-white/[0.03]"
-                  }`}
+                  className="analytics-parameter"
+                  aria-pressed={selectedParam === p.id}
                 >
                   <span className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
                   {p.label}
                 </button>
               ))}
             </div>
-            <div className="flex gap-1 p-0.5 rounded-lg bg-white/[0.03] border border-cyan-300/[0.08]">
+            <div className="analytics-ranges">
               {ALL_TIME_RANGES.map((t) => (
                 <button
                   key={t}
                   onClick={() => setLocalTimeRange(t)}
-                  className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all duration-200 ${
-                    localTimeRange === t
-                      ? "bg-blue-500 text-white shadow-[0_2px_8px_rgba(59,130,246,0.3)]"
-                      : "text-sky-200/50 hover:text-white"
-                  }`}
+                  className="analytics-range"
+                  aria-pressed={localTimeRange === t}
                 >
                   {t}
                 </button>
@@ -952,7 +951,7 @@ const KPIAnalyticsPanel: React.FC<KPIAnalyticsPanelProps> = ({ open, onClose }) 
           {/* ── TRENDS Section ── */}
           {activeSection === "trends" && (
             <div className="space-y-5">
-              <div className="card p-5">
+              <div className="card p-5 analytics-main-chart">
                 <div className="flex items-center justify-between mb-3">
                   <div>
                     <h3 className="text-[14px] font-semibold text-cyan-50">
@@ -1026,9 +1025,9 @@ const KPIAnalyticsPanel: React.FC<KPIAnalyticsPanelProps> = ({ open, onClose }) 
               <div className="grid grid-cols-4 gap-3">
                 {[
                   { label: "Average", value: Number(stats.avg), color: param.color },
-                  { label: "Peak", value: Number(stats.peak), color: "#ef4444" },
-                  { label: "Minimum", value: Number(stats.min), color: "#10b981" },
-                  { label: "Anomalies", value: anomalies.length, color: anomalies.length > 0 ? "#ef4444" : "#10b981" },
+                  { label: "Peak", value: Number(stats.peak), color: "#f18b82" },
+                  { label: "Minimum", value: Number(stats.min), color: "#6ed6a2" },
+                  { label: "Anomalies", value: anomalies.length, color: anomalies.length > 0 ? "#f18b82" : "#6ed6a2" },
                 ].map((stat, i) => (
                   <div
                     key={stat.label}
@@ -1054,7 +1053,7 @@ const KPIAnalyticsPanel: React.FC<KPIAnalyticsPanelProps> = ({ open, onClose }) 
                     { label: "Max Deviation", value: Math.max(Math.abs(Number(stats.peak) - param.nominal), Math.abs(Number(stats.min) - param.nominal)).toFixed(2), pct: (Math.max(Math.abs(Number(stats.peak) - param.nominal), Math.abs(Number(stats.min) - param.nominal)) / (param.max - param.min) * 100).toFixed(1) },
                   ].map((d) => {
                     const severity = Number(d.pct) > 40 ? "critical" : Number(d.pct) > 20 ? "warning" : "normal";
-                    const sColor = severity === "critical" ? "#ef4444" : severity === "warning" ? "#f59e0b" : "#10b981";
+                    const sColor = severity === "critical" ? "#f18b82" : severity === "warning" ? "#e9bd70" : "#6ed6a2";
                     return (
                       <div key={d.label} className="card-inner p-3">
                         <div className="text-[10px] text-sky-200/55 font-medium">{d.label}</div>

@@ -4,8 +4,8 @@
  * Zero dependencies beyond React (18 or 19). Renders the widget in an iframe
  * and speaks its postMessage protocol (see twin-manifest.json).
  *
- * Host-app setup: copy the widget's `app/` folder to
- * `public/widgets/gw-twin/` (or pass a custom `src`).
+ * Uses the hosted live HTTP Twin by default. Pass a custom `src` to use
+ * another deployment or the bundled widget.
  *
  * Usage:
  *   const twin = useRef<GatewayTwinHandle>(null)
@@ -68,11 +68,11 @@ export interface GatewayTwinEmbedProps {
   onTwinEvent?: (event: TwinEvent) => void
 }
 
-const DEFAULT_SRC = '/widgets/gw-twin/app/index.html'
+const DEFAULT_SRC = 'http://ce-public-alb-1719524608.us-east-1.elb.amazonaws.com/'
 // The widget entry document is intentionally versioned so an already-open
 // Smart Factory session cannot resurrect an older cached iframe bundle after
 // a Twin deployment. Hashed JS/CSS assets remain immutable once selected.
-const TWIN_EMBED_BUILD = 'live-20260804-rails'
+const TWIN_EMBED_BUILD = 'live-http-20260910'
 
 export const GatewayTwinEmbed = forwardRef<GatewayTwinHandle, GatewayTwinEmbedProps>(
   function GatewayTwinEmbed(props, ref) {

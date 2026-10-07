@@ -220,6 +220,7 @@ function wifiClientToRawDevice(c: IpsecWifiClient): Record<string, unknown> {
 class IpsecSource extends EventEmitter {
   private gateways = new Map<string, IpsecGatewayState>();
   private connection?: mqtt.MqttClientConnection;
+  private subscriptions = new Map<string, Parameters<mqtt.MqttClientConnection['subscribe']>>();
   private started = false;
   private connected = false;
   private lastError?: string;
@@ -300,12 +301,10 @@ class IpsecSource extends EventEmitter {
         console.warn('[ipsec] connection interrupted:', this.lastError);
         this.emit('status', { connected: false, reason: this.lastError });
       });
-      this.connection.on('resume', () => {
-        this.connected = true;
-        this.lastError = undefined;
-        // eslint-disable-next-line no-console
-        console.log('[ipsec] connection resumed');
-        this.emit('status', { connected: true });
+      this.connection.on('resume', (_returnCode, sessionPresent) => {
+        // A clean MQTT session loses its broker-side subscriptions on reconnect.
+        // Restore them before reporting a healthy telemetry connection.
+        void this.restoreSubscriptions(sessionPresent);
       });
       this.connection.on('disconnect', () => {
         this.connected = false;
@@ -324,7 +323,7 @@ class IpsecSource extends EventEmitter {
       // its own `gateway.name`; we tag the cached state with the source so the
       // UI can route Plano (`rdk/...`) and McKinney (`prpl/...`) separately.
       for (const topic of SUBSCRIBE_TOPICS) {
-        await this.connection.subscribe(
+        await this.subscribe(
           topic,
           mqtt.QoS.AtMostOnce,
           (t, payload) => this.handleMessage(t, payload),
@@ -334,7 +333,7 @@ class IpsecSource extends EventEmitter {
       // Subscribe to the path-control result topics so we can correlate acks
       // from the gateway's pathcontrol component back to in-flight commands.
       for (const prefix of PATH_PREFIXES) {
-        await this.connection.subscribe(
+        await this.subscribe(
           pathResultTopic(prefix),
           mqtt.QoS.AtLeastOnce,
           (t, payload) => this.handlePathResult(t, payload),
@@ -344,7 +343,7 @@ class IpsecSource extends EventEmitter {
       // Subscribe to the device-inventory topics. The parsed payload is fanned
       // out via the `inventory` event; deviceSource consumes it.
       for (const topic of INVENTORY_TOPICS) {
-        await this.connection.subscribe(
+        await this.subscribe(
           topic,
           mqtt.QoS.AtLeastOnce,
           (t, payload) => this.handleInventory(t, payload),
@@ -355,7 +354,7 @@ class IpsecSource extends EventEmitter {
       // message updates the aggregated AAR state and fans out via the `aar`
       // event; the Application Steering Patchboard consumes it over SSE.
       for (const topic of AAR_TOPICS) {
-        await this.connection.subscribe(
+        await this.subscribe(
           topic,
           mqtt.QoS.AtMostOnce,
           (t, payload) => this.handleAarMessage(t, payload),
@@ -366,7 +365,7 @@ class IpsecSource extends EventEmitter {
 
       // Subscribe to the Matter device-list topics under their own source tag.
       for (const topic of MATTER_TOPICS) {
-        await this.connection.subscribe(
+        await this.subscribe(
           topic,
           mqtt.QoS.AtLeastOnce,
           (t, payload) => this.handleInventory(t, payload, `${topicToSource(t)}:matter`),
@@ -375,7 +374,7 @@ class IpsecSource extends EventEmitter {
 
       // Subscribe to the Matter control result topic so sendMatterCommand can
       // correlate the gateway component's acks back to in-flight commands.
-      await this.connection.subscribe(
+      await this.subscribe(
         MATTER_RESULT_TOPIC,
         mqtt.QoS.AtLeastOnce,
         (t, payload) => this.handleMatterResult(t, payload),
@@ -384,30 +383,30 @@ class IpsecSource extends EventEmitter {
       // Shelly fleet: status notifications + retained online flag per device,
       // plus the single RPC reply topic shared by all of them.
       for (const id of SHELLY_DEVICE_IDS) {
-        await this.connection.subscribe(
+        await this.subscribe(
           `${id}/events/rpc`,
           mqtt.QoS.AtLeastOnce,
           (t, payload) => this.handleShellyEvent(id, payload),
         );
-        await this.connection.subscribe(
+        await this.subscribe(
           `${id}/online`,
           mqtt.QoS.AtLeastOnce,
           (t, payload) => this.handleShellyOnline(id, payload),
         );
         // Full status dumps (relay + sys) and per-component updates.
-        await this.connection.subscribe(
+        await this.subscribe(
           `${id}/status`,
           mqtt.QoS.AtLeastOnce,
           (t, payload) => this.handleShellyStatus(id, payload),
         );
-        await this.connection.subscribe(
+        await this.subscribe(
           `${id}/status/switch:0`,
           mqtt.QoS.AtLeastOnce,
           (t, payload) => this.handleShellyStatus(id, payload),
         );
       }
       if (SHELLY_DEVICE_IDS.length > 0) {
-        await this.connection.subscribe(
+        await this.subscribe(
           `${SHELLY_REPLY_SRC}/rpc`,
           mqtt.QoS.AtLeastOnce,
           (t, payload) => this.handleShellyReply(t, payload),
@@ -425,6 +424,30 @@ class IpsecSource extends EventEmitter {
       this.lastError = err instanceof Error ? err.message : String(err);
       // eslint-disable-next-line no-console
       console.error('[ipsec] failed to connect/subscribe:', err);
+      this.emit('status', { connected: false, reason: this.lastError });
+    }
+  }
+
+  private subscribe(...args: Parameters<mqtt.MqttClientConnection['subscribe']>) {
+    this.subscriptions.set(args[0], args);
+    return this.connection!.subscribe(...args);
+  }
+
+  private async restoreSubscriptions(sessionPresent: boolean): Promise<void> {
+    try {
+      if (!sessionPresent) {
+        for (const args of this.subscriptions.values()) {
+          await this.connection!.subscribe(...args);
+        }
+      }
+      this.connected = true;
+      this.lastError = undefined;
+      console.log('[ipsec] connection resumed; subscriptions restored');
+      this.emit('status', { connected: true });
+    } catch (err) {
+      this.connected = false;
+      this.lastError = err instanceof Error ? err.message : String(err);
+      console.error('[ipsec] failed to restore subscriptions:', err);
       this.emit('status', { connected: false, reason: this.lastError });
     }
   }

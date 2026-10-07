@@ -4,7 +4,6 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import ManufacturingStage3D from "./ManufacturingStage3D";
 import ProductFlow3D from "./ProductFlow3D";
-import ControlBoard3D from "./ControlBoard3D";
 import RobotArm3D from "./RobotArm3D";
 import FactoryWorker3D from "./FactoryWorker3D";
 import LidarScanner3D from "./LidarScanner3D";
@@ -23,9 +22,9 @@ import { setCameraTarget, resetCameraView } from "./CameraController";
 //                 the belt tangent (larger = less zoomed)
 //   cameraY     — camera height above the belt floor
 //   lookAtY     — look-target height (mid-machine)
-const FRONT_VIEW_DISTANCE = 5.5;
-const FRONT_VIEW_CAMERA_Y = 2.5;
-const FRONT_VIEW_LOOKAT_Y = 1.0;
+const FRONT_VIEW_DISTANCE = 11;
+const FRONT_VIEW_CAMERA_Y = 5.5;
+const FRONT_VIEW_LOOKAT_Y = 2.4;
 
 /**
  * ProcessPipeline3D — Zig-zag production line layout
@@ -81,13 +80,16 @@ const ProcessPipeline3D: React.FC = () => {
   // consistent for all seven stages.
   const frontViewFor = useCallback((stageId: StageId) => {
     const [x, y, z] = STAGE_POSITIONS[stageId];
+    const tallEquipment = stageId === "intake";
+    // Leave breathing room for the enlarged equipment and the right inspector.
+    const frameX = x + 2;
     return {
       cameraPos: [
-        x,
-        y + FRONT_VIEW_CAMERA_Y,
-        z + FRONT_VIEW_DISTANCE,
+        frameX,
+        y + FRONT_VIEW_CAMERA_Y + (tallEquipment ? 1 : 0),
+        z + FRONT_VIEW_DISTANCE + (tallEquipment ? 3 : 0),
       ] as [number, number, number],
-      lookAt: [x, y + FRONT_VIEW_LOOKAT_Y, z] as [number, number, number],
+      lookAt: [frameX, y + FRONT_VIEW_LOOKAT_Y + (tallEquipment ? 0.8 : 0), z] as [number, number, number],
     };
   }, []);
 
@@ -181,24 +183,7 @@ const ProcessPipeline3D: React.FC = () => {
         rotationY={fillingPlacement.rotationY}
       />
 
-      {/* ══════ CONTROL BOARDS - Billboard signs beside machines ══════
-          Only the currently-selected stage mounts its <Html> overlay. Each
-          drei <Html> (even in screen-space mode) runs internal per-frame
-          work to reproject its position — having 7 of them mounted all the
-          time cost ~3–6 ms per frame and showed up as UI choppiness.
-          Live sensor values are still available globally via the SensorHUD
-          top-right overlay, so this purely removes in-scene duplication. */}
-      {stagesRef.current.map((stage) => {
-        const pos = stage.position;
-        return (
-          <ControlBoard3D
-            key={`board-${stage.id}`}
-            stage={stage}
-            position={[pos[0] - 2.5, pos[1] - 0.5, pos[2]]}
-            visible={selectedStageId === stage.id}
-          />
-        );
-      })}
+      {/* Stage telemetry is shown by the workbench inspector. */}
 
       {/* ── Robot Arms ──
           Quality control cobot removes defective bottles detected by LiDAR.

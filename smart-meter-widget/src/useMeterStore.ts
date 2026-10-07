@@ -1,10 +1,14 @@
 import { create } from 'zustand'
 import { clamp, createDefaultControls, createInitialTelemetry, DEFAULT_IMP_PER_KWH, HISTORY_WINDOW_MS, validateMeterTelemetry } from './meter/physics'
-import type { CameraPreset, MeterConnection, MeterControls, MeterFault, MeterSource, MeterTelemetry } from './meter/types'
+import type { CameraPreset, MeterConnection, MeterControls, MeterFault, MeterSource, MeterTelemetry, MeterReading } from './meter/types'
+import { emptyMeterReading, normalizeLiveTelemetry } from './meter/live'
+import { readEnergySummary, type EnergySummary } from './meter/derived'
 
 export interface MeterStore {
-  telemetry: MeterTelemetry
-  history: MeterTelemetry[]
+  telemetry: MeterReading
+  energy: EnergySummary | null
+  energyError: string | null
+  history: MeterReading[]
   controls: MeterControls
   paused: boolean
   connection: MeterConnection
@@ -28,20 +32,22 @@ export interface MeterStore {
   setCameraPreset: (preset: CameraPreset) => void
   setAnnotations: (enabled: boolean) => void
   resetSimulation: () => void
-  ingest: (packet: unknown) => boolean
+  ingest: (packet: unknown, energy?: unknown, energyError?: unknown) => boolean
   setConnection: (connection: MeterConnection, error?: string | null) => void
   setSource: (source: MeterSource) => void
 }
 
 /** Factory is exported so independent sessions and tests never share mutable state. */
-export function createMeterStore() {
+export function createMeterStore(initialSource: MeterSource = 'simulation') {
   return create<MeterStore>()((set, get) => ({
-    telemetry: createInitialTelemetry(),
+    telemetry: initialSource === 'simulation' ? createInitialTelemetry() : emptyMeterReading(),
+    energy: null,
+    energyError: null,
     history: [],
     controls: createDefaultControls(),
     paused: false,
-    connection: 'simulated',
-    source: 'simulation',
+    connection: initialSource === 'simulation' ? 'simulated' : 'connecting',
+    source: initialSource,
     error: null,
     lastPacketAt: null,
     pulseOnUntil: 0,
@@ -94,10 +100,13 @@ export function createMeterStore() {
         pulseOnUntil: 0,
       })
     },
-    ingest: (packet) => {
+    ingest: (packet, energy, energyError) => {
       const state = get()
       const now = Date.now()
-      const result = validateMeterTelemetry(packet, state.lastPacketAt === null ? undefined : state.telemetry, now)
+      const previous = state.lastPacketAt === null ? undefined : state.telemetry
+      const result = state.source === 'simulation'
+        ? validateMeterTelemetry(packet, previous as MeterTelemetry | undefined, now)
+        : normalizeLiveTelemetry(packet, previous, now)
       if (!result.ok) {
         set({ error: `Telemetry rejected: ${result.error}` })
         return false
@@ -111,9 +120,11 @@ export function createMeterStore() {
         : recentHistory
       set({
         telemetry,
+        energy: state.source === 'simulation' ? null : readEnergySummary(energy, telemetry.timestamp),
+        energyError: typeof energyError === 'string' ? energyError : null,
         history,
         lastPacketAt: now,
-        pulseOnUntil: telemetry.pulseCount > state.telemetry.pulseCount ? now + 45 : state.pulseOnUntil,
+        pulseOnUntil: telemetry.pulseCount !== null && state.telemetry.pulseCount !== null && telemetry.pulseCount > state.telemetry.pulseCount ? now + 45 : 0,
         connection: state.source === 'simulation' ? 'simulated' : 'connected',
         error: null,
       })
@@ -124,6 +135,10 @@ export function createMeterStore() {
       if (get().source === source) return
       set({
         source,
+        energy: null,
+        energyError: null,
+        telemetry: source === 'simulation' ? createInitialTelemetry() : emptyMeterReading(),
+        thermal: false,
         paused: false,
         connection: source === 'simulation' ? 'simulated' : 'connecting',
         history: [],
@@ -135,4 +150,4 @@ export function createMeterStore() {
   }))
 }
 
-export const useMeterStore = createMeterStore()
+export const useMeterStore = createMeterStore('websocket')

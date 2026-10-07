@@ -1,0 +1,17 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "SubscribeToSmartMeter",
+      "Effect": "Allow",
+      "Action": "iot:Subscribe",
+      "Resource": "arn:aws:iot:us-east-1:841019700679:topicfilter/meter/data"
+    },
+    {
+      "Sid": "ReceiveSmartMeter",
+      "Effect": "Allow",
+      "Action": "iot:Receive",
+      "Resource": "arn:aws:iot:us-east-1:841019700679:topic/meter/data"
+    }
+  ]
+}

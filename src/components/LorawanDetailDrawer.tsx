@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import "./workspace-details.css";
 import ReactDOM from "react-dom";
 import {
   useLorawanSensors,
@@ -57,6 +58,7 @@ const LorawanDetailDrawer: React.FC<LorawanDetailDrawerProps> = ({ open, onClose
         role="dialog"
         aria-modal="true"
         aria-label="LoRaWAN sensor detail"
+        className="lorawan-drawer"
         onClick={(e) => e.stopPropagation()}
         style={{
           position: "absolute",
@@ -64,109 +66,49 @@ const LorawanDetailDrawer: React.FC<LorawanDetailDrawerProps> = ({ open, onClose
           right: 0,
           bottom: 0,
           width: "min(640px, 94vw)",
-          background: "rgba(10, 14, 22, 0.97)",
-          borderLeft: "1px solid rgba(0, 92, 185, 0.45)",
+          background: "var(--ind-bg-1)",
+          borderLeft: "1px solid var(--ind-edge)",
           boxShadow: "-12px 0 40px rgba(0,0,0,0.55)",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
-          fontFamily: "'Montserrat', 'Segoe UI', system-ui, sans-serif",
-          color: "#e5e7eb",
+          fontFamily: "var(--font-sans)",
+          color: "var(--ind-text)",
           animation: "lora-drawer-slide 220ms ease-out",
         }}
       >
-        {/* Header */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "16px 20px",
-            borderBottom: "1px solid rgba(0, 92, 185, 0.35)",
-            background:
-              "linear-gradient(180deg, rgba(0, 92, 185, 0.28), rgba(0, 31, 77, 0.0))",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <SoilGlyph />
-            <div>
-              <div
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  letterSpacing: "0.12em",
-                  color: "#93c5fd",
-                  textTransform: "uppercase",
-                }}
-              >
-                LoRaWAN Sensors
-              </div>
-              <div
-                style={{
-                  fontSize: "16px",
-                  fontWeight: 700,
-                  color: "#f0f9ff",
-                  marginTop: "2px",
-                }}
-              >
-                Soil & irrigation feed
-              </div>
-            </div>
+        <header className="lorawan-header">
+          <div>
+            <div className="lorawan-heading"><SoilGlyph /><div><h2>LoRaWAN sensors</h2><p>Soil and irrigation telemetry</p></div></div>
+            <p className="lorawan-feed-note">{lastReading ? "Latest packet · " + formatRelative(lastReading.receivedAt) : "Waiting for gateway packets"}</p>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            style={{
-              width: "28px",
-              height: "28px",
-              borderRadius: "8px",
-              border: "1px solid rgba(0, 92, 185, 0.45)",
-              background: "rgba(0, 92, 185, 0.15)",
-              color: "#bfdbfe",
-              cursor: "pointer",
-              fontSize: "14px",
-              lineHeight: 1,
-            }}
-          >
-            X
-          </button>
-        </div>
-
-        {/* Body */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            padding: "16px 20px",
-            display: "flex",
-            flexDirection: "column",
-            gap: "16px",
-          }}
-        >
+          <button className="workspace-close" onClick={onClose} aria-label="Close LoRaWAN sensors"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg></button>
+        </header>
+        <div className="lorawan-content">
           {/* Summary stats */}
           <Section title="Summary">
-            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-              <Stat label="Devices" value={String(list.length)} accent="#60a5fa" />
+            <div className="lorawan-summary">
+              <Stat label="Devices" value={String(list.length)} accent="#65aeeb" />
               <Stat
                 label="Readings"
                 value={String(totalReadings)}
-                accent="#a78bfa"
+                accent="#43d8f1"
               />
               <Stat
                 label="Avg moisture"
                 value={avgMoisture != null ? `${avgMoisture.toFixed(1)}%` : "—"}
-                accent="#34d399"
+                accent="#6ed6a2"
               />
               <Stat
                 label="Avg temp"
                 value={avgTemp != null ? `${avgTemp.toFixed(1)}°C` : "—"}
-                accent="#fbbf24"
+                accent="#e9bd70"
               />
               <Stat
                 label="Min battery"
                 value={minBattery != null ? `${minBattery.toFixed(2)} V` : "—"}
                 accent={
-                  minBattery != null && minBattery < 3.3 ? "#ef4444" : "#cbd5e1"
+                  minBattery != null && minBattery < 3.3 ? "#f18b82" : "#bacbd4"
                 }
               />
             </div>
@@ -190,8 +132,9 @@ const LorawanDetailDrawer: React.FC<LorawanDetailDrawerProps> = ({ open, onClose
               <div
                 style={{
                   fontSize: "11px",
-                  color: "#94a3b8",
-                  fontFamily: "ui-monospace, Consolas, monospace",
+                  color: "#a7bbc6",
+                  fontFamily: "var(--font-sans)",
+                  fontVariantNumeric: "tabular-nums",
                   background: "rgba(255,255,255,0.02)",
                   border: "1px solid rgba(148, 163, 184, 0.10)",
                   borderRadius: "8px",
@@ -217,101 +160,20 @@ export default LorawanDetailDrawer;
 /* ── Sub-components ────────────────────────────────────── */
 
 const SoilGlyph: React.FC = () => (
-  <div
-    style={{
-      width: "36px",
-      height: "36px",
-      borderRadius: "50%",
-      overflow: "hidden",
-      background: "linear-gradient(180deg, #34d399 0%, #065f46 100%)",
-      flex: "0 0 auto",
-      boxShadow: "0 0 12px rgba(52, 211, 153, 0.35)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      color: "#ecfdf5",
-    }}
-  >
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2v6" />
-      <path d="M9 8c1 2 2 4 3 6 1-2 2-4 3-6" />
-      <path d="M3 14h18" />
-      <path d="M5 14v6h14v-6" />
-    </svg>
-  </div>
+  <div className="lorawan-glyph"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v6M9 8c1 2 2 4 3 6 1-2 2-4 3-6M3 14h18M5 14v6h14v-6" /></svg></div>
 );
 
 const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-  <div>
-    <div
-      style={{
-        fontSize: "10px",
-        fontWeight: 700,
-        letterSpacing: "0.12em",
-        color: "#7fa2c7",
-        textTransform: "uppercase",
-        marginBottom: "8px",
-      }}
-    >
-      {title}
-    </div>
-    {children}
-  </div>
+  <section><h3 className="lorawan-section-title">{title}</h3>{children}</section>
 );
 
 const Stat: React.FC<{ label: string; value: string; accent: string }> = ({ label, value, accent }) => (
-  <div
-    style={{
-      flex: "1 1 100px",
-      minWidth: "100px",
-      background: "rgba(255,255,255,0.02)",
-      border: "1px solid rgba(148, 163, 184, 0.12)",
-      borderRadius: "10px",
-      padding: "10px 12px",
-    }}
-  >
-    <div
-      style={{
-        fontSize: "9px",
-        fontWeight: 700,
-        letterSpacing: "0.1em",
-        color: "#94a3b8",
-        textTransform: "uppercase",
-      }}
-    >
-      {label}
-    </div>
-    <div
-      style={{
-        fontSize: "18px",
-        fontWeight: 700,
-        color: accent,
-        fontVariantNumeric: "tabular-nums",
-        marginTop: "2px",
-      }}
-    >
-      {value}
-    </div>
-  </div>
+  <div className="lorawan-stat"><span>{label}</span><strong style={{ color: accent }}>{value}</strong></div>
 );
 
 const EmptyHint: React.FC<{ label: string }> = ({ label }) => (
-  <div
-    style={{
-      fontSize: "12px",
-      color: "#64748b",
-      fontStyle: "italic",
-      padding: "12px 14px",
-      background: "rgba(255,255,255,0.02)",
-      border: "1px dashed rgba(148, 163, 184, 0.18)",
-      borderRadius: "10px",
-    }}
-  >
-    {label}
-  </div>
+  <div className="lorawan-empty">{label}</div>
 );
-
-/* ── Sparkline + Device card ───────────────────────────── */
 
 const Sparkline: React.FC<{
   values: number[];
@@ -327,7 +189,7 @@ const Sparkline: React.FC<{
         style={{
           height: "20px",
           fontSize: "9px",
-          color: "#64748b",
+          color: "#90aab7",
           fontStyle: "italic",
           display: "flex",
           alignItems: "center",
@@ -388,7 +250,7 @@ const MetricRow: React.FC<{
       padding: "6px 0",
     }}
   >
-    <div style={{ fontSize: "11px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+    <div style={{ fontSize: "11px", color: "#a7bbc6", textTransform: "uppercase", letterSpacing: "0.06em" }}>
       {label}
     </div>
     <div
@@ -403,7 +265,7 @@ const MetricRow: React.FC<{
       }}
     >
       {value}
-      <span style={{ fontSize: "10px", color: "#64748b", marginLeft: "3px" }}>{unit}</span>
+      <span style={{ fontSize: "10px", color: "#90aab7", marginLeft: "3px" }}>{unit}</span>
     </div>
     <Sparkline
       values={history}
@@ -435,17 +297,10 @@ const DeviceCard: React.FC<{ device: LorawanDevice }> = ({ device }) => {
   // Battery: red below 3.3V, amber 3.3-3.5, green above
   const bat = r.batteryV;
   const batColor =
-    bat == null ? "#94a3b8" : bat < 3.3 ? "#ef4444" : bat < 3.5 ? "#f59e0b" : "#34d399";
+    bat == null ? "#a7bbc6" : bat < 3.3 ? "#f18b82" : bat < 3.5 ? "#e9bd70" : "#6ed6a2";
 
   return (
-    <div
-      style={{
-        background: "rgba(0, 92, 185, 0.06)",
-        border: "1px solid rgba(0, 92, 185, 0.25)",
-        borderRadius: "12px",
-        padding: "12px 14px",
-      }}
-    >
+    <div className="lorawan-device">
       {/* Device header */}
       <div
         style={{
@@ -457,7 +312,7 @@ const DeviceCard: React.FC<{ device: LorawanDevice }> = ({ device }) => {
       >
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <span style={{ fontSize: "13px", fontWeight: 700, color: "#f0f9ff" }}>
+            <span style={{ fontSize: "13px", fontWeight: 700, color: "#eef5f7" }}>
               {device.deviceName}
             </span>
             {anySimulated && <SimBadge />}
@@ -465,8 +320,9 @@ const DeviceCard: React.FC<{ device: LorawanDevice }> = ({ device }) => {
           <div
             style={{
               fontSize: "10px",
-              color: "#64748b",
-              fontFamily: "ui-monospace, Consolas, monospace",
+              color: "#90aab7",
+              fontFamily: "var(--font-sans)",
+              fontVariantNumeric: "tabular-nums",
               marginTop: "1px",
             }}
           >
@@ -483,7 +339,7 @@ const DeviceCard: React.FC<{ device: LorawanDevice }> = ({ device }) => {
           value={r.soilTempC != null ? r.soilTempC.toFixed(1) : "—"}
           unit="°C"
           history={tempHistory}
-          color="#fbbf24"
+          color="#e9bd70"
           simulated={sim.soilTempC}
         />
         <MetricRow
@@ -491,7 +347,7 @@ const DeviceCard: React.FC<{ device: LorawanDevice }> = ({ device }) => {
           value={r.soilMoisturePct != null ? r.soilMoisturePct.toFixed(1) : "—"}
           unit="%"
           history={moistHistory}
-          color="#34d399"
+          color="#6ed6a2"
           min={0}
           max={100}
           simulated={sim.soilMoisturePct}
@@ -501,7 +357,7 @@ const DeviceCard: React.FC<{ device: LorawanDevice }> = ({ device }) => {
           value={r.conductivityUsCm != null ? r.conductivityUsCm.toFixed(1) : "—"}
           unit="µS/cm"
           history={condHistory}
-          color="#60a5fa"
+          color="#65aeeb"
           simulated={sim.conductivityUsCm}
         />
         <MetricRow
@@ -522,7 +378,7 @@ const DeviceCard: React.FC<{ device: LorawanDevice }> = ({ device }) => {
       <div
         style={{
           fontSize: "9px",
-          color: "#475569",
+          color: "#90aab7",
           marginTop: "6px",
           textAlign: "right",
         }}
@@ -542,9 +398,9 @@ const SimBadge: React.FC = () => (
       fontWeight: 700,
       letterSpacing: "0.08em",
       textTransform: "uppercase",
-      color: "#c4b5fd",
-      background: "rgba(167, 139, 250, 0.12)",
-      border: "1px solid rgba(167, 139, 250, 0.3)",
+      color: "#a9c3ce",
+      background: "#243b46",
+      border: "1px solid #426675",
       borderRadius: "4px",
       padding: "1px 4px",
       whiteSpace: "nowrap",
@@ -586,7 +442,6 @@ const BatteryPill: React.FC<{ voltage?: number; color: string }> = ({ voltage, c
             width: `${pct}%`,
             background: color,
             borderRadius: "1px",
-            transition: "width 0.4s ease",
           }}
         />
       </div>
@@ -630,12 +485,10 @@ const SoilMoistureBar: React.FC<{ pct?: number }> = ({ pct }) => {
             width: `${value}%`,
             background:
               value < 20
-                ? "linear-gradient(90deg, #ef4444, #f97316)"
+                ? "linear-gradient(90deg, #f18b82, #f97316)"
                 : value > 60
-                  ? "linear-gradient(90deg, #34d399, #3b82f6)"
-                  : "linear-gradient(90deg, #34d399, #10b981)",
-            transition: "width 0.5s cubic-bezier(0.22, 1, 0.36, 1)",
-            boxShadow: "0 0 8px rgba(52,211,153,0.4)",
+                  ? "linear-gradient(90deg, #6ed6a2, #3b82f6)"
+                  : "linear-gradient(90deg, #6ed6a2, #10b981)",
           }}
         />
       </div>
@@ -644,7 +497,7 @@ const SoilMoistureBar: React.FC<{ pct?: number }> = ({ pct }) => {
           display: "flex",
           justifyContent: "space-between",
           fontSize: "8px",
-          color: "#64748b",
+          color: "#90aab7",
           textTransform: "uppercase",
           letterSpacing: "0.1em",
           marginTop: "3px",

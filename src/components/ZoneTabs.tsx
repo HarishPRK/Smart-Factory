@@ -18,6 +18,7 @@ const ZoneTabs: React.FC = () => {
         return (
           <button
             key={zone.id}
+            aria-pressed={isActive}
             onClick={() => dispatch({ type: "SET_ZONE", zone: zone.id })}
             className={`px-3.5 py-1.5 rounded-lg text-[10px] transition-all duration-250 relative overflow-hidden ${
               isActive

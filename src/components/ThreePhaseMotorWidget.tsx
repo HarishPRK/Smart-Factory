@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { subscribeRawPLCPayload, type RawPLCPayload } from "../services/plcService";
 import MotorSpinner3D from "./MotorSpinner3D";
@@ -123,10 +123,23 @@ function classifyMotor(meter: MeterReading): MotorState {
 }
 
 const PHASE_COLORS: Record<"a" | "b" | "c", string> = {
-  a: "#ef4444", // R
-  b: "#eab308", // Y
-  c: "#3b82f6", // B
+  a: "#f18b82", // R
+  b: "#e9bd70", // Y
+  c: "#71b4ef", // B
 };
+
+function PhaseBus({ live }: { live: Record<"a" | "b" | "c", boolean> }) {
+  return <svg className="pi-meter__bus" viewBox="0 0 240 64" aria-hidden="true">
+    <path d="M35 15v14h72M120 15v14M205 15v14h-72" className="pi-meter__wire" />
+    {(["a", "b", "c"] as const).map((leg, index) => <g key={leg} data-live={live[leg]} style={{ color: PHASE_COLORS[leg] }}>
+      <circle cx={35 + index * 85} cy="11" r="4" fill="currentColor" />
+      <path d={`M${35 + index * 85} 18v10`} stroke="currentColor" strokeWidth="1.5" />
+    </g>)}
+    <circle cx="120" cy="40" r="15" className="pi-meter__motor" />
+    <text x="120" y="43" textAnchor="middle">M</text><path d="M111 51h18m-15 4h12" className="pi-meter__wire" />
+    <text className="pi-meter__bus-note" x="32" y="52">L1 · L2 · L3</text><text className="pi-meter__bus-note" x="158" y="52">Forming</text>
+  </svg>;
+}
 
 /* ── Detail drawer (portaled) ──────────────────────────── */
 
@@ -134,10 +147,28 @@ const DetailDrawer: React.FC<{
   meter: MeterReading;
   running: boolean;
   state: MotorState;
+  connected: boolean;
   onClose: () => void;
-}> = ({ meter, running, state, onClose }) => {
+}> = ({ meter, running, state, connected, onClose }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const closeButton = dialogRef.current?.querySelector<HTMLButtonElement>("button");
+    closeButton?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+      if (event.key === "Tab") {
+        event.preventDefault();
+        closeButton?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => { document.removeEventListener("keydown", onKeyDown); previous?.focus(); };
+  }, [onClose]);
   const stateLabel =
-    state === "running" ? "Running"
+    !meter.hasAny ? "No data"
+    : !connected ? "Last received"
+    : state === "running" ? "Running"
     : state === "energized" ? "Energized"
     : "Offline";
   const stateClasses =
@@ -158,7 +189,9 @@ const DetailDrawer: React.FC<{
       onClick={onClose}
     >
       <div
-        className="card p-5 w-[560px] max-w-[94vw] flex flex-col gap-3"
+        ref={dialogRef}
+        className="card pi-meter-dialog p-5 w-[560px] max-w-[94vw] flex flex-col gap-3"
+        role="dialog" aria-modal="true" aria-label="Three-phase motor readings"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -194,6 +227,7 @@ const DetailDrawer: React.FC<{
             </span>
             <button
               onClick={onClose}
+              aria-label="Close motor readings"
               className="w-7 h-7 rounded-lg bg-white/[0.04] border border-white/10 flex items-center justify-center hover:bg-white/[0.08] transition-colors"
             >
               <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
@@ -321,93 +355,43 @@ const DetailDrawer: React.FC<{
 
 interface ThreePhaseMotorWidgetProps {
   className?: string;
+  connected?: boolean;
 }
 
 const ThreePhaseMotorWidget: React.FC<ThreePhaseMotorWidgetProps> = ({
   className = "",
+  connected = true,
 }) => {
   const [meter, setMeter] = useState<MeterReading>(EMPTY_READING);
   const [open, setOpen] = useState(false);
+  const closeDetails = useCallback(() => setOpen(false), []);
 
   useEffect(() => {
     const unsubscribe = subscribeRawPLCPayload((payload) => {
       const next = readMeter(payload);
-      if (next.hasAny) setMeter(next);
+      // A meter payload full of missing-value sentinels clears prior readings.
+      // Unrelated PLC updates do not erase the latest meter sample.
+      if (Object.keys(payload).some((key) => key.startsWith("boardB_shellypro3em_data_"))) setMeter(next);
     });
     return unsubscribe;
   }, []);
 
   const state = classifyMotor(meter);
-  const running = state === "running";
+  const running = connected && state === "running";
   const energised: Record<"a" | "b" | "c", boolean> = {
-    a: (meter.a.voltage ?? 0) > VOLTAGE_LIVE_THRESHOLD,
-    b: (meter.b.voltage ?? 0) > VOLTAGE_LIVE_THRESHOLD,
-    c: (meter.c.voltage ?? 0) > VOLTAGE_LIVE_THRESHOLD,
+    a: connected && (meter.a.voltage ?? 0) > VOLTAGE_LIVE_THRESHOLD,
+    b: connected && (meter.b.voltage ?? 0) > VOLTAGE_LIVE_THRESHOLD,
+    c: connected && (meter.c.voltage ?? 0) > VOLTAGE_LIVE_THRESHOLD,
   };
 
   return (
     <>
-      {/* Rendered as a PLC-parameter tile inside the PLC Parameters grid.
-          Clicking opens the full per-phase detail drawer. */}
-      <button
-        onClick={() => setOpen(true)}
-        className={`card-inner p-2 flex flex-col justify-between transition-all duration-300 relative overflow-hidden group/card cursor-pointer active:scale-[0.97] text-left ${className}`}
-      >
-        {/* Top: label + status */}
-        <div className="flex justify-between items-center gap-1 relative z-10">
-          <span
-            className="text-blue-200/80 uppercase tracking-[0.06em] font-medium whitespace-nowrap"
-            style={{ fontSize: "11px" }}
-          >
-            3-Phase
-          </span>
-          <span
-            className={`font-semibold px-1.5 py-0.5 rounded-md flex items-center gap-1 whitespace-nowrap ${
-              running
-                ? "text-amber-300 bg-amber-500/[0.10] border border-amber-500/25"
-                : "text-blue-200/60 bg-white/[0.03] border border-white/[0.06]"
-            }`}
-            style={{ fontSize: "9.5px" }}
-          >
-            <span
-              className={`w-1 h-1 rounded-full ${
-                running ? "bg-amber-400 animate-pulse-glow" : "bg-blue-400/30"
-              }`}
-            />
-            {running ? "Run" : "Idle"}
-          </span>
-        </div>
-
-        {/* Center: RYB phase dots */}
-        <div className="flex items-center justify-center gap-2.5 relative z-10 my-auto py-1.5">
-          {(["a", "b", "c"] as const).map((leg) => (
-            <span
-              key={leg}
-              className="w-2.5 h-2.5 rounded-full transition-all"
-              style={{
-                backgroundColor: energised[leg]
-                  ? PHASE_COLORS[leg]
-                  : "rgba(75,85,99,0.5)",
-                boxShadow: energised[leg]
-                  ? `0 0 8px ${PHASE_COLORS[leg]}`
-                  : undefined,
-              }}
-            />
-          ))}
-        </div>
-
-        {/* Bottom: Σ power + current (tweened) */}
-        <div className="flex justify-between items-center relative z-10 font-mono text-cyan-100/80" style={{ fontSize: "9.5px" }}>
-          <span className="flex items-baseline gap-0.5">
-            <span className="text-amber-200/55 mr-0.5">Σ</span>
-            <LiveAmount value={meter.totalActPower} decimals={1} />
-            <span className="text-blue-300/45 ml-0.5">W</span>
-          </span>
-          <span className="flex items-baseline gap-0.5">
-            <LiveAmount value={meter.totalCurrent} decimals={2} />
-            <span className="text-blue-300/45 ml-0.5">A</span>
-          </span>
-        </div>
+      <button type="button" onClick={() => setOpen(true)} className={`card-inner pi-meter ${className}`} aria-label="View three-phase motor details">
+        <span className="pi-meter__heading"><strong>3-phase motor</strong><span data-state={connected ? state : "offline"}>{!meter.hasAny ? "No data" : !connected ? "Last received" : state === "running" ? "Running" : state === "energized" ? "Energized" : "No voltage"}</span></span>
+        <PhaseBus live={energised} />
+        <span className="pi-meter__phases">{(["a", "b", "c"] as const).map((leg, index) => <span key={leg} data-live={energised[leg]}><span><i style={{ backgroundColor: PHASE_COLORS[leg] }} />L{index + 1}</span><strong>{fmt(meter[leg].voltage, 1)} <small>V</small></strong><span className="pi-meter__phase-amount">{fmt(meter[leg].current, 2)} <small>A</small></span><span className="pi-meter__phase-amount">{fmt(meter[leg].actPower, 1)} <small>W</small></span></span>)}</span>
+        <span className="pi-meter__totals"><span><small>Active power</small><span><strong><LiveAmount value={meter.totalActPower} decimals={1} /></strong> W</span></span><span><small>Total current</small><span><strong><LiveAmount value={meter.totalCurrent} decimals={2} /></strong> A</span></span></span>
+        <span className="pi-meter__open">View meter details <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
       </button>
 
       {open && (
@@ -415,7 +399,8 @@ const ThreePhaseMotorWidget: React.FC<ThreePhaseMotorWidgetProps> = ({
           meter={meter}
           running={running}
           state={state}
-          onClose={() => setOpen(false)}
+          connected={connected}
+          onClose={closeDetails}
         />
       )}
     </>

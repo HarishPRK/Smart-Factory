@@ -7,52 +7,55 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
-/* ───── Token scope (defaults to dark to match the host app) ─────────────── */
+/* ───── Shared charcoal and cyan workspace tokens ──────────────────────── */
 .integration-scope {
-  --bg:           #0c0d1c;
-  --bg-grad-1:    #161330;
-  --bg-grad-2:    #0a0a18;
-  --panel:        rgba(38, 36, 70, 0.58);
-  --panel-solid:  #25223f;
-  --panel-2:      rgba(54, 50, 92, 0.78);
+  --bg:           #111d26;
+  --bg-grad-1:    #111d26;
+  --bg-grad-2:    #111d26;
+  --panel:        #17232d;
+  --panel-solid:  #17232d;
+  --panel-2:      #1d2d38;
+  --surface:     #17232d;
+  --surface-2:   #1d2d38;
 
-  --border:        rgba(200, 195, 230, 0.10);
-  --border-strong: rgba(200, 195, 230, 0.22);
+  --border:        #2e4553;
+  --border-strong: #497080;
 
-  --text:        #f3f1ff;
-  --text-dim:    #c4bee0;
-  --text-muted:  #8a83b0;
+  --text:        #eef5f7;
+  --text-dim:    #bacbd4;
+  --text-muted:  #a7bbc6;
 
-  --accent-rgb:   124 255 212;
-  --accent-2-rgb: 255 123 214;
-  --accent-3-rgb: 192 132 252;
+  --accent-rgb:   67 216 241;
+  --accent-2-rgb: 101 174 235;
+  --accent-3-rgb: 74 194 190;
   --accent:   rgb(var(--accent-rgb));
   --accent-2: rgb(var(--accent-2-rgb));
   --accent-3: rgb(var(--accent-3-rgb));
-  --grad-accent:      linear-gradient(135deg, #7cffd4 0%, #c084fc 50%, #ff7bd6 100%);
-  --grad-accent-soft: linear-gradient(135deg, rgba(124,255,212,0.18), rgba(255,123,214,0.18));
+  --grad-accent:      #43d8f1;
+  --grad-accent-soft: #203e4b;
 
-  --ok-rgb:   74 222 128;
-  --warn-rgb: 251 191 36;
-  --err-rgb:  255 85 119;
+  --ok-rgb:   110 214 162;
+  --warn-rgb: 233 189 112;
+  --err-rgb:  241 139 130;
   --ok:   rgb(var(--ok-rgb));
   --warn: rgb(var(--warn-rgb));
   --err:  rgb(var(--err-rgb));
 
-  --shadow-sm:   0 1px 2px rgba(0,0,0,0.25);
-  --shadow:      0 10px 30px rgba(5, 4, 16, 0.5), 0 1px 0 rgba(255,255,255,0.04) inset;
-  --glow-accent: 0 0 0 1px rgba(124,255,212,0.45), 0 0 28px rgba(124,255,212,0.32);
-  --glow-pink:   0 0 0 1px rgba(255,123,214,0.45), 0 0 24px rgba(255,123,214,0.30);
+  --shadow-sm:   0 2px 8px #00000022;
+  --shadow:      none;
+  --glow-accent: none;
+  --glow-pink:   none;
 
-  --card-blur:      saturate(140%) blur(14px);
-  --card-highlight: linear-gradient(180deg, rgba(255,255,255,0.06), transparent 30%);
+  --card-blur:      none;
+  --card-highlight: none;
 
-  --row-hover:    rgba(124,255,212,0.06);
-  --selection-bg: rgba(124,255,212,0.30);
-  --kbd-bg:       rgba(255,255,255,0.05);
+  --row-hover:    #1d2d38;
+  --selection-bg: #43d8f1;
+  --kbd-bg:       #1d2d38;
 
   color: var(--text);
-  font-family: 'Space Grotesk', 'Montserrat', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: dark;
+  font-family: 'Inter Variable', Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   font-size: 14px;
   line-height: 1.5;
   letter-spacing: -0.005em;
@@ -95,17 +98,17 @@
 }
 .integration-scope button.primary {
   background: var(--grad-accent);
-  border-color: transparent;
-  color: #0a0a18;
+  border-color: #43d8f1;
+  color: #08212a;
   font-weight: 600;
   box-shadow: var(--glow-accent);
 }
 .integration-scope button.primary:hover { filter: brightness(1.10); }
 .integration-scope button.danger {
-  background: linear-gradient(135deg, var(--err), var(--accent-2));
-  border-color: transparent;
-  color: #fff;
-  box-shadow: 0 6px 20px rgba(var(--err-rgb) / 0.35);
+  background: #392624;
+  border-color: #75483f;
+  color: var(--err);
+  box-shadow: none;
 }
 .integration-scope button.danger:hover { filter: brightness(1.08); }
 .integration-scope button:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -113,7 +116,7 @@
 /* ───── Inputs & selects ───────────────────────────────────────────────── */
 .integration-scope input,
 .integration-scope select {
-  background: rgba(255,255,255,0.04);
+  background: #111d26;
   border: 1px solid var(--border);
   color: var(--text);
   border-radius: 10px;
@@ -127,7 +130,7 @@
 }
 .integration-scope input:hover,
 .integration-scope select:hover { border-color: var(--border-strong); }
-.integration-scope select option { background: #1a1530; color: #f3f1ff; }
+.integration-scope select option { background: #17232d; color: #eef5f7; }
 .integration-scope input::placeholder { color: var(--text-muted); }
 .integration-scope input:focus,
 .integration-scope select:focus {

@@ -22,6 +22,9 @@ export interface SceneSettingsStore {
   extrasEnabled: boolean;
   cctvEnabled: boolean;
   labelsVisible: boolean;
+  sensorMonitorVisible: boolean;
+  xrayMode: boolean;
+  flowVisible: boolean;
   quality: QualityTier;
   postFxQuality: PostFxQuality;
 
@@ -29,6 +32,9 @@ export interface SceneSettingsStore {
   setExtras: (v: boolean) => void;
   setCCTV: (v: boolean) => void;
   setLabels: (v: boolean) => void;
+  setSensorMonitor: (v: boolean) => void;
+  setXray: (v: boolean) => void;
+  setFlow: (v: boolean) => void;
   setQuality: (q: QualityTier) => void;
   setPostFxQuality: (q: PostFxQuality) => void;
 }
@@ -45,6 +51,9 @@ export const useSceneSettingsStore = create<SceneSettingsStore>((set) => ({
   extrasEnabled: false,
   cctvEnabled: false,
   labelsVisible: true,
+  sensorMonitorVisible: true,
+  xrayMode: false,
+  flowVisible: false,
   // Default quality lowered from "high" → "medium" so the post-processing
   // stack (Bloom + ToneMapping + BrightnessContrast + HueSaturation + Vignette
   // + SMAA) runs in its lighter configuration. The "high" preset was eating
@@ -58,6 +67,9 @@ export const useSceneSettingsStore = create<SceneSettingsStore>((set) => ({
   setExtras: (v) => set({ extrasEnabled: v }),
   setCCTV: (v) => set({ cctvEnabled: v }),
   setLabels: (v) => set({ labelsVisible: v }),
+  setSensorMonitor: (v) => set({ sensorMonitorVisible: v }),
+  setXray: (v) => set({ xrayMode: v }),
+  setFlow: (v) => set({ flowVisible: v }),
   setQuality: (q) => set({ quality: q, postFxQuality: QUALITY_TO_POSTFX[q] }),
   setPostFxQuality: (q) => set({ postFxQuality: q }),
 }));

@@ -28,6 +28,7 @@
 import './load-env.js';
 
 import express from 'express';
+import { registerHardwareMetricsRoutes } from './hardware-metrics-routes.js';
 import cors from 'cors';
 import { registerIpsecRoutes } from './ipsec-routes.js';
 import { registerIpsecInsightRoute } from './ipsec-insight-route.js';
@@ -44,6 +45,7 @@ app.use(express.json({ limit: '256kb' }));
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
+registerHardwareMetricsRoutes(app);
 registerIpsecRoutes(app);
 registerIpsecInsightRoute(app);
 registerAppRouteRoutes(app);

@@ -5,6 +5,15 @@ import React, {
   useState,
 } from "react";
 import {
+  Activity,
+  ArrowDown,
+  ArrowUp,
+  Droplets,
+  Factory,
+  Gauge,
+  Volume2,
+  Zap,
+  CloudCog,
   BrainCircuit,
   ChartNoAxesCombined,
   ChevronLeft,
@@ -20,104 +29,26 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { useFilters } from "../context/FilterContext";
 import { getKpiForZone, kpis } from "../data/mockData";
-import { useTweenedNumber } from "../hooks/useTweenedNumber";
 import KpiCard, { type KpiCardStatusTone } from "./KpiCard";
+import KpiSparkline from "./KpiSparkline";
+import WorkspacePreview from "./WorkspacePreview";
 import LorawanWidget from "./LorawanWidget";
-import WorkspaceVisualization, {
-  type WorkspaceVisualizationKind,
-} from "./WorkspaceVisualizations";
-
-function parseKpiValue(value: string) {
-  const cleaned = value.replace(/,/g, "");
-  const number = Number.parseFloat(cleaned);
-  const decimalPoint = cleaned.indexOf(".");
-  const decimals = decimalPoint >= 0 ? cleaned.length - decimalPoint - 1 : 0;
-
-  return {
-    decimals,
-    group: value.includes(",") || number >= 1000,
-    number,
-    valid: Number.isFinite(number),
-  };
-}
-
-const KpiCountUp = ({ value }: { value: string }) => {
-  const { decimals, group, number, valid } = parseKpiValue(value);
-  const [revealed, setRevealed] = useState(false);
-
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => setRevealed(true));
-    return () => cancelAnimationFrame(frame);
-  }, []);
-
-  const tweened = useTweenedNumber(valid && revealed ? number : 0, 800);
-
-  if (!valid) return <>{value}</>;
-
-  return (
-    <>
-      {tweened.toLocaleString("en-US", {
-        maximumFractionDigits: decimals,
-        minimumFractionDigits: decimals,
-        useGrouping: group,
-      })}
-    </>
-  );
-};
-
-const MiniSparkline = ({
-  color,
-  data,
-}: {
-  color: string;
-  data: number[];
-}) => {
-  if (data.length < 2) return null;
-
-  const max = Math.max(...data);
-  const min = Math.min(...data);
-  const range = max - min || 1;
-  const width = 64;
-  const height = 28;
-  const inset = 2;
-
-  const points = data.map((value, index) => ({
-    x: inset + (index / (data.length - 1)) * (width - inset * 2),
-    y: height - inset - ((value - min) / range) * (height - inset * 2),
-  }));
-
-  let path = `M${points[0].x},${points[0].y}`;
-  for (let index = 1; index < points.length; index += 1) {
-    const previous = points[index - 1];
-    const current = points[index];
-    const firstControl = previous.x + (current.x - previous.x) * 0.4;
-    const secondControl = previous.x + (current.x - previous.x) * 0.6;
-    path += ` C${firstControl},${previous.y} ${secondControl},${current.y} ${current.x},${current.y}`;
-  }
-
-  const lastPoint = points[points.length - 1];
-
-  return (
-    <svg className="kpi-card__sparkline" viewBox={`0 0 ${width} ${height}`}>
-      <path className="kpi-card__sparkline-track" d={`M2 ${height - 3}H${width - 2}`} />
-      <path
-        d={path}
-        fill="none"
-        stroke={color}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.7"
-      />
-      <circle cx={lastPoint.x} cy={lastPoint.y} fill={color} r="2.2" />
-    </svg>
-  );
-};
+import ZoneTabs from "./ZoneTabs";
+import "../kpi-workspace.css";
 
 function hexToRgbChannels(hex: string) {
   const normalized = hex.replace("#", "");
   const value = Number.parseInt(normalized, 16);
   return `${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255}`;
 }
+
+const metricStyles: Record<string, { color: string; icon: LucideIcon }> = {
+  energy: { color: "#43d8f1", icon: Zap },
+  noise: { color: "#8acde8", icon: Volume2 },
+  emission: { color: "#6ed6a2", icon: Factory },
+  water: { color: "#5fbaf3", icon: Droplets },
+  oee: { color: "#76decf", icon: Gauge },
+};
 
 type RailGroup = "metrics" | "workspaces";
 
@@ -131,10 +62,12 @@ interface WorkspaceCardDescriptor {
   onClick?: () => void;
   status?: React.ReactNode;
   statusTone?: KpiCardStatusTone;
-  visualization: WorkspaceVisualizationKind;
+  description: string;
 }
 
 interface KPIBarProps {
+  onOfferingsClick?: () => void;
+  onEagleClick?: () => void;
   onOeeClick?: () => void;
   onAnalyticsClick?: () => void;
   onPredictClick?: () => void;
@@ -145,10 +78,13 @@ interface KPIBarProps {
   onOnboardingClick?: () => void;
   onGatewayTwinClick?: () => void;
   onVideoClick?: () => void;
+  onLanggraphClick?: () => void;
   predAlertCount?: number;
 }
 
 const KPIBar: React.FC<KPIBarProps> = ({
+  onOfferingsClick,
+  onEagleClick,
   onOeeClick,
   onAnalyticsClick,
   onPredictClick,
@@ -159,6 +95,7 @@ const KPIBar: React.FC<KPIBarProps> = ({
   onOnboardingClick,
   onGatewayTwinClick,
   onVideoClick,
+  onLanggraphClick,
   predAlertCount = 0,
 }) => {
   const { state, dispatch } = useFilters();
@@ -173,12 +110,15 @@ const KPIBar: React.FC<KPIBarProps> = ({
     if (!element) return;
 
     const maxScroll = element.scrollWidth - element.clientWidth;
-    setCanScrollLeft(element.scrollLeft > 4);
-    setCanScrollRight(maxScroll > 4 && element.scrollLeft < maxScroll - 4);
+    // Measure the unobstructed panel too, so arrows cannot keep themselves
+    // visible when cards would fit without their reserved width.
+    const panelWidth = element.parentElement?.clientWidth ?? element.clientWidth;
+    const needsScroll = element.scrollWidth - panelWidth > 4;
+    setCanScrollLeft(needsScroll && element.scrollLeft > 4);
+    setCanScrollRight(needsScroll && maxScroll > 4 && element.scrollLeft < maxScroll - 4);
   }, []);
 
   useEffect(() => {
-    updateScrollState();
     const element = scrollRef.current;
     if (!element) return;
 
@@ -214,6 +154,8 @@ const KPIBar: React.FC<KPIBarProps> = ({
   };
 
   const workspaceCount = [
+    onOfferingsClick,
+    onEagleClick,
     onAnalyticsClick,
     onPredictClick,
     onDpsClick,
@@ -223,6 +165,7 @@ const KPIBar: React.FC<KPIBarProps> = ({
     onOnboardingClick,
     onGatewayTwinClick,
     onVideoClick,
+    onLanggraphClick,
   ].filter(Boolean).length + 1;
 
   const groups: Array<{ id: RailGroup; label: string; count: number }> = [
@@ -232,6 +175,16 @@ const KPIBar: React.FC<KPIBarProps> = ({
 
   const actionCards: WorkspaceCardDescriptor[] = [
     {
+      accent: '#67e8f9', accentRgb: '103, 232, 249',
+      ariaLabel: 'Open Solution Offerings', icon: CloudCog, id: 'offerings',
+      label: 'Solution Offerings', onClick: onOfferingsClick, description: 'Connected solutions',
+    },
+    {
+      accent: '#7dd9ed', accentRgb: '125, 217, 237',
+      ariaLabel: 'Open EA:GLE', icon: Activity, id: 'eagle',
+      label: 'EA:GLE', onClick: onEagleClick, description: 'Operational intelligence',
+    },
+    {
       accent: "#22d3ee",
       accentRgb: "34, 211, 238",
       ariaLabel: "Open analytics trends",
@@ -239,11 +192,11 @@ const KPIBar: React.FC<KPIBarProps> = ({
       id: "analytics",
       label: "Analytics",
       onClick: onAnalyticsClick,
-      visualization: "analytics",
+      description: "Trends & sensor history",
     },
     {
-      accent: "#c084fc",
-      accentRgb: "192, 132, 252",
+      accent: "#7dd9ed",
+      accentRgb: "125, 217, 237",
       ariaLabel:
         predAlertCount > 0
           ? `Open predictive risks, ${predAlertCount} alert${predAlertCount === 1 ? "" : "s"}`
@@ -257,7 +210,7 @@ const KPIBar: React.FC<KPIBarProps> = ({
           ? `${predAlertCount > 99 ? "99+" : predAlertCount} alert${predAlertCount === 1 ? "" : "s"}`
           : undefined,
       statusTone: "warning",
-      visualization: "predict",
+      description: "Predictive maintenance",
     },
     {
       accent: "#60a5fa",
@@ -267,17 +220,17 @@ const KPIBar: React.FC<KPIBarProps> = ({
       id: "dps",
       label: "DPS",
       onClick: onDpsClick,
-      visualization: "dps",
+      description: "Dynamic path selection",
     },
     {
-      accent: "#a78bfa",
-      accentRgb: "167, 139, 250",
+      accent: "#80cae8",
+      accentRgb: "128, 202, 232",
       ariaLabel: "Open application traffic routing",
       icon: Route,
       id: "routing",
       label: "App routing",
       onClick: onRoutingClick,
-      visualization: "routing",
+      description: "Application traffic",
     },
     {
       accent: "#5eead4",
@@ -287,7 +240,7 @@ const KPIBar: React.FC<KPIBarProps> = ({
       id: "it-devices",
       label: "IT devices",
       onClick: onItDevicesClick,
-      visualization: "it-devices",
+      description: "IT device inventory",
     },
     {
       accent: "#fb7185",
@@ -297,7 +250,7 @@ const KPIBar: React.FC<KPIBarProps> = ({
       id: "ot-devices",
       label: "OT devices",
       onClick: onOtDevicesClick,
-      visualization: "ot-devices",
+      description: "OT device inventory",
     },
     {
       accent: "#fbbf24",
@@ -307,19 +260,28 @@ const KPIBar: React.FC<KPIBarProps> = ({
       id: "onboarding",
       label: "Onboarding",
       onClick: onOnboardingClick,
-      visualization: "gateway",
+      description: "Connect a gateway",
     },
     {
       accent: "#67e8f9",
       accentRgb: "103, 232, 249",
-      ariaLabel: "Open Gateway Twin in a new tab",
+      ariaLabel: "Open Gateway Twin",
       icon: ServerCog,
       id: "gateway",
       label: "Gateway twin",
       onClick: onGatewayTwinClick,
-      status: <span aria-hidden="true">↗</span>,
       statusTone: "neutral",
-      visualization: "gateway",
+      description: "Gateway observability",
+    },
+    {
+      accent: "#76decf",
+      accentRgb: "118, 222, 207",
+      ariaLabel: "Open LangGraph AI",
+      icon: BrainCircuit,
+      id: "langgraph",
+      label: "LangGraph AI",
+      onClick: onLanggraphClick,
+      description: "Chat with the factory agent.",
     },
     {
       accent: "#7ab4ee",
@@ -329,7 +291,7 @@ const KPIBar: React.FC<KPIBarProps> = ({
       id: "video",
       label: "Video",
       onClick: onVideoClick,
-      visualization: "video",
+      description: "Camera intelligence",
     },
   ];
 
@@ -354,8 +316,10 @@ const KPIBar: React.FC<KPIBarProps> = ({
   };
 
   const renderMetricCards = () =>
-    kpis.map((kpi, index) => {
+    kpis.map((kpi) => {
       const selected = state.selectedKpi === kpi.id;
+      const metricStyle = metricStyles[kpi.id] ?? metricStyles.energy;
+      const MetricIcon = metricStyle.icon;
       const zoneData = getKpiForZone(kpi, state.selectedZone);
       const trendTone: KpiCardStatusTone = kpi.trendColor.includes("red")
         ? "critical"
@@ -369,18 +333,14 @@ const KPIBar: React.FC<KPIBarProps> = ({
       return (
         <KpiCard
           key={kpi.id}
-          accent={kpi.sparkColor}
-          accentRgb={hexToRgbChannels(kpi.sparkColor)}
+          accent={metricStyle.color}
+          accentRgb={hexToRgbChannels(metricStyle.color)}
           aria-haspopup={kpi.id === "oee" ? "dialog" : undefined}
           aria-label={actionLabel}
-          delayIndex={index}
-          icon={
-            <img
-              alt=""
-              className="kpi-card__source-icon"
-              src={kpi.icon}
-            />
-          }
+          aria-description={kpi.id === "oee"
+            ? `Sample data. Overall equipment effectiveness, ${zoneData.value} percent on a 0 to 100 percent scale.`
+            : `Sample data. ${zoneData.trendUp ? "Increase" : "Decrease"} of ${trendValue}.`}
+          icon={<MetricIcon size={17} strokeWidth={1.8} />}
           label={kpi.label}
           onClick={() => {
             if (kpi.id === "oee" && onOeeClick) {
@@ -389,32 +349,28 @@ const KPIBar: React.FC<KPIBarProps> = ({
             }
             dispatch({ type: "SET_KPI", kpi: kpi.id });
           }}
-          primary={<KpiCountUp value={zoneData.value} />}
+          primary={zoneData.value}
           secondary={kpi.unit}
           selected={selected}
+          visual={<KpiSparkline data={zoneData.sparkData} />}
           status={
             selected ? (
               "Filtering"
             ) : (
               <>
-                <span aria-hidden="true">
-                  {zoneData.trendUp ? "↑" : "↓"}
-                </span>
+                {zoneData.trendUp ? <ArrowUp aria-hidden="true" size={11} /> : <ArrowDown aria-hidden="true" size={11} />}
                 {trendValue}
               </>
             )
           }
           statusTone={selected ? "neutral" : trendTone}
           variant="metric"
-          visualization={
-            <MiniSparkline data={zoneData.sparkData} color={kpi.sparkColor} />
-          }
         />
       );
     });
 
   const renderWorkspaceCards = () => [
-    ...actionCards.map((card, index) => {
+    ...actionCards.map((card) => {
       if (!card.onClick) return null;
       const Icon = card.icon;
 
@@ -425,14 +381,14 @@ const KPIBar: React.FC<KPIBarProps> = ({
           accentRgb={card.accentRgb}
           aria-haspopup={card.id === "gateway" ? undefined : "dialog"}
           aria-label={card.ariaLabel}
-          delayIndex={index}
           icon={<Icon size={17} strokeWidth={1.8} />}
           label={card.label}
           onClick={card.onClick}
           status={card.status}
           statusTone={card.statusTone}
+          title={card.description}
+          visual={<WorkspacePreview kind={card.id} />}
           variant="module"
-          visualization={<WorkspaceVisualization kind={card.visualization} />}
         />
       );
     }),
@@ -449,7 +405,7 @@ const KPIBar: React.FC<KPIBarProps> = ({
   const activeGroupLabel = activeGroupMeta.label;
 
   return (
-    <section className="kpi-deck" aria-label="Factory metrics and tools">
+    <section className="kpi-deck kpi-deck--instruments" aria-label="Factory metrics and tools">
       <div className="kpi-deck__toolbar">
         <div
           aria-label="KPI rail category"
@@ -473,6 +429,7 @@ const KPIBar: React.FC<KPIBarProps> = ({
               type="button"
             >
               <span>{group.label}</span>
+              {group.id === "metrics" && <span className="kpi-data-source">Sample data</span>}
               <span aria-hidden="true" className="kpi-deck__tab-count">
                 {group.count}
               </span>
@@ -480,9 +437,7 @@ const KPIBar: React.FC<KPIBarProps> = ({
           ))}
         </div>
 
-        <span aria-live="polite" className="kpi-deck__position">
-          {activeGroupMeta.count} items
-        </span>
+        <div className="operations-zones"><ZoneTabs /></div>
       </div>
 
       {groups.map((group) => {
@@ -492,7 +447,7 @@ const KPIBar: React.FC<KPIBarProps> = ({
           <div
             key={group.id}
             aria-labelledby={`kpi-tab-${group.id}`}
-            className="kpi-deck__panel"
+            className={`kpi-deck__panel${canScrollLeft || canScrollRight ? " is-scrollable" : ""}`}
             hidden={!active}
             id={`kpi-panel-${group.id}`}
             role="tabpanel"
@@ -513,7 +468,7 @@ const KPIBar: React.FC<KPIBarProps> = ({
                 <div
                   ref={scrollRef}
                   aria-label={`${activeGroupLabel} cards`}
-                  className="kpi-rail__viewport"
+                  className={`kpi-rail__viewport kpi-rail__viewport--${activeGroup}`}
                   id="kpi-rail-scroll"
                   onKeyDown={(event) => {
                     if (event.target !== event.currentTarget) return;
@@ -527,24 +482,6 @@ const KPIBar: React.FC<KPIBarProps> = ({
                     }
                   }}
                   role="region"
-                  style={{
-                    maskImage: `linear-gradient(90deg, ${
-                      canScrollLeft ? "transparent 0, #000 42px" : "#000 0"
-                    }, ${
-                      canScrollRight
-                        ? "#000 calc(100% - 48px), transparent 100%"
-                        : "#000 100%"
-                    })`,
-                    msOverflowStyle: "none",
-                    scrollbarWidth: "none",
-                    WebkitMaskImage: `linear-gradient(90deg, ${
-                      canScrollLeft ? "transparent 0, #000 42px" : "#000 0"
-                    }, ${
-                      canScrollRight
-                        ? "#000 calc(100% - 48px), transparent 100%"
-                        : "#000 100%"
-                    })`,
-                  }}
                   tabIndex={0}
                 >
                   {renderActiveCards()}

@@ -1,5 +1,13 @@
 # GW Operational Twin — Embeddable Widget
 
+Smart Factory's React wrapper now defaults to the live dashboard at
+`http://ce-public-alb-1719524608.us-east-1.elb.amazonaws.com/` (September 10,
+2026). It requires no login and receives the same live AWS telemetry as the
+HTTPS Twin. Open Smart Factory over HTTP when using this temporary embed;
+HTTPS pages cannot embed HTTP frames. AI requests and physical controls remain
+on the authenticated HTTPS Twin. The bundled files below remain available by
+passing `src="/widgets/gw-twin/app/index.html"` explicitly.
+
 Portable export of the BGW620-700 3D operational digital twin. The widget is
 **self-contained by default**: procedural 3D model, in-browser TR-181
 simulator, scenarios, LED mirroring, thermal x-ray, exploded view — no

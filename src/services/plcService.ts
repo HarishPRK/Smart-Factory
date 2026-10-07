@@ -627,37 +627,37 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
     raw,
     ["boardA_relay_motor"],
     prevState?.outputs.motorFanOn ?? false,
-    prevState != null,
+    prevKnown(prevState, "relay"),
   );
   const alarmRelay = readBitSignal(
     raw,
     ["boardA_relay_alarm"],
     prevState?.outputs.relay?.[1] ?? false,
-    prevState != null,
+    prevKnown(prevState, "relay"),
   );
   const alertRed = readBitSignal(
     raw,
     ["boardA_alert_relays_red", "boardB_io_output_red"],
     prevState?.outputs.alerts?.[0] ?? false,
-    prevState != null,
+    prevKnown(prevState, "relay"),
   );
   const alertYellow = readBitSignal(
     raw,
     ["boardA_alert_relays_yellow", "boardB_io_output_yellow"],
     prevState?.outputs.alerts?.[1] ?? false,
-    prevState != null,
+    prevKnown(prevState, "relay"),
   );
   const alertGreen = readBitSignal(
     raw,
     ["boardA_alert_relays_green", "boardB_io_output_green"],
     prevState?.outputs.relay?.[4] ?? false,
-    prevState != null,
+    prevKnown(prevState, "relay"),
   );
   const alertBuzzer = readBitSignal(
     raw,
     ["boardA_alert_relays_buzzer", "boardB_io_output_buzzer"],
     prevState?.outputs.alerts?.[2] ?? false,
-    prevState != null,
+    prevKnown(prevState, "relay"),
   );
 
   // RFID latch — once authorized, hold true until a real E-stop event.
@@ -934,6 +934,9 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
     debugEvents,
   );
 
+  // Unrelated analog traffic is not evidence that relay feedback is available.
+  const hasRelayFeedback = [motorRelay, alarmRelay, alertRed, alertYellow, alertGreen, alertBuzzer]
+    .some((signal) => signal.hasReal);
   const relayAccent = alertRed.value || alertBuzzer.value || alarmRelay.value
     ? "#ef4444"
     : alertYellow.value
@@ -980,10 +983,10 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null): PLC
       id: "relay",
       label: "Relay",
       kind: "relay",
-      active: true,
+      active: hasRelayFeedback,
       accentHex: relayAccent,
       status: relayStatus,
-      placeholder: false,
+      placeholder: !hasRelayFeedback,
     },
     analogParam({
       id: "ph",
@@ -1505,7 +1508,7 @@ export class IoTCorePLCService implements PLCService {
   async fetchCurrentState(): Promise<PLCState> {
     if (this.lastState) return this.lastState;
     return {
-      params: plcParameters.map((p) => ({ ...p })),
+      params: [],
       outputs: { ...DEFAULT_OUTPUTS },
     };
   }
@@ -1924,7 +1927,7 @@ export class MosquittoPLCService implements PLCService {
   async fetchCurrentState(): Promise<PLCState> {
     if (this.lastState) return this.lastState;
     return {
-      params: plcParameters.map((p) => ({ ...p })),
+      params: [],
       outputs: { ...DEFAULT_OUTPUTS },
     };
   }

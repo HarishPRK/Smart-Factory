@@ -1,10 +1,9 @@
 import React, { useRef, useState, useEffect, Suspense, lazy } from "react";
 import KPIBar from "./KPIBar";
-import ZoneTabs from "./ZoneTabs";
-import workerIcon from "../assets/icons/worker.svg";
+import { Activity, Bell, Bot, Box, ChartNoAxesCombined, Network, Sparkles, Gauge, ArrowUpRight, PanelRight, ChevronRight } from "lucide-react";
+import "./langgraph-entry.css";
+import { usePLCContext } from "../context/PLCContext";
 import capgeminiLogo from "../assets/capgemini-logo.jpeg";
-import alertWarning from "../assets/icons/alert_warning.svg";
-import gearIcon from "../assets/icons/Gear.svg";
 // Weather component available for future use but not shown in header
 // import Weather from "../Weather";
 // import { ShiftIndicator, SystemStatus } from "./HeaderWidgets";
@@ -14,8 +13,12 @@ import MotorFanWidget from "./MotorFanWidget";
 import EmergencyLightWidget from "./EmergencyLightWidget";
 import IntegrationModal from "./IntegrationModal";
 import GatewayTwinEmbed from "./GatewayTwinEmbed";
+import SmartMeterEmbed from "./SmartMeterEmbed";
 import { usePredictionStore } from "../stores/predictionStore";
 
+import { OfferingNavigation } from '../integrations/components/offerings/OfferingNavigation';
+const ServiceOfferingsPage = lazy(() => import('../integrations/pages/ServiceOfferings').then(m => ({ default: m.ServiceOfferingsPage })));
+const HardwareAnomaliesPage = lazy(() => import('../integrations/pages/HardwareAnomalies').then(m => ({ default: m.HardwareAnomaliesPage })));
 const FactoryScene = lazy(() => import("./factory3d/FactoryScene"));
 const AIAssistantModal = lazy(() => import("./AIAssistantModal"));
 const LanggraphAgentPanel = lazy(() => import("./LanggraphAgentPanel"));
@@ -85,10 +88,13 @@ const GatewaySourceSelector: React.FC<{
 const Dashboard: React.FC = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [aiChatOpen, setAiChatOpen] = useState(false);
+  const [langgraphOpen, setLanggraphOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [oeeOpen, setOeeOpen] = useState(false);
   const [predictiveOpen, setPredictiveOpen] = useState(false);
+  const [offeringsOpen, setOfferingsOpen] = useState(() => window.location.pathname === '/service-offerings');
+  const [eagleOpen, setEagleOpen] = useState(() => window.location.pathname === '/hardware-anomalies');
   const [dpsOpen, setDpsOpen] = useState(false);
   const [appRoutingOpen, setAppRoutingOpen] = useState(false);
   const [devicesDomain, setDevicesDomain] = useState<"IT" | "OT" | null>(null);
@@ -97,16 +103,19 @@ const Dashboard: React.FC = () => {
   const [videoOpen, setVideoOpen] = useState(false);
   const [gwTwinOpen, setGwTwinOpen] = useState(false);
   const [smartMeterOpen, setSmartMeterOpen] = useState(false);
+  const [modelFocused, setModelFocused] = useState(false);
+  const [inspectorHost, setInspectorHost] = useState<HTMLDivElement | null>(null);
   const gwTwinFullscreenRef = useRef<HTMLDivElement>(null);
   const smartMeterFullscreenRef = useRef<HTMLDivElement>(null);
   const [unsOpen, setUnsOpen] = useState(false);
   const predAlertCount = usePredictionStore((s) => s.anomalyAlerts.length);
   const { filteredAlerts } = useFilters();
+  const { isConnected } = usePLCContext(false);
 
   // The integration modals cover the whole screen, so freeze the 3D render
   // loop while one is open — on integrated GPUs the scene otherwise competes
   // with the modal for the GPU and makes it take seconds to appear.
-  const scenePaused = dpsOpen || appRoutingOpen || devicesDomain !== null || onboardingOpen || videoOpen || gwTwinOpen || smartMeterOpen;
+  const scenePaused = analyticsOpen || oeeOpen || predictiveOpen || offeringsOpen || eagleOpen || dpsOpen || appRoutingOpen || devicesDomain !== null || onboardingOpen || videoOpen || gwTwinOpen || smartMeterOpen;
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -114,110 +123,58 @@ const Dashboard: React.FC = () => {
   }, []);
 
   return (
-    <div className="smart-factory-ui min-h-dvh xl:h-dvh xl:max-h-dvh text-white px-3 py-3 xl:px-5 xl:py-3.5 font-sans flex flex-col overflow-y-auto xl:overflow-hidden gap-3">
-      {/* Header — minimal, modern */}
-      <header className="flex items-center justify-between gap-4 flex-none animate-fade-in px-3 py-2">
-        <div className="flex items-center gap-3.5 min-w-0">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center relative group/logo cursor-pointer transition-all duration-300 overflow-hidden bg-white/95 shadow-[0_2px_10px_rgba(0,0,0,0.3)]">
-            <img
-              src={capgeminiLogo}
-              alt="Capgemini"
-              className="w-8 h-8 object-contain group-hover/logo:scale-110 transition-transform duration-300"
-            />
-          </div>
-          <div className="min-w-0">
-            <div className="text-[15px] font-semibold tracking-[0.06em] text-white/92 uppercase truncate leading-none">
-              Manufacturing Industry
-            </div>
-            <div className="text-[10px] text-white/55 font-medium tracking-[0.1em] mt-1 uppercase">
-              Live Operations
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4">
-          {/* Compact inline time + weather */}
-          <div className="hidden lg:flex items-center gap-4 text-[13px] text-white/60 font-medium tabular-nums">
-            <span>{currentTime.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })}</span>
-            <span className="text-white/8">|</span>
-            <span className="flex items-center gap-2">
-              <span className="text-[15px] text-white/75 font-semibold">25°</span>
-              <span className="text-white/55">Colorado</span>
-            </span>
-          </div>
-
-          {/* Notification */}
-          <button
-            onClick={() => setNotifOpen(true)}
-            className="icon-btn notification-bell w-10 h-10 flex items-center justify-center rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-white/50 hover:text-white relative transition-all duration-200"
-          >
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-              <path d="M10 2a6 6 0 00-6 6v3l-1.5 2.5h15L16 11V8a6 6 0 00-6-6z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
-              <path d="M8 17a2 2 0 004 0" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-            </svg>
-            {filteredAlerts.length > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-5 h-5 bg-red-500 rounded-full text-[8px] leading-none font-bold flex items-center justify-center px-1 text-white">
-                {filteredAlerts.length}
-              </span>
-            )}
-          </button>
-
-          {/* UNS Explorer — live unified-namespace tree */}
-          <button
-            onClick={() => setUnsOpen(true)}
-            title="UNS Explorer"
-            className="icon-btn w-10 h-10 flex items-center justify-center rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-white/50 hover:text-white relative transition-all duration-200"
-          >
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-              <rect x="3" y="3" width="5" height="4" rx="1" stroke="currentColor" strokeWidth="1.4" />
-              <rect x="12" y="8" width="5" height="4" rx="1" stroke="currentColor" strokeWidth="1.4" />
-              <rect x="3" y="13" width="5" height="4" rx="1" stroke="currentColor" strokeWidth="1.4" />
-              <path d="M8 5h2.5v10H8M10.5 10H12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-            </svg>
-          </button>
-
-          {/* Smart meter twin */}
-          <button
-            type="button"
-            onClick={() => setSmartMeterOpen(true)}
-            title="Open Aituzero smart meter twin"
-            aria-label="Open Aituzero smart meter twin"
-            className="icon-btn w-10 h-10 flex items-center justify-center rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-white/60 hover:text-white transition-colors"
-          >
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" />
-              <rect x="7" y="7" width="10" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" />
-              <path d="M8 16h2m2 0h2m2 0h1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </button>
-
-          {/* Settings */}
-          <button className="icon-btn w-10 h-10 flex items-center justify-center rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-white/50 hover:text-white relative transition-all duration-200 group/settings">
-            <img
-              src={gearIcon}
-              alt="Settings"
-              className="w-4.5 h-4.5 opacity-50 invert group-hover/settings:rotate-90 transition-all duration-500"
-            />
-          </button>
-
-          {/* Avatar */}
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/30 to-violet-500/20 flex items-center justify-center cursor-pointer hover:from-indigo-500/40 hover:to-violet-500/30 transition-all duration-300">
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" className="opacity-60">
-              <circle cx="10" cy="7" r="3.5" stroke="white" strokeWidth="1.5" />
-              <path d="M3 17.5c0-3 3-5.5 7-5.5s7 2.5 7 5.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </div>
+    <div className={`smart-factory-ui operations-shell plant-console${modelFocused ? " is-model-focused" : ""}`}>
+      <aside className="operations-rail">
+        <a href={import.meta.env.BASE_URL} aria-label="Manufacturing Industry home" className="rail-brand"><img src={capgeminiLogo} alt="Capgemini" /></a>
+        <nav className="operations-nav" aria-label="Main navigation">
+          <button className="is-current" aria-current="page"><Box size={20} /><span>Twin</span></button>
+          <button onClick={() => setAnalyticsOpen(true)}><ChartNoAxesCombined size={20} /><span>Analytics</span></button>
+          <button onClick={() => setOfferingsOpen(true)}><Network size={20} /><span>Solutions</span></button>
+          <button onClick={() => setUnsOpen(true)}><Activity size={20} /><span>Network</span></button>
+        </nav>
+        <span className="rail-footnote">OPERATIONS</span>
+      </aside>
+      <header className="operations-header">
+        <div className="operations-brand"><span>Manufacturing</span><ChevronRight size={14} /><span className="workspace-name">Plant workspace</span></div>
+        <div className="operations-header__actions">
+          <time>{currentTime.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })}</time>
+          <button aria-label="Open Aituzero Smart Meter" title="Smart meter" onClick={() => setSmartMeterOpen(true)}><Gauge size={18} /></button>
+          <button aria-label="UNS Explorer" title="UNS Explorer" onClick={() => setUnsOpen(true)}><Network size={18} /></button>
+          <button aria-label={`Notifications: ${filteredAlerts.length} alerts`} title="Notifications" className="operations-notifications" onClick={() => setNotifOpen(true)}><Bell size={18} />{filteredAlerts.length > 0 && <span>{filteredAlerts.length}</span>}</button>
+          <button className="operations-assistant" aria-label="Ask AI" onClick={() => setAiChatOpen(true)}><Sparkles size={15} /><span>Ask AI</span></button>
+          <button type="button" className="operations-langgraph" aria-label="Open LangGraph AI" aria-haspopup="dialog" aria-expanded={langgraphOpen} aria-controls={langgraphOpen ? "langgraph-agent-dialog" : undefined} onClick={() => setLanggraphOpen(true)}><Bot size={17} /><span>LangGraph AI</span></button>
         </div>
       </header>
+      <div className="operations-titlebar">
+        <div><h1>Production line</h1><p>Monitor the process. Inspect every machine.</p></div>
+        <div className="operations-titlebar__status"><span className={isConnected ? "connection-state is-connected" : "connection-state"}><i />{isConnected ? "PLC connected" : "PLC offline"}</span><button className="focus-model" aria-pressed={modelFocused} onClick={() => setModelFocused(!modelFocused)}><PanelRight size={15} />{modelFocused ? "Show telemetry" : "Focus model"}</button><button onClick={() => setPredictiveOpen(true)}><Activity size={15} />Insights<ArrowUpRight size={14} /></button></div>
+      </div>
+
+      <IntegrationModal open={offeringsOpen} onClose={() => setOfferingsOpen(false)} title="Solution Offerings" layout="immersive" enableFullscreen>
+        <OfferingNavigation.Provider value={(path) => {
+          setOfferingsOpen(false);
+          if (path === '/hardware-anomalies') setEagleOpen(true);
+          else if (path === '/path-selection') setDpsOpen(true);
+          else if (path === '/video-analytics') setVideoOpen(true);
+          else if (path === '/cost-insights') setAnalyticsOpen(true);
+        }}>
+          <Suspense fallback={<IntegrationLoading />}><ServiceOfferingsPage /></Suspense>
+        </OfferingNavigation.Provider>
+      </IntegrationModal>
+      <IntegrationModal open={eagleOpen} onClose={() => setEagleOpen(false)} title="EA:GLE" layout="immersive" enableFullscreen>
+        <Suspense fallback={<IntegrationLoading />}><HardwareAnomaliesPage /></Suspense>
+      </IntegrationModal>
 
       {/* Main Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-3 flex-grow min-h-0 xl:overflow-hidden">
+      <div className="operations-grid">
         {/* Center Content */}
-        <div className="xl:col-span-9 flex flex-col gap-3 xl:h-full min-h-0">
+        <div className="operations-main">
           <KPIBar
             onOeeClick={() => setOeeOpen(true)}
             onAnalyticsClick={() => setAnalyticsOpen(true)}
             onPredictClick={() => setPredictiveOpen(true)}
+            onOfferingsClick={() => setOfferingsOpen(true)}
+            onEagleClick={() => setEagleOpen(true)}
             onDpsClick={() => setDpsOpen(true)}
             onRoutingClick={() => setAppRoutingOpen(true)}
             onItDevicesClick={() => setDevicesDomain("IT")}
@@ -225,159 +182,21 @@ const Dashboard: React.FC = () => {
             onOnboardingClick={() => setOnboardingOpen(true)}
             onGatewayTwinClick={() => setGwTwinOpen(true)}
             onVideoClick={() => setVideoOpen(true)}
+            onLanggraphClick={() => setLanggraphOpen(true)}
             predAlertCount={predAlertCount}
           />
-          <div className="flex-grow min-h-[460px] xl:min-h-0 card data-trace corner-marks relative overflow-hidden group rounded-2xl">
-            {/* 3D Scene */}
-            <Suspense
-              fallback={
-                <div className="absolute inset-0 flex items-center justify-center text-white/50 text-[11px] tracking-wider uppercase">
-                  Initializing 3D scene…
-                </div>
-              }
-            >
-              <FactoryScene paused={scenePaused} />
+          <section className="operations-twin" aria-label="Interactive factory digital twin">
+            <Suspense fallback={<div className="twin-loading"><Box size={26} /><span>Preparing your factory view</span><small>Loading the production model…</small></div>}>
+              <FactoryScene paused={scenePaused} inspectorHost={modelFocused ? null : inspectorHost} />
             </Suspense>
-
-            {/* Gradient overlays */}
-            <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-[#0b0c1a]/70 to-transparent pointer-events-none z-10"></div>
-            <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#0b0c1a]/80 to-transparent pointer-events-none z-10"></div>
-
-            <div className="absolute top-14 left-5 z-20 pointer-events-auto">
-              <ZoneTabs />
-            </div>
-
-            <div
-              className={`absolute top-[280px] right-5 glass rounded-2xl px-5 py-3 flex items-center gap-4 z-20 hidden`}
-            >
-              <div className="text-right">
-                <div className="text-lg font-semibold gradient-number leading-none">
-                  2,498
-                </div>
-                <div className="text-[10px] text-blue-300/55 uppercase tracking-[0.15em] mt-1.5 font-medium">
-                  On-floor Workforce
-                </div>
-              </div>
-              <div className="w-9 h-9 rounded-xl bg-blue-500/[0.08] flex items-center justify-center border border-blue-400/[0.10] shadow-[0_0_12px_rgba(59,130,246,0.08)]">
-                <img
-                  src={workerIcon}
-                  alt="Worker"
-                  className="w-4 h-4 opacity-70 invert"
-                />
-              </div>
-            </div>
-
-            {/* Alert Cards — hidden in factory view for full 3D scene visibility */}
-            {filteredAlerts.length > 0 && false && (
-              <>
-                <div className="absolute bottom-24 left-5 z-20">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-red-200/75">
-                    Priority Alerts
-                  </div>
-                  <div className="text-[11px] text-blue-200/70 mt-1">
-                    Issues are sorted by severity for faster response.
-                  </div>
-                </div>
-                <div className="absolute bottom-4 left-4 right-4 flex gap-3 z-20">
-                  {filteredAlerts.slice(0, 2).map((alert) => (
-                    <div
-                      key={alert.id}
-                      className={`flex-1 backdrop-blur-xl border rounded-2xl p-3 flex items-center gap-3 transition-all duration-300 group/alert relative overflow-hidden ${
-                        alert.severity === "critical"
-                          ? "bg-gradient-to-br from-red-950/30 to-red-950/15 border-red-500/10 hover:border-red-500/25"
-                          : alert.severity === "warning"
-                            ? "bg-gradient-to-br from-amber-950/30 to-amber-950/15 border-amber-500/10 hover:border-amber-500/25"
-                            : "bg-gradient-to-br from-blue-950/30 to-blue-950/15 border-blue-500/10 hover:border-blue-500/25"
-                      }`}
-                    >
-                      {/* Alert icon */}
-                      <div
-                        className={`w-9 h-9 rounded-xl flex items-center justify-center border flex-shrink-0 ${
-                          alert.severity === "critical"
-                            ? "bg-red-500/[0.10] border-red-500/[0.15] shadow-[0_0_16px_rgba(239,68,68,0.12)]"
-                            : alert.severity === "warning"
-                              ? "bg-amber-500/[0.10] border-amber-500/[0.15] shadow-[0_0_16px_rgba(245,158,11,0.12)]"
-                              : "bg-blue-500/[0.10] border-blue-500/[0.15] shadow-[0_0_16px_rgba(59,130,246,0.12)]"
-                        }`}
-                      >
-                        <img
-                          src={alertWarning}
-                          alt="Warning"
-                          className="w-4 h-4 opacity-60 invert"
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div
-                          className={`text-[12px] font-medium transition-colors truncate ${
-                            alert.severity === "critical"
-                              ? "text-red-200/90 group-hover/alert:text-red-100"
-                              : alert.severity === "warning"
-                                ? "text-amber-200/90 group-hover/alert:text-amber-100"
-                                : "text-blue-200/90 group-hover/alert:text-blue-100"
-                          }`}
-                        >
-                          {alert.machineName}
-                        </div>
-                        <div
-                          className={`text-[10px] mt-0.5 font-medium flex items-center gap-1.5 ${
-                            alert.severity === "critical"
-                              ? "text-red-400/60"
-                              : alert.severity === "warning"
-                                ? "text-amber-400/60"
-                                : "text-blue-400/60"
-                          }`}
-                        >
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full animate-pulse-glow ${
-                              alert.severity === "critical"
-                                ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.7)]"
-                                : alert.severity === "warning"
-                                  ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.7)]"
-                                  : "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.7)]"
-                            }`}
-                            style={{
-                              color:
-                                alert.severity === "critical"
-                                  ? "#ef4444"
-                                  : alert.severity === "warning"
-                                    ? "#f59e0b"
-                                    : "#3b82f6",
-                            }}
-                          ></span>
-                          {alert.issue} • {alert.time}
-                        </div>
-                      </div>
-                      {/* Glow */}
-                      <div
-                        className={`absolute -bottom-6 -left-6 w-20 h-20 blur-[25px] rounded-full pointer-events-none transition-all duration-500 ${
-                          alert.severity === "critical"
-                            ? "bg-red-500/[0.06] group-hover/alert:bg-red-500/[0.10]"
-                            : alert.severity === "warning"
-                              ? "bg-amber-500/[0.06] group-hover/alert:bg-amber-500/[0.10]"
-                              : "bg-blue-500/[0.06] group-hover/alert:bg-blue-500/[0.10]"
-                        }`}
-                      ></div>
-                      <div
-                        className={`absolute -top-8 -right-8 w-16 h-16 blur-[20px] rounded-full pointer-events-none ${
-                          alert.severity === "critical"
-                            ? "bg-red-500/[0.03]"
-                            : alert.severity === "warning"
-                              ? "bg-amber-500/[0.03]"
-                              : "bg-blue-500/[0.03]"
-                        }`}
-                      ></div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
+          </section>
         </div>
 
         {/* Right Sidebar */}
-        <div className="xl:col-span-3 flex flex-col gap-3 xl:h-full min-h-0">
-          <PLCParametersWidget className="flex-1 min-h-[360px] xl:min-h-0" />
-          <div className="flex-none h-[140px] flex gap-3">
+        <div className="operations-sidebar">
+          <div ref={setInspectorHost} className="twin-inspector-slot" />
+          <PLCParametersWidget className="operations-plc" />
+          <div className="operations-actuators">
             <MotorFanWidget className="flex-1 min-h-0" />
             <EmergencyLightWidget className="flex-1 min-h-0" />
           </div>
@@ -385,9 +204,10 @@ const Dashboard: React.FC = () => {
       </div>
 
       <Suspense fallback={null}>
+        {aiChatOpen && <AIAssistantModal open onClose={() => setAiChatOpen(false)} />}
         {/* External agentic-AI assistant. It sends only user-submitted prompts
             and remains separate from the governed Bedrock insight routes. */}
-        <LanggraphAgentPanel />
+        <LanggraphAgentPanel open={langgraphOpen} onClose={() => setLanggraphOpen(false)} />
         {notifOpen && (
           <NotificationDrawer
             open={notifOpen}
@@ -478,9 +298,8 @@ const Dashboard: React.FC = () => {
           </Suspense>
         </IntegrationModal>
       )}
-      {/* Gateway Digital Twin — local embedded widget (public/widgets/gw-twin,
-          built from the GW-Operational-Twin repo). Fully self-contained:
-          in-browser TR-181 simulator, no backend, no external host. */}
+      {/* Gateway Digital Twin — hosted HTTP dashboard with the same live AWS
+          telemetry as the standalone Twin, without a separate sign-in. */}
       {gwTwinOpen && (
         <IntegrationModal
           open={gwTwinOpen}
@@ -499,18 +318,13 @@ const Dashboard: React.FC = () => {
         <IntegrationModal
           open
           onClose={() => setSmartMeterOpen(false)}
-          title="Aituzero Smart Meter · Simulation"
+          title="Aituzero Smart Meter"
           layout="immersive"
           enableFullscreen
           fullscreenTargetRef={smartMeterFullscreenRef}
         >
           <div ref={smartMeterFullscreenRef} style={{ height: "calc(var(--fit-vh, 100vh) - 152px)", minHeight: 480, borderRadius: 12, overflow: "hidden" }}>
-            <iframe
-              title="Aituzero Form 2S smart meter digital twin"
-              src="/widgets/aituzero-meter/"
-              loading="lazy"
-              style={{ width: "100%", height: "100%", border: 0, background: "#f1f4f5" }}
-            />
+            <SmartMeterEmbed />
           </div>
         </IntegrationModal>
       )}

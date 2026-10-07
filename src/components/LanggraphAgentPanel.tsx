@@ -1,166 +1,23 @@
 import React, { useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom";
+import { ArrowUp, Bot, Network, ShieldAlert, X, Zap } from "lucide-react";
 import {
   useLangraphChat,
   type LangraphMessage,
 } from "../hooks/useLangraphChat";
 
 /**
- * Minimal chat drawer for the external langgraph agent.
- *
- * Self-contained: mounts a floating button (bottom-left, so it doesn't fight
- * Plant Copilot at bottom-right) plus a small drawer with the conversation.
- * No tabs, no PLC context, no streaming - submit > poll > render.
+ * Chat for the external LangGraph agent. Dashboard owns the named launchers;
+ * this component remains mounted so closing the dialog keeps the conversation.
+ * Prompts are sent only on submission or an explicit suggested-prompt click.
  */
-const LanggraphAgentPanel: React.FC = () => {
-  const [open, setOpen] = useState(false);
+const LanggraphAgentPanel: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
   const chat = useLangraphChat();
 
-  return (
-    <>
-      <FloatingButton open={open} onClick={() => setOpen((v) => !v)} />
-      {open && <Drawer chat={chat} onClose={() => setOpen(false)} />}
-    </>
-  );
+  return open ? <Drawer chat={chat} onClose={onClose} /> : null;
 };
 
 export default LanggraphAgentPanel;
-
-/* -- Floating button ------------------------------------- */
-
-const AgenticCoreMark: React.FC<{ size?: number; active?: boolean }> = ({
-  size = 64,
-  active = false,
-}) => (
-  <svg
-    aria-hidden
-    width={size}
-    height={size}
-    viewBox="0 0 100 100"
-    fill="none"
-    style={{ display: "block", overflow: "visible" }}
-  >
-    <defs>
-      <linearGradient id="lg-core-gradient" x1="18" y1="14" x2="84" y2="88">
-        <stop stopColor="#DCC8FF" />
-        <stop offset="0.42" stopColor="#A855F7" />
-        <stop offset="1" stopColor="#4F46E5" />
-      </linearGradient>
-      <linearGradient id="lg-core-orbit" x1="10" y1="0" x2="90" y2="100">
-        <stop stopColor="#5EEAD4" stopOpacity="0.9" />
-        <stop offset="0.55" stopColor="#C084FC" stopOpacity="0.15" />
-        <stop offset="1" stopColor="#818CF8" stopOpacity="0.9" />
-      </linearGradient>
-      <filter id="lg-core-glow" x="-50%" y="-50%" width="200%" height="200%">
-        <feGaussianBlur stdDeviation="4" result="blur" />
-        <feMerge>
-          <feMergeNode in="blur" />
-          <feMergeNode in="SourceGraphic" />
-        </feMerge>
-      </filter>
-    </defs>
-    <g opacity={active ? 0.95 : 0.72}>
-      <ellipse
-        cx="50"
-        cy="50"
-        rx="43"
-        ry="18"
-        stroke="url(#lg-core-orbit)"
-        strokeWidth="1.5"
-        strokeDasharray="4 4"
-      >
-        <animateTransform
-          attributeName="transform"
-          type="rotate"
-          from="0 50 50"
-          to="360 50 50"
-          dur="8s"
-          repeatCount="indefinite"
-        />
-      </ellipse>
-      <ellipse
-        cx="50"
-        cy="50"
-        rx="18"
-        ry="43"
-        stroke="url(#lg-core-orbit)"
-        strokeWidth="1.2"
-        opacity="0.7"
-      >
-        <animateTransform
-          attributeName="transform"
-          type="rotate"
-          from="360 50 50"
-          to="0 50 50"
-          dur="10s"
-          repeatCount="indefinite"
-        />
-      </ellipse>
-    </g>
-    <circle cx="50" cy="50" r="25" fill="url(#lg-core-gradient)" filter="url(#lg-core-glow)">
-      <animate attributeName="r" values="24;26;24" dur="3s" repeatCount="indefinite" />
-    </circle>
-    <circle cx="50" cy="50" r="17" fill="rgba(16, 12, 39, 0.3)" stroke="rgba(255,255,255,0.35)" />
-    <path
-      d="M50 25c2.6 16.3 7.3 21 23 25-15.7 4-20.4 8.7-23 25-2.6-16.3-7.3-21-23-25 15.7-4 20.4-8.7 23-25Z"
-      fill="#F5F3FF"
-    />
-    <circle cx="70" cy="31" r="3.1" fill="#5EEAD4">
-      <animate attributeName="opacity" values="0.45;1;0.45" dur="1.8s" repeatCount="indefinite" />
-    </circle>
-    <circle cx="30" cy="69" r="2.2" fill="#C4B5FD" />
-  </svg>
-);
-
-const FloatingButton: React.FC<{ open: boolean; onClick: () => void }> = ({
-  open,
-  onClick,
-}) => (
-  <button
-    onClick={onClick}
-    aria-label={open ? "Close Agentic AI assistant" : "Open Agentic AI assistant"}
-    aria-pressed={open}
-    title="Agentic AI · Plant intelligence"
-    className="lg-agent-trigger"
-    style={{
-      position: "fixed",
-      left: "18px",
-      bottom: "18px",
-      zIndex: 40,
-      width: "66px",
-      height: "66px",
-      padding: 0,
-      borderRadius: "20px",
-      border: "1px solid rgba(167, 139, 250, 0.58)",
-      background:
-        "radial-gradient(circle at 28% 20%, rgba(196,181,253,0.28), transparent 43%), linear-gradient(145deg, rgba(60, 26, 130, 0.96), rgba(13, 25, 67, 0.98))",
-      boxShadow: open
-        ? "0 0 0 3px rgba(139, 92, 246, 0.25), 0 0 28px rgba(124, 58, 237, 0.5), 0 14px 34px rgba(0,0,0,0.56)"
-        : "0 0 22px rgba(124, 58, 237, 0.28), 0 12px 30px rgba(0,0,0,0.5)",
-      cursor: "pointer",
-      display: "grid",
-      placeItems: "center",
-      transition: "box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease",
-      transform: open ? "translateY(-3px) scale(1.02)" : "translateY(0)",
-    }}
-  >
-    <AgenticCoreMark size={57} active={open} />
-    <span
-      aria-hidden
-      style={{
-        position: "absolute",
-        right: "8px",
-        bottom: "8px",
-        width: "8px",
-        height: "8px",
-        borderRadius: "999px",
-        background: "#34d399",
-        border: "2px solid #18112e",
-        boxShadow: "0 0 10px rgba(52, 211, 153, 0.9)",
-      }}
-    />
-  </button>
-);
 
 /* -- Drawer ---------------------------------------------- */
 
@@ -173,6 +30,9 @@ const Drawer: React.FC<DrawerProps> = ({ chat, onClose }) => {
   const { messages, pending, send, cancel, clear } = chat;
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
 
   // Auto-scroll to bottom on new messages / pending updates.
   useEffect(() => {
@@ -181,14 +41,35 @@ const Drawer: React.FC<DrawerProps> = ({ chat, onClose }) => {
     el.scrollTop = el.scrollHeight;
   }, [messages]);
 
-  // ESC closes the modal.
+  // Keep keyboard navigation in the dialog and restore the launcher's focus.
   useEffect(() => {
+    const launcher = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusable = () => Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), [tabindex="0"]') ?? []);
+    (dialogRef.current?.querySelector<HTMLInputElement>("input") ?? dialogRef.current)?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onCloseRef.current();
+      }
+      if (e.key === "Tab") {
+        const controls = focusable();
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (e.shiftKey && (document.activeElement === first || !dialogRef.current?.contains(document.activeElement))) {
+          e.preventDefault();
+          last?.focus();
+        } else if (!e.shiftKey && (document.activeElement === last || !dialogRef.current?.contains(document.activeElement))) {
+          e.preventDefault();
+          first?.focus();
+        }
+      }
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      if (launcher?.isConnected) launcher.focus();
+    };
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -304,9 +185,13 @@ const Drawer: React.FC<DrawerProps> = ({ chat, onClose }) => {
           `}
       </style>
       <div
+        ref={dialogRef}
+        id="langgraph-agent-dialog"
+        className="langgraph-dialog"
         role="dialog"
         aria-modal="true"
-        aria-label="Agentic AI factory assistant"
+        aria-label="LangGraph AI factory assistant"
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         style={{
           position: "relative",
@@ -363,6 +248,7 @@ const Drawer: React.FC<DrawerProps> = ({ chat, onClose }) => {
 
         {/* Header */}
         <div
+          className="langgraph-dialog__header"
           style={{
             position: "relative",
             display: "flex",
@@ -402,32 +288,31 @@ const Drawer: React.FC<DrawerProps> = ({ chat, onClose }) => {
             />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
-            <AgenticCoreMark size={34} />
+            <Bot size={26} color="#43d8f1" aria-hidden />
             <div style={{ minWidth: 0 }}>
-              <div
+              <h2
                 style={{
-                  fontSize: "10px",
-                  fontWeight: 800,
-                  letterSpacing: "0.16em",
-                  textTransform: "uppercase",
-                  color: "#a78bfa",
+                  fontSize: "18px",
+                  fontWeight: 650,
+                  color: "#eef5f7",
                   marginBottom: "2px",
                 }}
               >
-                Agentic AI
-              </div>
+                LangGraph AI
+              </h2>
               <div
                 style={{
-                  fontSize: "18px",
-                  fontWeight: 700,
-                  color: "#f5f3ff",
+                  fontSize: "11px",
+                  fontWeight: 450,
+                  color: "#a7bbc6",
                 }}
               >
-                Factory Assistant
+                External factory agent · advisory
               </div>
             </div>
           </div>
           <div
+            className="langgraph-dialog__actions"
             style={{
               display: "flex",
               alignItems: "center",
@@ -435,34 +320,6 @@ const Drawer: React.FC<DrawerProps> = ({ chat, onClose }) => {
               marginLeft: "auto",
             }}
           >
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "5px",
-                padding: "5px 9px",
-                borderRadius: "999px",
-                border: "1px solid rgba(52, 211, 153, 0.25)",
-                background: "rgba(16, 185, 129, 0.08)",
-                color: "#a7f3d0",
-                fontSize: "10px",
-                fontWeight: 700,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-              }}
-            >
-              <span
-                aria-hidden
-                style={{
-                  width: "6px",
-                  height: "6px",
-                  borderRadius: "50%",
-                  background: "#34d399",
-                  boxShadow: "0 0 8px #34d399",
-                }}
-              />
-              External agent · advisory
-            </div>
             <div style={{ display: "flex", gap: "6px" }}>
               <IconButton
                 onClick={clear}
@@ -471,8 +328,8 @@ const Drawer: React.FC<DrawerProps> = ({ chat, onClose }) => {
               >
                 Clear
               </IconButton>
-              <IconButton onClick={onClose} title="Close">
-                X
+              <IconButton onClick={onClose} title="Close LangGraph AI">
+                <X size={14} aria-hidden />
               </IconButton>
             </div>
           </div>
@@ -539,6 +396,7 @@ const IconButton: React.FC<{
     onClick={onClick}
     disabled={disabled}
     title={title}
+    aria-label={title}
     style={{
       background: "rgba(139, 92, 246, 0.12)",
       border: "1px solid rgba(139, 92, 246, 0.2)",
@@ -584,6 +442,7 @@ const AssistantComposer: React.FC<{
       }}
     >
       <div
+        className="langgraph-composer__source"
         aria-hidden
         style={{
           display: compact ? "none" : "inline-flex",
@@ -606,10 +465,11 @@ const AssistantComposer: React.FC<{
             boxShadow: "0 0 9px rgba(52, 211, 153, 0.85)",
           }}
         />
-        Live context
+        Agent
       </div>
       <input
         type="text"
+        aria-label="Message LangGraph AI"
         value={input}
         onChange={(event) => onChange(event.target.value)}
         placeholder={pending ? "Agent is processing your request…" : "Ask anything about the plant…"}
@@ -644,22 +504,22 @@ const AssistantComposer: React.FC<{
           opacity: ready ? 1 : 0.48,
         }}
       >
-        ↑
+        <ArrowUp size={19} aria-hidden />
       </button>
     </form>
   );
 };
 
 const SAMPLE_PROMPTS = [
-  "How is my overall system performance?",
+  "How is the system performing overall?",
   "How many units have been produced so far?",
-  "What is the downtime of my system?",
-  "The system is in emergency state. How to restart the plant?",
-  "List all devices connected through modbus/rs485 with plc.",
-  "How many times has the system entered emergency state?",
-  "Analyze the power consumption, voltage and current of single phase motor.",
-  "Analyze pressure sensor data.",
-  "Predict downtime risk for the plant."
+  "How much downtime has the system had?",
+  "How can I restart the plant after an emergency state?",
+  "Which devices are connected to the PLC through Modbus / RS485?",
+  "How many times has the system entered an emergency state?",
+  "What do the single-phase motor's power, voltage, and current readings show?",
+  "What do the pressure sensor readings show?",
+  "What is the predicted downtime risk for the plant?"
 ];
 
 const FEATURED_PROMPTS = [
@@ -667,19 +527,19 @@ const FEATURED_PROMPTS = [
     title: "Emergency recovery",
     detail: "Get the safe restart path when the plant enters an emergency state.",
     prompt: SAMPLE_PROMPTS[3],
-    glyph: "!",
+    Icon: ShieldAlert,
   },
   {
     title: "Connected devices",
     detail: "Inspect the devices connected to the PLC through Modbus / RS485.",
     prompt: SAMPLE_PROMPTS[4],
-    glyph: "⌘",
+    Icon: Network,
   },
   {
     title: "Motor energy analysis",
     detail: "Analyze single-phase motor power, voltage, and current together.",
     prompt: SAMPLE_PROMPTS[6],
-    glyph: "ϟ",
+    Icon: Zap,
   },
 ];
 
@@ -701,235 +561,6 @@ interface EmptyStateProps {
   disabled?: boolean;
 }
 
-const AgenticOperationsMesh: React.FC = () => (
-  <div
-    aria-hidden
-    style={{
-      position: "relative",
-      width: "min(520px, 100%)",
-      height: "198px",
-      marginBottom: "-2px",
-      pointerEvents: "none",
-    }}
-  >
-    <div
-      style={{
-        position: "absolute",
-        inset: "30px 76px 22px",
-        borderRadius: "50%",
-        background:
-          "radial-gradient(ellipse, rgba(124, 58, 237, 0.2) 0%, rgba(49, 46, 129, 0.1) 42%, transparent 72%)",
-        filter: "blur(12px)",
-      }}
-    />
-    <svg
-      width="100%"
-      height="100%"
-      viewBox="0 0 520 198"
-      fill="none"
-      style={{ position: "absolute", inset: 0, overflow: "visible" }}
-    >
-      <defs>
-        <linearGradient id="lg-mesh-line" x1="55" y1="38" x2="461" y2="164">
-          <stop stopColor="#5EEAD4" stopOpacity="0.8" />
-          <stop offset="0.5" stopColor="#C084FC" stopOpacity="0.82" />
-          <stop offset="1" stopColor="#818CF8" stopOpacity="0.72" />
-        </linearGradient>
-        <filter id="lg-mesh-glow" x="-40%" y="-40%" width="180%" height="180%">
-          <feGaussianBlur stdDeviation="3" result="blur" />
-          <feMerge>
-            <feMergeNode in="blur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-      </defs>
-      <path
-        d="M260 95 L72 48 M260 95 L448 48 M260 95 L260 171"
-        stroke="url(#lg-mesh-line)"
-        strokeWidth="1.4"
-        strokeDasharray="5 7"
-        opacity="0.78"
-      >
-        <animate
-          attributeName="stroke-dashoffset"
-          from="48"
-          to="0"
-          dur="3.2s"
-          repeatCount="indefinite"
-        />
-      </path>
-      <path
-        d="M72 48 Q156 5 260 34 Q364 5 448 48"
-        stroke="rgba(196, 181, 253, 0.3)"
-        strokeWidth="1"
-        strokeDasharray="2 8"
-      />
-      <path
-        d="M72 48 Q136 176 260 171 Q384 176 448 48"
-        stroke="rgba(94, 234, 212, 0.18)"
-        strokeWidth="1"
-      />
-      {[
-        [72, 48, "#5eead4"],
-        [448, 48, "#a78bfa"],
-        [260, 171, "#818cf8"],
-      ].map(([cx, cy, color], index) => (
-        <g key={index}>
-          <circle
-            cx={cx}
-            cy={cy}
-            r="12"
-            fill="rgba(15, 23, 42, 0.9)"
-            stroke={color as string}
-            strokeWidth="1.2"
-            filter="url(#lg-mesh-glow)"
-          />
-          <circle cx={cx} cy={cy} r="3.5" fill={color as string}>
-            <animate
-              attributeName="r"
-              values="2.8;4.2;2.8"
-              dur="2.1s"
-              begin={`${index * 0.32}s`}
-              repeatCount="indefinite"
-            />
-          </circle>
-        </g>
-      ))}
-      <circle
-        cx="260"
-        cy="95"
-        r="56"
-        stroke="rgba(196, 181, 253, 0.28)"
-        strokeWidth="1"
-        strokeDasharray="2 7"
-      >
-        <animateTransform
-          attributeName="transform"
-          type="rotate"
-          from="0 260 95"
-          to="360 260 95"
-          dur="17s"
-          repeatCount="indefinite"
-        />
-      </circle>
-      <circle cx="260" cy="95" r="70" stroke="rgba(139, 92, 246, 0.14)" strokeWidth="1" />
-    </svg>
-    <div
-      style={{
-        position: "absolute",
-        left: "50%",
-        top: "39px",
-        transform: "translateX(-50%)",
-        filter: "drop-shadow(0 12px 20px rgba(76, 29, 149, 0.35))",
-      }}
-    >
-      <AgenticCoreMark size={112} active />
-    </div>
-    <MeshLabel side="left" top="22px" label="Recovery route" accent="#5eead4" />
-    <MeshLabel side="right" top="22px" label="PLC device map" accent="#c4b5fd" />
-    <MeshLabel side="bottom" top="168px" label="Motor signals" accent="#a5b4fc" />
-    <div
-      style={{
-        position: "absolute",
-        left: "50%",
-        top: "119px",
-        transform: "translateX(-50%)",
-        color: "#ddd6fe",
-        fontSize: "9px",
-        fontWeight: 800,
-        letterSpacing: "0.15em",
-        textTransform: "uppercase",
-        whiteSpace: "nowrap",
-      }}
-    >
-      Agentic operations mesh
-    </div>
-  </div>
-);
-
-const MeshLabel: React.FC<{
-  side: "left" | "right" | "bottom";
-  top: string;
-  label: string;
-  accent: string;
-}> = ({ side, top, label, accent }) => {
-  const position =
-    side === "left"
-      ? { left: "0" }
-      : side === "right"
-        ? { right: "0" }
-        : { left: "50%", transform: "translateX(-50%)" };
-
-  return (
-    <div
-      style={{
-        position: "absolute",
-        top,
-        ...position,
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "6px",
-        color: "#cbd5e1",
-        fontSize: "9px",
-        fontWeight: 700,
-        letterSpacing: "0.1em",
-        textTransform: "uppercase",
-        whiteSpace: "nowrap",
-      }}
-    >
-      <span
-        style={{
-          width: "5px",
-          height: "5px",
-          borderRadius: "50%",
-          background: accent,
-          boxShadow: `0 0 8px ${accent}`,
-        }}
-      />
-      {label}
-    </div>
-  );
-};
-
-const CommandHeroMark: React.FC = () => (
-  <div
-    aria-hidden
-    style={{
-      width: "min(430px, 88vw)",
-      height: "54px",
-      display: "grid",
-      placeItems: "center",
-      marginBottom: "4px",
-    }}
-  >
-    <svg width="100%" height="54" viewBox="0 0 430 54" fill="none">
-      <defs>
-        <linearGradient id="lg-command-beam" x1="0" y1="27" x2="430" y2="27">
-          <stop stopColor="#8B5CF6" stopOpacity="0" />
-          <stop offset="0.34" stopColor="#A78BFA" stopOpacity="0.46" />
-          <stop offset="0.5" stopColor="#E879F9" stopOpacity="0.96" />
-          <stop offset="0.66" stopColor="#A78BFA" stopOpacity="0.46" />
-          <stop offset="1" stopColor="#8B5CF6" stopOpacity="0" />
-        </linearGradient>
-        <filter id="lg-command-star" x="-40%" y="-60%" width="180%" height="220%">
-          <feGaussianBlur stdDeviation="2.5" result="blur" />
-          <feMerge>
-            <feMergeNode in="blur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-      </defs>
-      <path d="M0 27H430" stroke="url(#lg-command-beam)" strokeWidth="1.2" />
-      <path
-        d="M215 2c2.8 17.2 7.8 22.2 25 25-17.2 2.8-22.2 7.8-25 25-2.8-17.2-7.8-22.2-25-25 17.2-2.8 22.2-7.8 25-25Z"
-        fill="#C084FC"
-        filter="url(#lg-command-star)"
-      />
-      <circle cx="215" cy="27" r="5.4" fill="#F5F3FF" />
-    </svg>
-  </div>
-);
-
 const EmptyState: React.FC<EmptyStateProps> = ({
   input,
   pending,
@@ -939,6 +570,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({
   disabled,
 }) => (
   <div
+    className="langgraph-empty"
     style={{
       flex: 1,
       display: "flex",
@@ -951,72 +583,10 @@ const EmptyState: React.FC<EmptyStateProps> = ({
       padding: "28px 20px",
     }}
   >
-    <CommandHeroMark />
-
-    {/* Live badge */}
-    <div
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "6px",
-        padding: "4px 10px",
-        borderRadius: "999px",
-        background:
-          "linear-gradient(180deg, rgba(16,185,129,0.15), rgba(16,185,129,0.04))",
-        border: "1px solid rgba(16, 185, 129, 0.35)",
-        fontSize: "10.5px",
-        fontWeight: 700,
-        letterSpacing: "0.14em",
-        textTransform: "uppercase",
-        color: "#6ee7b7",
-        marginTop: "-4px",
-      }}
-    >
-      <span
-        style={{
-          width: "6px",
-          height: "6px",
-          borderRadius: "999px",
-          background: "#34d399",
-          boxShadow: "0 0 8px #34d399",
-        }}
-      />
-      Live plant context
-    </div>
-
-    <div
-      style={{
-        fontSize: "34px",
-        fontWeight: 400,
-        letterSpacing: "-0.03em",
-        color: "#ddd6fe",
-      }}
-    >
-      Good afternoon, operator.
-    </div>
-    <div
-      style={{
-        fontSize: "34px",
-        fontWeight: 700,
-        letterSpacing: "-0.03em",
-        color: "#a78bfa",
-        marginTop: "-14px",
-      }}
-    >
-      What needs attention on the plant?
-    </div>
-    <div
-      style={{
-        fontSize: "11px",
-        lineHeight: 1.6,
-        maxWidth: "540px",
-        color: "#a78bfa",
-        letterSpacing: "0.08em",
-        textTransform: "uppercase",
-      }}
-    >
-      Prompt sent to the external LangGraph service · verify before operational action
-    </div>
+    <h3 className="langgraph-empty__heading">
+      What needs attention at the plant?
+    </h3>
+    <p className="langgraph-empty__help">Ask about production, downtime, devices, or sensor readings.</p>
 
     <AssistantComposer
       input={input}
@@ -1082,7 +652,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({
               boxShadow: "0 0 12px rgba(139, 92, 246, 0.22)",
             }}
           >
-            {item.glyph}
+            <item.Icon size={15} strokeWidth={1.8} />
           </span>
           <span
             style={{
@@ -1138,12 +708,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({
             padding: "7px 10px",
           }}
         >
-          {prompt
-            .replace("How many ", "")
-            .replace("What is the ", "")
-            .replace("Analyze ", "")
-            .replace("List all ", "")
-            .replace("The system is in emergency state. ", "")}
+          {prompt}
         </button>
       ))}
     </div>
@@ -1543,7 +1108,7 @@ const ThinkingContent: React.FC<{ elapsedMs: number; onCancel: () => void }> = (
                     : "rgba(167, 139, 250, 0.25)",
                 boxShadow:
                   i === phase ? "0 0 8px rgba(167,139,250,0.6)" : "none",
-                transition: "width 0.35s ease, background 0.35s ease",
+                transition: "background 0.35s ease",
               }}
             />
           ))}

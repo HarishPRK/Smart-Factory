@@ -38,6 +38,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 import { mqtt as iotMqtt, iot, auth } from "aws-iot-device-sdk-v2";
+import { createMeterFrame } from "./meter-wire.mjs";
+import { MeterEnergyCounter } from "./meter-energy.mjs";
 import {
   commandRequiresAuthorization,
   commandRequiresSafetyCheck,
@@ -78,6 +80,12 @@ const CLOUD_TOPICS = (process.env.CLOUD_TOPICS ?? "prplHome/McKinney/lineA/plc1/
   .split(",")
   .map((t) => t.trim())
   .filter(Boolean);
+// Meter telemetry is read-only and independent of PLC command readiness.
+const METER_TOPIC = process.env.IOT_METER_TOPIC ?? "meter/data";
+const meterEnergy = new MeterEnergyCounter({
+  topic: METER_TOPIC,
+  file: process.env.METER_ENERGY_STATE_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.local-data/meter-energy.json'),
+});
 const ENDPOINT = process.env.AWS_IOT_ENDPOINT ?? process.env.IOT_ENDPOINT ??
   "alht1i2bx8tzt-ats.iot.us-east-1.amazonaws.com";
 const REGION = process.env.AWS_REGION ?? process.env.IOT_REGION ?? "us-east-1";
@@ -113,7 +121,7 @@ const bridgeServer = http.createServer((request, response) => {
     "Content-Type": "application/json",
     "Cache-Control": "no-store",
   });
-  response.end(JSON.stringify({ ready, awsReady, subscriptionsReady }));
+  response.end(JSON.stringify({ ready, awsReady, subscriptionsReady, meterSubscribed, meterEnergyError: meterEnergy.error }));
 });
 const wss = new WebSocketServer({ server: bridgeServer });
 const clients = new Set();
@@ -199,8 +207,20 @@ wss.on("connection", (ws, request) => {
   });
 });
 
-function broadcast(topic, payloadBuf) {
+function broadcast(topic, payloadBuf, retained = false) {
   received++;
+  if (topic === METER_TOPIC) {
+    try {
+      const frame = JSON.parse(createMeterFrame(topic, payloadBuf, Date.now(), retained));
+      frame.energy = meterEnergy.accept(frame);
+      frame.energyError = meterEnergy.error;
+      const message = JSON.stringify(frame);
+      for (const ws of clients) if (ws.readyState === 1) ws.send(message);
+    } catch (error) {
+      console.warn('[cloud] Rejected meter payload:', error.message);
+    }
+    return;
+  }
   let payload;
   let bridgeTs;
   try {
@@ -214,7 +234,7 @@ function broadcast(topic, payloadBuf) {
   }
   // Preserve the edge's stamp as publishedAt so the browser measures the full
   // factory→browser path; fall back to now() if the edge didn't stamp it.
-  const msg = JSON.stringify({ topic, payload, publishedAt: bridgeTs ?? Date.now() });
+  const msg = JSON.stringify({ topic, payload, publishedAt: bridgeTs ?? Date.now(), ...(retained ? { retained: true } : {}) });
   for (const ws of clients) {
     if (ws.readyState === 1) ws.send(msg);
   }
@@ -223,6 +243,7 @@ function broadcast(topic, payloadBuf) {
 // --- AWS IoT Core (SigV4 WebSocket) subscriber ---
 let awsReady = false;
 let subscriptionsReady = false;
+let meterSubscribed = false;
 let awsConnection = null;
 
 async function connectAws() {
@@ -242,6 +263,8 @@ async function connectAws() {
   awsConnection.on("interrupt", (err) => {
     awsReady = false;
     subscriptionsReady = false;
+    meterSubscribed = false;
+    meterEnergy.disconnect();
     controlAuthorization.invalidate();
     console.warn("[cloud] IoT connection interrupted:", err?.error ?? String(err));
   });
@@ -266,17 +289,24 @@ async function connectAws() {
 
 async function subscribeAll() {
   subscriptionsReady = false;
+  meterSubscribed = false;
   controlAuthorization.invalidate();
   const failures = [];
-  for (const filter of CLOUD_TOPICS) {
+  for (const filter of new Set([...CLOUD_TOPICS, METER_TOPIC])) {
     try {
-      await awsConnection.subscribe(filter, iotMqtt.QoS.AtMostOnce, (topic, payload) =>
-        broadcast(topic, Buffer.from(payload)),
+      const subscription = await awsConnection.subscribe(filter, iotMqtt.QoS.AtMostOnce, (topic, payload, _dup, _qos, retain) =>
+        broadcast(topic, Buffer.from(payload), retain),
       );
+      if (subscription.qos > 2) throw new Error('MQTT subscription was rejected.');
       console.log(`[cloud] Subscribed to ${filter}`);
+      if (filter === METER_TOPIC) meterSubscribed = true;
     } catch (err) {
       console.error(`[cloud] Subscribe failed for ${filter}:`, err?.message ?? err);
-      failures.push(filter);
+      if (filter === METER_TOPIC) {
+        console.error(`[cloud] Meter is unavailable. Allow iot:Subscribe on topicfilter/${METER_TOPIC} and iot:Receive on topic/${METER_TOPIC}, then restart the bridge.`);
+      } else {
+        failures.push(filter);
+      }
     }
   }
   if (failures.length > 0) {

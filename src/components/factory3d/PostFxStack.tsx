@@ -15,25 +15,26 @@ import { useSceneSettingsStore } from "../../stores/sceneSettingsStore";
 
 export default function PostFxStack() {
   const postFxQuality = useSceneSettingsStore((s) => s.postFxQuality);
-  const gl = useThree((s) => s.gl);
+  const get = useThree((s) => s.get);
 
   useEffect(() => {
     if (postFxQuality === "off") return;
+    const gl = get().gl;
     const prev = gl.toneMapping;
     gl.toneMapping = THREE.NoToneMapping;
     return () => {
       gl.toneMapping = prev;
     };
-  }, [gl, postFxQuality]);
+  }, [get, postFxQuality]);
 
   if (postFxQuality === "off") return null;
 
   const bloomIntensity =
-    postFxQuality === "ultra" ? 1.8 : postFxQuality === "high" ? 1.2 : 0.7;
+    postFxQuality === "ultra" ? 0.35 : postFxQuality === "high" ? 0.25 : 0.12;
   const bloomThreshold =
-    postFxQuality === "ultra" ? 0.25 : postFxQuality === "high" ? 0.3 : 0.4;
+    0.85;
   const vignetteDarkness =
-    postFxQuality === "ultra" ? 0.75 : postFxQuality === "high" ? 0.6 : 0.4;
+    0.12;
   const enableGrading =
     postFxQuality === "ultra" || postFxQuality === "high";
 
@@ -49,7 +50,7 @@ export default function PostFxStack() {
       <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
       {enableGrading ? (
         <BrightnessContrast
-          brightness={-0.02}
+          brightness={0.015}
           contrast={postFxQuality === "ultra" ? 0.06 : 0.04}
         />
       ) : (

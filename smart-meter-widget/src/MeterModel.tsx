@@ -113,7 +113,7 @@ function printBoard(ctx: CanvasRenderingContext2D) {
 }
 
 const digitSegments: Record<string, string> = {
-  '0': 'abcdef', '1': 'bc', '2': 'abged', '3': 'abgcd', '4': 'fgbc',
+  '-': 'g', '0': 'abcdef', '1': 'bc', '2': 'abged', '3': 'abgcd', '4': 'fgbc',
   '5': 'afgcd', '6': 'afgecd', '7': 'abc', '8': 'abcdefg', '9': 'abfgcd',
 }
 
@@ -140,7 +140,10 @@ function drawDigit(ctx: CanvasRenderingContext2D, digit: string, x: number, y: n
 
 function LiveRegister() {
   const telemetry = useMeterStore(state => state.telemetry)
+  const energy = useMeterStore(state => state.energy)
   const hasReading = useMeterStore(state => state.source === 'simulation' || state.lastPacketAt !== null)
+  const stale = useMeterStore(state => state.source !== 'simulation' && state.connection !== 'connected')
+  const simulated = useMeterStore(state => state.source === 'simulation')
   const surface = useMemo(() => makeTexture(1024, 330), [])
   useEffect(() => () => surface.texture.dispose(), [surface])
   useEffect(() => {
@@ -156,9 +159,9 @@ function LiveRegister() {
       ctx.fillStyle = '#344d36'
       ctx.textAlign = 'center'
       ctx.font = '600 30px monospace'
-      ctx.fillText('AWAITING METER DATA', 512, 122)
+      ctx.fillText('IMPORT ENERGY', 512, 122)
       ctx.font = '24px monospace'
-      ctx.fillText('— — — — — —', 512, 184)
+      ctx.fillText('— — —  Wh', 512, 184)
       ctx.font = '19px monospace'
       ctx.fillText('NO VALID TELEMETRY RECEIVED', 512, 272)
       ctx.textAlign = 'left'
@@ -167,12 +170,14 @@ function LiveRegister() {
     }
     ctx.fillStyle = '#344d36'
     ctx.font = '600 22px monospace'
-    ctx.fillText(telemetry.reverseEnergy ? '← EXPORT ACTIVE ENERGY' : '→ IMPORT ACTIVE ENERGY', 38, 39)
+    const wattHours = simulated ? (telemetry.importKwh === null ? null : telemetry.importKwh * 1000) : energy?.importWh ?? null
+    const unit = wattHours !== null && wattHours >= 100_000 ? 'kWh' : 'Wh'
+    const display = wattHours === null ? null : wattHours / (unit === 'kWh' ? 1000 : 1)
+    ctx.fillText('IMPORT ENERGY', 38, 39)
     ctx.textAlign = 'right'
-    ctx.fillText(telemetry.reverseEnergy ? '2.8.0' : '1.8.0', 984, 39)
+    ctx.fillText(stale ? 'HELD' : display === null ? 'WAITING FOR TOTAL' : simulated ? 'SIMULATED' : energy?.persisted ? 'CALCULATED' : 'LAST SAVED', 984, 39)
     ctx.textAlign = 'left'
-    const energy = telemetry.reverseEnergy ? telemetry.exportKwh : telemetry.importKwh
-    const value = Math.min(999999.999, energy).toFixed(3).padStart(10, '0')
+    const value = display === null ? '------.---' : display.toFixed(3).padStart(10, '0')
     let cursor = 47
     for (const digit of value) {
       if (digit === '.') {
@@ -186,22 +191,22 @@ function LiveRegister() {
     }
     ctx.font = '600 35px monospace'
     ctx.fillStyle = '#273d30'
-    ctx.fillText('kWh', 850, 188)
+    ctx.fillText(unit, 850, 188)
     ctx.fillStyle = 'rgba(45, 71, 45, .3)'
     ctx.fillRect(34, 219, 956, 2)
     ctx.fillStyle = '#344d36'
     ctx.font = '20px monospace'
     const columns = [38, 295, 548, 811]
-    ;['ACTIVE', 'VOLTAGE', 'CURRENT', 'PF'].forEach((text, index) => ctx.fillText(text, columns[index], 259))
+    ;['POWER', 'VOLTAGE', 'CURRENT', 'PF'].forEach((text, index) => ctx.fillText(text, columns[index], 259))
     ctx.font = '600 26px monospace'
     ;[
-      `${(telemetry.activePower / 1000).toFixed(2)}kW`,
-      `${telemetry.voltage.toFixed(1)}V`,
-      `${telemetry.current.toFixed(1)}A`,
-      telemetry.powerFactor.toFixed(3),
+      telemetry.activePower === null ? '— W' : `${telemetry.activePower.toFixed(2)}W`,
+      telemetry.voltage === null ? '— V' : `${telemetry.voltage.toFixed(1)}V`,
+      telemetry.current === null ? '— A' : `${telemetry.current.toFixed(3)}A`,
+      telemetry.powerFactor === null ? '—' : telemetry.powerFactor.toFixed(3),
     ].forEach((text, index) => ctx.fillText(text, columns[index], 302))
     uploadCanvas(surface.texture)
-  }, [surface, telemetry, hasReading])
+  }, [surface, telemetry, energy, hasReading, stale, simulated])
   return (
     <group position={[0, 0.3, 0.31]}>
       <mesh castShadow>
@@ -284,10 +289,10 @@ function MeterLeds({ reducedMotion }: { reducedMotion: boolean }) {
   const pulseUntil = useRef(0)
   const lastObserved = useRef(0)
   const reverseEnergy = useMeterStore(state => (state.source === 'simulation' || state.lastPacketAt !== null) && state.telemetry.reverseEnergy)
-  const alarm = useMeterStore(state => (state.source === 'simulation' || state.lastPacketAt !== null) && state.telemetry.alarms.length > 0)
+  const alarm = useMeterStore(state => (state.source === 'simulation' || state.lastPacketAt !== null) && (state.telemetry.alarms?.length ?? 0) > 0)
   useFrame(({ clock }) => {
     const state = useMeterStore.getState()
-    if (state.source !== 'simulation' && state.lastPacketAt === null) {
+    if (state.telemetry.pulseCount === null || (state.source !== 'simulation' && state.connection !== 'connected')) {
       if (pulseMaterial.current) {
         pulseMaterial.current.emissiveIntensity = 0
         pulseMaterial.current.color.set('#b56936')
@@ -296,7 +301,7 @@ function MeterLeds({ reducedMotion }: { reducedMotion: boolean }) {
       return
     }
     const elapsed = clock.elapsedTime
-    const pulsesPerSecond = Math.abs(state.telemetry.activePower) * state.impPerKwh / 3_600_000
+    const pulsesPerSecond = state.source === 'simulation' ? Math.abs(state.telemetry.activePower ?? 0) * state.impPerKwh / 3_600_000 : 0
     if (lastPulse.current !== state.telemetry.pulseCount) {
       if (lastPulse.current >= 0) pulseUntil.current = elapsed + 0.055
       lastPulse.current = state.telemetry.pulseCount
@@ -380,10 +385,10 @@ const annotationStyle = {
 /** Procedural visual reference, not a certified manufacturer mechanical drawing. */
 export default function MeterModel({ reducedMotion = false }: { reducedMotion?: boolean }) {
   const exploded = useMeterStore(state => state.exploded)
-  const thermal = useMeterStore(state => state.thermal && (state.source === 'simulation' || state.lastPacketAt !== null))
+  const thermal = useMeterStore(state => state.thermal && state.source === 'simulation')
   const annotations = useMeterStore(state => state.annotations)
   const narrowViewport = useThree(state => state.size.width < 500)
-  const temperature = useMeterStore(state => state.telemetry.temperature)
+  const temperature = useMeterStore(state => state.telemetry.temperature ?? 0)
   const baseRef = useRef<THREE.Group>(null)
   const boardRef = useRef<THREE.Group>(null)
   const faceRef = useRef<THREE.Group>(null)

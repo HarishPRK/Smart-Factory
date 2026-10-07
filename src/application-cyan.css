@@ -1,0 +1,135 @@
+/* Shared dark cyan theme. Keep portal-based workspaces in the same visual system. */
+:root {
+  color-scheme: dark;
+  --font-sans: 'Inter Variable', Inter, system-ui, sans-serif;
+  --ind-bg-0: #0d151c;
+  --ind-bg-1: #111d26;
+  --ind-surface: #17232d;
+  --ind-surface-2: #1d2d38;
+  --ind-edge: #2e4553;
+  --ind-edge-strong: #497080;
+  --ind-text: #eef5f7;
+  --ind-text-muted: #a7bbc6;
+  --ind-text-dim: #90aab7;
+  --ind-accent: #43d8f1;
+  --ind-accent-weak: #43d8f114;
+  --ind-info: #43d8f1;
+  --ind-ok: #6ed6a2;
+  --ind-warn: #e9bd70;
+  --ind-alarm: #f18b82;
+  --color-panel-bg: #17232d;
+  --color-panel-edge: #2e4553;
+  --color-panel-highlight: #0d151c;
+  --color-text-primary: #eef5f7;
+  --color-text-secondary: #a7bbc6;
+  --color-text-muted: #a7bbc6;
+  --color-text-dim: #90aab7;
+  --color-track-bg: #2e4553;
+  --color-primary: #43d8f1;
+  --color-primary-light: #7deafb;
+  --color-primary-glow: #43d8f114;
+  --color-status-success: #6ed6a2;
+  --color-status-success-light: #89e1b5;
+  --color-status-warning: #e9bd70;
+  --color-status-warning-light: #f4ce8b;
+  --color-status-danger: #f18b82;
+  --color-status-danger-light: #f5a69f;
+  --shadow-sm: 0 2px 8px #00000022;
+  --shadow-md: 0 5px 18px #00000030;
+  --shadow-lg: 0 12px 32px #00000044;
+  --shadow-xl: 0 20px 56px #00000055;
+  --shadow-glow: none;
+}
+
+body { background: var(--ind-bg-0); color: var(--ind-text); caret-color: #43d8f1; }
+::selection, .plant-console ::selection { color: #08212a; background: #43d8f1; }
+:focus-visible { outline-color: #43d8f1; }
+::-webkit-scrollbar-thumb { background: #395a6b; }
+::-webkit-scrollbar-thumb:hover { background: #5b8293; }
+
+.plant-console { background: #0d151c; --ind-bg-0: #0d151c; --ind-surface: #17232d; --ind-edge: #2e4553; }
+.plant-console .operations-rail { background: #0a1117; }
+.plant-console .operations-nav > button.is-current { background: #43d8f1; border-color: #43d8f1; color: #08212a; }
+.plant-console .kpi-deck, .plant-console .operations-plc.plc-console, .plant-console .operations-actuators > * { background: #17232d; }
+.plant-console .kpi-deck__toolbar, .plant-console .twin-heading { background: #15222c; }
+.plant-console .kpi-deck__tab[aria-selected="true"] { color: #67e3f5; border-color: #43d8f1; }
+.plant-console .operations-titlebar__status button:last-child { background: #43d8f1; color: #08212a; border-color: #43d8f1; }
+.plant-console .plant-label.is-selected { background: #184351; border-color: #43d8f1; }
+.plant-console .twin-view-switch button[aria-pressed="true"],
+.plant-console .twin-tool-group button[aria-pressed="true"] { background: #43d8f1; color: #08212a; box-shadow: inset 0 0 0 1px #43d8f1; }
+.plant-console .twin-loading, .plant-console .twin-loading small { color: #a7bbc6; }
+.plant-console .operations-nav > button.is-current:hover { background: #7deafb; color: #08212a; }
+.plant-console .twin-view-switch button[aria-pressed="true"]:hover,
+.plant-console .twin-tool-group button[aria-pressed="true"]:hover { background: #7deafb; color: #08212a; }
+.plant-console .plant-label.is-selected { color: #eef5f7; }
+.plant-console .plant-label.is-selected span { color: #92ddec; }
+.plant-console .operations-titlebar__status button:last-child:hover { background: #7deafb; }
+.plant-console .twin-heading__identity > svg, .plant-console .twin-source > span { color: #43d8f1; }
+.plant-console .twin-source > span { background: #43d8f1; }
+.plant-console .operations-assistant { color: #67e3f5; }
+.plant-console .plant-process-readout i { background: #43d8f1; }
+.plant-console button:focus-visible, .plant-console a:focus-visible, .plant-console select:focus-visible { outline-color: #43d8f1; }
+
+/* Existing instrument and analytics containers consume shared root tokens. */
+.glass, .card { background: #17232d; color: var(--ind-text); border-color: var(--ind-edge); box-shadow: none; backdrop-filter: none; }
+.glass:hover, .card:hover { border-color: var(--ind-edge-strong); box-shadow: none; }
+.card-inner { background: #1d2d38; color: var(--ind-text); }
+.card-inner:hover { background: #253b48; }
+.gradient-number { background: none; color: var(--ind-text); -webkit-text-fill-color: currentColor; filter: none; }
+.status-badge { color: #6ed6a2; background: #1d352c; border-color: #37634c; }
+
+/* Portals render outside the dashboard; use their semantic dialog boundary. */
+body > [role="presentation"]:has(> [role="dialog"]) { background: #02080dcc !important; }
+[role="dialog"][data-layout] { background: #111d26 !important; color: #eef5f7; border-color: #2e4553 !important; box-shadow: 0 20px 64px #00000066 !important; }
+[role="dialog"][data-layout] > div:first-child { background: #17232d !important; border-color: #2e4553 !important; }
+[role="dialog"][data-layout] > div:first-child button { color: #a7bbc6 !important; border-color: #385965 !important; background: #1d2d38 !important; }
+[role="dialog"]:not([data-layout]) { background: #17232d !important; color: #eef5f7 !important; border-color: #2e4553 !important; box-shadow: 0 20px 60px #00000066 !important; font-family: var(--font-sans) !important; }
+
+/* Dark versions of legacy utility colors retain their semantic role. */
+:is(.smart-factory-ui, [role="dialog"], [class*="z-[9991]"], .integration-scope) :is([class*="text-cyan-50"], [class*="text-cyan-100"], [class*="text-slate-100"], [class~="text-white"]) { color: #eef5f7; }
+:is(.smart-factory-ui, [role="dialog"], [class*="z-[9991]"], .integration-scope) :is([class*="text-blue-200"], [class*="text-blue-300"], [class*="text-sky-200"], [class*="text-slate-300"], [class*="text-slate-400"], [class*="text-gray-400"]) { color: #a7bbc6; }
+:is(.smart-factory-ui, [role="dialog"], [class*="z-[9991]"], .integration-scope) :is([class*="text-cyan-200"], [class*="text-cyan-300"], [class*="text-cyan-400"], [class*="text-sky-300"]) { color: #67e3f5; }
+:is(.smart-factory-ui, [role="dialog"], [class*="z-[9991]"], .integration-scope) :is([class*="text-emerald-"], [class*="text-green-"]) { color: #6ed6a2; }
+:is(.smart-factory-ui, [role="dialog"], [class*="z-[9991]"], .integration-scope) :is([class*="text-amber-"], [class*="text-yellow-"]) { color: #e9bd70; }
+:is(.smart-factory-ui, [role="dialog"], [class*="z-[9991]"], .integration-scope) :is([class*="text-red-"], [class*="text-rose-"]) { color: #f18b82; }
+:is(.smart-factory-ui, [role="dialog"], [class*="z-[9991]"], .integration-scope) :is([class*="border-white/"], [class*="border-cyan-"]) { border-color: #2e4553; }
+:is(.smart-factory-ui, [role="dialog"], [class*="z-[9991]"]) :is([class*="bg-[#0"], [class*="bg-[#1"], [class*="bg-[#2"], [class*="bg-slate-9"], [class*="bg-slate-8"]) { background: #1a2934; }
+
+/* The assistant's existing fixed panel has no dialog role yet. */
+[class*="z-[9991]"] > .pointer-events-auto { background: #17232d !important; color: #eef5f7; border-color: #2e4553 !important; box-shadow: 0 20px 60px #00000066 !important; }
+[class*="z-[9991]"] > .pointer-events-auto > [class*="w-[280px]"] { background: #14232d !important; border-color: #2e4553 !important; }
+[class*="z-[9991]"] [style*="background: rgb(27, 35, 48)"],
+[class*="z-[9991]"] [style*="background: rgb(20, 27, 39)"] { background: #1d2d38 !important; }
+[class*="z-[9991]"] [style*="color: rgb(228, 235, 243)"] { color: #eef5f7 !important; }
+[class*="z-[9991]"] :is([style*="color: rgb(138, 151, 168)"], [style*="color: rgb(93, 106, 124)"]) { color: #a7bbc6 !important; }
+[class*="z-[9991]"] [style*="background: rgb(42, 52, 68)"] { background: #2e4553 !important; }
+
+/* Legacy drawer text is supplied inline; remap neutral and signal values only. */
+[role="dialog"] :is([style*="color: rgb(229, 231, 235)"], [style*="color: rgb(240, 249, 255)"], [style*="color: rgb(245, 243, 255)"], [style*="color: rgb(237, 233, 254)"], [style*="color: rgb(219, 234, 254)"]) { color: #eef5f7 !important; }
+[role="dialog"] :is([style*="color: rgb(203, 213, 225)"], [style*="color: rgb(156, 163, 175)"], [style*="color: rgb(148, 163, 184)"], [style*="color: rgb(127, 162, 199)"], [style*="color: rgb(100, 116, 139)"]) { color: #a7bbc6 !important; }
+[role="dialog"] :is([style*="color: rgb(167, 139, 250)"], [style*="color: rgb(221, 214, 254)"], [style*="color: rgb(196, 181, 253)"], [style*="color: rgb(216, 180, 254)"], [style*="color: rgb(147, 197, 253)"], [style*="color: rgb(191, 219, 254)"]) { color: #67e3f5 !important; }
+[role="dialog"] :is([style*="color: rgb(167, 243, 208)"], [style*="color: rgb(110, 231, 183)"], [style*="color: rgb(236, 253, 245)"]) { color: #6ed6a2 !important; }
+[role="dialog"] [style*="color: rgb(253, 230, 138)"] { color: #e9bd70 !important; }
+[role="dialog"] [style*="color: rgb(252, 165, 165)"] { color: #f18b82 !important; }
+[role="dialog"] :is([style*="background: rgba(8, 10, 18"], [style*="background: rgba(20, 12, 43"], [style*="background: rgba(30, 27, 75"]) { background: #1d2d38 !important; }
+[role="dialog"][aria-label="Agentic AI factory assistant"] > [aria-hidden] { display: none; }
+[role="dialog"] .lg-prompt-card { background: #1d2d38 !important; border-color: #385965 !important; }
+[role="dialog"] .lg-prompt-card:hover { background: #203440 !important; }
+[role="dialog"] .lg-shimmer-text { color: #67e3f5 !important; background: none !important; -webkit-text-fill-color: currentColor !important; }
+
+.toast { background: #17232d; color: #eef5f7; border-color: #2e4553; box-shadow: 0 8px 24px #00000044; font-family: var(--font-sans); }
+.toast-detail { color: #a7bbc6; }
+
+/* Component-level fallbacks for former dark-only integration details. */
+.integration-scope .modal { background: #17232d; box-shadow: 0 18px 54px #00000055; }
+.integration-scope .modal-backdrop { background: #02080dcc; }
+.integration-scope :is(.ipsec-flow-wrap, .va-tile, .va-tile-body) { background: #14232d; }
+.integration-scope .va-stop-btn { background: #392624; color: #f18b82; border-color: #75483f; }
+.integration-scope .va-stop-btn:hover:not(:disabled) { background: #49302b; }
+.integration-scope .va-live-badge { color: #f18b82; background: #392624; }
+.integration-scope .devices-page .power-toggle.on { color: #17232d; }
+.integration-scope .so-pyramid-layer-1::after { background: #184351; }
+.integration-scope .so-pyramid-layer-1 :is(.so-pyramid-copy strong, .so-pyramid-copy span, .so-chip) { color: #d7e6ed; }
+.integration-scope .gradient-text { color: #43d8f1; background: none; -webkit-text-fill-color: currentColor; }
+.integration-scope .recharts-default-tooltip { background: #17232d !important; border-color: #2e4553 !important; color: #eef5f7 !important; }
+.integration-scope .recharts-cartesian-axis-tick-value { fill: #a7bbc6; }

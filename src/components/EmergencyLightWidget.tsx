@@ -95,7 +95,7 @@ interface EmergencyLightWidgetProps {
 const EmergencyLightWidget: React.FC<EmergencyLightWidgetProps> = ({
   className = "",
 }) => {
-  const { sendCommand } = usePLCContext(false);
+  const { sendCommand, isConnected } = usePLCContext(false);
   const emergencyLightOn = usePLCStore((s) => s.emergencyLightOn);
   const alarmRelayOn = usePLCStore((s) => s.relays[1] ?? false);
   const [manualAlert, setManualAlert] = useState<boolean | null>(null);
@@ -468,7 +468,7 @@ const EmergencyLightWidget: React.FC<EmergencyLightWidgetProps> = ({
   return (
     <button
       type="button"
-      className={`card w-full appearance-none text-left p-3 flex flex-col gap-2 animate-fade-in delay-5 cursor-pointer active:scale-[0.97] transition-all duration-300 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 disabled:cursor-wait disabled:opacity-90 ${className}`}
+      className={`card plc-actuator plc-actuator--emergency w-full appearance-none text-left p-3 flex flex-col gap-2 animate-fade-in delay-5 cursor-pointer active:scale-[0.97] transition-all duration-300 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 disabled:cursor-wait disabled:opacity-90 ${className}`}
       onClick={handleToggle}
       disabled={commandPending}
       aria-label={
@@ -499,7 +499,7 @@ const EmergencyLightWidget: React.FC<EmergencyLightWidgetProps> = ({
             </svg>
           </div>
           <h3 className="text-[11px] font-semibold text-white/75 uppercase tracking-[0.14em]">
-            Emergency
+            Beacon
           </h3>
         </div>
         <span
@@ -528,7 +528,9 @@ const EmergencyLightWidget: React.FC<EmergencyLightWidgetProps> = ({
                 ? manualAlert
                   ? "Activate sent"
                   : "Clear sent"
-              : hasAlert
+              : !isConnected
+                ? "No feedback"
+                : hasAlert
                 ? "Active"
                 : "Clear"}
         </span>
@@ -540,6 +542,8 @@ const EmergencyLightWidget: React.FC<EmergencyLightWidgetProps> = ({
       </div>
 
       {/* Emergency banner — portaled to top of page */}
+      <span className="pi-actuator-action">{commandPending ? "Publishing…" : commandedAlert ? "Clear beacon" : "Activate beacon"}<svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+
       {createPortal(
         <div
           className={`fixed top-0 left-0 right-0 z-[9999] flex items-center justify-center transition-all duration-500 ${

@@ -20,3 +20,9 @@
 
 
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}.flex{display:flex}.items-center{align-items:center}.justify-between{justify-content:space-between}
+
+/* Live readings preserve missing values and keep all series usable on narrow screens. */
+.series-buttons{flex-wrap:wrap;gap:12px 16px}.chart-series{align-items:flex-start;flex-wrap:wrap}.chart-series>.mono{white-space:nowrap}.health-line.unknown-health{background:#f3f6f7;color:#526975;border-color:var(--line)}.reading-time{padding:12px 21px;margin:0;border-top:1px solid var(--line);font-size:11px;color:#526975}.live-notes>div:last-child{padding:0 21px 20px;font-size:14px;line-height:1.55;color:#526975}.live-notes p{margin:0 0 18px}.live-notes dl{margin:0}.live-notes dl>div+div{margin-top:16px}.live-notes dt{font-weight:600;color:#263b43;margin-bottom:4px}.live-notes dd{margin:0}.scene-toggles button:disabled{opacity:.55;cursor:not-allowed}
+
+/* Calculated values retain the meter layout and tabular readout treatment. */
+.accumulated-register{border-bottom:1px solid var(--line)}.energy-register .energy-note{margin:0;font-size:10px;line-height:1.5;color:#526975}.energy-register .energy-warning{color:#8a4d0c}.live-notes .derived-readings>div{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);margin:0}.derived-readings dt{font-size:12px;font-weight:500}.derived-readings dt small{display:block;font-size:10px;font-weight:400;color:#526975;margin-top:3px}.derived-readings dd{font-family:var(--mono);font-size:15px;white-space:nowrap;color:#263b43}.derived-readings dd span{font-family:'DM Sans Variable',sans-serif;font-size:10px;color:#526975}.live-notes p.derived-note{font-size:11px;line-height:1.55;margin:14px 0 0}

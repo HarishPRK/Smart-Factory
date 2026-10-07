@@ -1,0 +1,12 @@
+[
+  {
+    "antipattern": "ai-color-palette",
+    "name": "AI color palette",
+    "description": "Purple/violet gradients and cyan-on-dark are the most recognizable tells of AI-generated UIs. Choose a distinctive, intentional palette.",
+    "severity": "warning",
+    "category": "slop",
+    "file": "C:\\Users\\haris\\Projects\\Smart-Factory\\src\\components\\PLCParametersWidget.tsx",
+    "line": 365,
+    "snippet": "from-indigo-500 gradient"
+  }
+]

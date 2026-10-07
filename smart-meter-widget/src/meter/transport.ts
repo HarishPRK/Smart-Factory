@@ -1,14 +1,15 @@
 import type { MqttClient } from 'mqtt'
 import { useMeterStore, type MeterStore } from '../useMeterStore'
 import { MAX_PACKET_AGE_MS, stepMeter } from './physics'
-import type { MeterSource, MeterStreamOptions } from './types'
+import { decodeMeterBase64, decodeMeterBytes } from './protobuf'
+import type { MeterSource, MeterStreamOptions, MeterTelemetry } from './types'
 
 export const SIMULATION_INTERVAL_MS = 100
-export const STALE_STREAM_MS = 10_000
+export const STALE_STREAM_MS = 15_000
 export const MAX_PACKET_BYTES = 65_536
 
 type StoreApi = { getState: () => MeterStore }
-type Socket = Pick<WebSocket, 'onopen' | 'onmessage' | 'onclose' | 'onerror' | 'close' | 'readyState'>
+type Socket = Pick<WebSocket, 'onopen' | 'onmessage' | 'onclose' | 'onerror' | 'close' | 'readyState'> & Partial<Pick<WebSocket, 'binaryType'>>
 
 /** Dependency seam for transport tests and alternate browser runtimes. */
 export interface StreamDependencies {
@@ -22,16 +23,22 @@ export function reconnectDelayMs(attempt: number, random = Math.random): number 
   return Math.round(Math.min(30_000, 1_000 * 2 ** Math.min(Math.max(attempt, 0), 5)) * (0.8 + random() * 0.4))
 }
 
+export function defaultMeterBridgeUrl(page: Pick<Location, 'protocol' | 'hostname' | 'host'>): string {
+  const scheme = page.protocol === 'https:' ? 'wss:' : 'ws:'
+  const local = page.hostname === 'localhost' || page.hostname === '127.0.0.1' || page.hostname === '[::1]'
+  return local && page.protocol !== 'https:' ? `${scheme}//${page.hostname}:9001` : `${scheme}//${page.host}/ws`
+}
+
 function resolveOptions(overrides: Partial<MeterStreamOptions>): MeterStreamOptions | string {
   const env = import.meta.env ?? {}
-  const source = overrides.source ?? env.VITE_METER_TRANSPORT ?? 'simulation'
+  const source = overrides.source ?? env.VITE_METER_TRANSPORT ?? 'websocket'
   if (!['simulation', 'websocket', 'mqtt'].includes(source)) {
     return 'VITE_METER_TRANSPORT must be simulation, websocket, or mqtt.'
   }
   return {
     source: source as MeterSource,
-    url: overrides.url ?? env.VITE_METER_URL,
-    topic: overrides.topic ?? env.VITE_METER_TOPIC ?? 'meters/aituzero-2s/telemetry',
+    url: overrides.url ?? (env.VITE_METER_URL || (source === 'websocket' && typeof location !== 'undefined' ? defaultMeterBridgeUrl(location) : undefined)),
+    topic: overrides.topic ?? env.VITE_METER_TOPIC ?? 'meter/data',
   }
 }
 
@@ -59,7 +66,8 @@ export function startMeterStream(
       previousTick = monotonicNow
       const state = store.getState()
       if (state.paused) return
-      state.ingest(stepMeter(state.telemetry, state.controls, elapsedSeconds, Date.now(), dependencies.random, state.impPerKwh))
+      // Entering simulation initializes a complete simulation packet.
+      state.ingest(stepMeter(state.telemetry as MeterTelemetry, state.controls, elapsedSeconds, Date.now(), dependencies.random, state.impPerKwh))
     }, SIMULATION_INTERVAL_MS)
     return () => clearInterval(interval)
   }
@@ -110,20 +118,56 @@ export function startMeterStream(
     }, delay)
   }
 
-  const receive = (text: string, token: number) => {
+  const receive = (data: string | Uint8Array, token: number, retained = false) => {
     if (disposed || token !== generation) return
-    if (text.length > MAX_PACKET_BYTES || new TextEncoder().encode(text).byteLength > MAX_PACKET_BYTES) {
+    if (data.length > MAX_PACKET_BYTES || (typeof data === 'string' && new TextEncoder().encode(data).byteLength > MAX_PACKET_BYTES)) {
       store.getState().setConnection('error', 'Telemetry packet exceeds the 64 KiB limit.')
       return
     }
     let packet: unknown
+    let energy: unknown
+    let energyError: unknown
     try {
-      packet = JSON.parse(text)
-    } catch {
-      store.getState().setConnection('error', 'Rejected malformed JSON telemetry.')
+      packet = typeof data === 'string' ? JSON.parse(data) : decodeMeterBytes(data)
+    } catch (error) {
+      store.getState().setConnection('error', typeof data === 'string' ? 'Rejected malformed JSON telemetry.' : `Rejected protobuf telemetry: ${error instanceof Error ? error.message : 'Invalid payload.'}`)
       return
     }
-    if (store.getState().ingest(packet)) {
+    // The shared factory bridge multiplexes { topic, payload, publishedAt } frames.
+    // Ignore other topics completely; they cannot update freshness or readings.
+    if (packet && typeof packet === 'object' && 'topic' in packet) {
+      const envelope = packet as { topic: unknown; payload?: unknown; encoding?: unknown; publishedAt?: unknown; retained?: unknown; energy?: unknown; energyError?: unknown }
+      if (envelope.topic !== options.topic) return
+      energy = envelope.energy
+      energyError = envelope.energyError
+      packet = envelope.payload
+      if (envelope.encoding === 'protobuf') {
+        try { packet = decodeMeterBase64(packet) } catch (error) {
+          store.getState().setConnection('error', `Rejected protobuf telemetry: ${error instanceof Error ? error.message : 'Invalid payload.'}`)
+          return
+        }
+      } else if (envelope.encoding !== undefined) {
+        store.getState().setConnection('error', 'Unsupported meter payload encoding.')
+        return
+      } else if (typeof packet === 'string') {
+        try { packet = JSON.parse(packet) } catch {
+          store.getState().setConnection('error', 'Rejected malformed meter payload.')
+          return
+        }
+      }
+      if (envelope.retained === true && (!packet || typeof packet !== 'object' || !('timestamp' in packet))) {
+        store.getState().setConnection('error', 'Retained meter data has no measurement timestamp. Waiting for a fresh reading.')
+        return
+      }
+      if (packet && typeof packet === 'object' && !Array.isArray(packet) && !('timestamp' in packet) && envelope.publishedAt !== undefined) {
+        packet = { ...packet, timestamp: envelope.publishedAt }
+      }
+    }
+    if (retained && (!packet || typeof packet !== 'object' || !('timestamp' in packet))) {
+      store.getState().setConnection('error', 'Retained meter data has no measurement timestamp. Waiting for a fresh reading.')
+      return
+    }
+    if (store.getState().ingest(packet, energy, energyError)) {
       lastValidPacketAt = Date.now()
       attempt = 0
       clearConnectionTimer()
@@ -140,6 +184,7 @@ export function startMeterStream(
     try {
       if (options.source === 'websocket') {
         const socket = (dependencies.createSocket ?? ((address: string) => new WebSocket(address)))(url.href)
+        socket.binaryType = 'arraybuffer'
         closeCurrent = () => {
           socket.onopen = null
           socket.onmessage = null
@@ -149,14 +194,20 @@ export function startMeterStream(
         }
         socket.onopen = () => {
           // A live socket alone is insufficient: wait for a valid meter packet.
-          if (!disposed && token === generation) store.getState().setConnection('connecting')
+          if (!disposed && token === generation) {
+            clearConnectionTimer()
+            store.getState().setConnection('connecting')
+          }
         }
         socket.onmessage = (event) => {
-          if (typeof event.data !== 'string') {
-            if (!disposed && token === generation) store.getState().setConnection('error', 'Expected a UTF-8 JSON text frame.')
+          if (event.data instanceof ArrayBuffer) {
+            receive(new Uint8Array(event.data), token)
+          } else if (typeof event.data === 'string') {
+            receive(event.data, token)
+          } else {
+            if (!disposed && token === generation) store.getState().setConnection('error', 'Expected JSON text or binary MeterData protobuf.')
             return
           }
-          receive(event.data, token)
         }
         socket.onclose = () => { if (token === generation) scheduleReconnect('Meter connection closed. Retrying…') }
         socket.onerror = () => { if (token === generation) scheduleReconnect('Unable to reach the meter gateway. Retrying…') }
@@ -182,16 +233,17 @@ export function startMeterStream(
           if (disposed || token !== generation) return
           client.subscribe(options.topic!, { qos: 1 }, (error, granted) => {
             if (disposed || token !== generation) return
-            if (error || granted?.some((entry) => entry.qos > 2)) scheduleReconnect('MQTT telemetry subscription was rejected. Retrying…')
+            if (error || !granted?.length || granted.some((entry) => entry.qos > 2)) scheduleReconnect('MQTT telemetry subscription was rejected. Retrying…')
+            else clearConnectionTimer()
           })
         })
-        client.on('message', (topic, payload) => {
+        client.on('message', (topic, payload, packet) => {
           if (topic !== options.topic || disposed || token !== generation) return
           if (payload.byteLength > MAX_PACKET_BYTES) {
             store.getState().setConnection('error', 'Telemetry packet exceeds the 64 KiB limit.')
             return
           }
-          receive(payload.toString('utf8'), token)
+          receive(payload, token, packet?.retain)
         })
         client.on('close', () => { if (token === generation) scheduleReconnect('MQTT connection closed. Retrying…') })
         client.on('error', () => { if (token === generation) scheduleReconnect('MQTT connection failed. Retrying…') })
