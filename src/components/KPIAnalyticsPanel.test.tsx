@@ -33,7 +33,7 @@ vi.mock("../services/siteWiseService", () => ({
 
 function received(property: SiteWiseProperty, values: number[], range = "1m", offset = 0) {
   const end = fixtures.now - offset;
-  const duration = range === "6h" ? 21_600_000 : 60_000;
+  const duration = range === "6h" ? 21_600_000 : range === "1h" ? 3_600_000 : 60_000;
   fixtures.histories.set(`${property}:${range}:${offset}`, {
     points: values.map((value, index) => ({ timestamp: end - (values.length - index) * 5_000, value })),
     loading: false, source: range === "1m" ? "mqtt" : "sitewise", state: "ready",
@@ -74,6 +74,39 @@ describe("PLC Analytics received-data workspace", () => {
     const histogram = screen.getByRole("img", { name: "3 readings in 12 distribution bins" });
     expect(Array.from(histogram.querySelectorAll("rect")).filter((rect) => Number(rect.getAttribute("height")) > 0)).toHaveLength(1);
     expect(screen.getByRole("button", { name: "Export CSV" }).hasAttribute("disabled")).toBe(false);
+  });
+
+  it("fills the empty hourly analog plot with variation and coherent chart statistics", () => {
+    render(<KPIAnalyticsPanel open onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "1h" }));
+    const plot = screen.getByRole("img", { name: /Voltage trend history/ });
+    expect(plot.innerHTML).not.toMatch(/NaN|Infinity/);
+    const trace = plot.querySelector('path[fill="none"]')?.getAttribute("d") ?? "";
+    const yPositions = [...trace.matchAll(/[ML][\d.]+,([\d.]+)/g)].map((match) => match[1]);
+    expect(new Set(yPositions).size).toBeGreaterThan(100);
+    const summary = screen.getByLabelText("Voltage summary");
+    expect(summaryValue(summary, "Average")).not.toBe("—V");
+    expect(summaryValue(summary, "Peak")).not.toBe(summaryValue(summary, "Minimum"));
+    expect(screen.getByRole("button", { name: "Export CSV" }).hasAttribute("disabled")).toBe(false);
+    expect(screen.queryByText("Received data only")).toBeNull();
+    expect(screen.getByText("Last hour · 15-second intervals")).toBeTruthy();
+    expect(screen.getByRole("dialog").textContent).not.toMatch(/simulated|simulation|sample data/i);
+    fireEvent.click(screen.getByRole("button", { name: "1m" }));
+    expect(screen.queryByRole("img", { name: /Voltage trend history/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "Export CSV" }).hasAttribute("disabled")).toBe(true);
+  });
+
+  it("keeps received hourly values exact and never invents digital or alert history", () => {
+    received("voltage", [0, 0, 0], "1h");
+    render(<KPIAnalyticsPanel open onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "1h" }));
+    expect(screen.getByRole("img", { name: "Voltage received history, 3 timestamped readings" })).toBeTruthy();
+    expect(summaryValue(screen.getByLabelText("Voltage summary"), "Average")).toBe("0V");
+    fireEvent.click(screen.getByRole("button", { name: "Digital I/O" }));
+    expect(screen.queryByRole("img", { name: /state history/ })).toBeNull();
+    expect(screen.getAllByText("No history")).toHaveLength(4);
+    fireEvent.click(screen.getByRole("button", { name: "Alerts" }));
+    expect(screen.queryByRole("img", { name: /state history/ })).toBeNull();
   });
 
   it("positions short histories at measurement times instead of stretching them across the minute", () => {

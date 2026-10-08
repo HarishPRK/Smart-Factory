@@ -77,7 +77,6 @@ interface KPIBarProps {
   onOnboardingClick?: () => void;
   onGatewayTwinClick?: () => void;
   onVideoClick?: () => void;
-  onLanggraphClick?: () => void;
   predAlertCount?: number;
 }
 
@@ -94,7 +93,6 @@ const KPIBar: React.FC<KPIBarProps> = ({
   onOnboardingClick,
   onGatewayTwinClick,
   onVideoClick,
-  onLanggraphClick,
   predAlertCount = 0,
 }) => {
   const { state, dispatch } = useFilters();
@@ -164,7 +162,6 @@ const KPIBar: React.FC<KPIBarProps> = ({
     onOnboardingClick,
     onGatewayTwinClick,
     onVideoClick,
-    onLanggraphClick,
   ].filter(Boolean).length + 1;
 
   const groups: Array<{ id: RailGroup; label: string; count: number }> = [
@@ -214,12 +211,12 @@ const KPIBar: React.FC<KPIBarProps> = ({
     {
       accent: "#60a5fa",
       accentRgb: "96, 165, 250",
-      ariaLabel: "Open dynamic path selection",
+      ariaLabel: "Open dynamic failover",
       icon: Shuffle,
       id: "dps",
-      label: "DPS",
+      label: "Dynamic Failover",
       onClick: onDpsClick,
-      description: "Dynamic path selection",
+      description: "Dynamic failover",
     },
     {
       accent: "#80cae8",
@@ -273,22 +270,12 @@ const KPIBar: React.FC<KPIBarProps> = ({
       description: "Gateway observability",
     },
     {
-      accent: "#76decf",
-      accentRgb: "118, 222, 207",
-      ariaLabel: "Open LangGraph AI",
-      icon: BrainCircuit,
-      id: "langgraph",
-      label: "LangGraph AI",
-      onClick: onLanggraphClick,
-      description: "Chat with the factory agent.",
-    },
-    {
       accent: "#7ab4ee",
       accentRgb: "122, 180, 238",
       ariaLabel: "Open video analytics streams",
       icon: Video,
       id: "video",
-      label: "Video",
+      label: "Video Analytics",
       onClick: onVideoClick,
       description: "Camera intelligence",
     },
@@ -340,7 +327,7 @@ const KPIBar: React.FC<KPIBarProps> = ({
             ? `Sample data. Overall equipment effectiveness, ${zoneData.value} percent on a 0 to 100 percent scale.`
             : `Sample data. ${zoneData.trendUp ? "Increase" : "Decrease"} of ${trendValue}.`}
           icon={<MetricIcon size={17} strokeWidth={1.8} />}
-          label={kpi.label}
+          label={kpi.label.toUpperCase()}
           onClick={() => {
             if (kpi.id === "oee" && onOeeClick) {
               onOeeClick();
@@ -381,7 +368,7 @@ const KPIBar: React.FC<KPIBarProps> = ({
           aria-haspopup={card.id === "gateway" ? undefined : "dialog"}
           aria-label={card.ariaLabel}
           icon={<Icon size={17} strokeWidth={1.8} />}
-          label={card.label}
+          label={card.label.toUpperCase()}
           onClick={card.onClick}
           status={card.status}
           statusTone={card.statusTone}

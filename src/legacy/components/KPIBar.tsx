@@ -262,10 +262,10 @@ const KPIBar: React.FC<KPIBarProps> = ({
     {
       accent: "#60a5fa",
       accentRgb: "96, 165, 250",
-      ariaLabel: "Open dynamic path selection",
+      ariaLabel: "Open dynamic failover",
       icon: Shuffle,
       id: "dps",
-      label: "DPS",
+      label: "Dynamic Failover",
       onClick: onDpsClick,
       visualization: "dps",
     },
@@ -327,7 +327,7 @@ const KPIBar: React.FC<KPIBarProps> = ({
       ariaLabel: "Open video analytics streams",
       icon: Video,
       id: "video",
-      label: "Video",
+      label: "Video Analytics",
       onClick: onVideoClick,
       visualization: "video",
     },
@@ -381,7 +381,7 @@ const KPIBar: React.FC<KPIBarProps> = ({
               src={kpi.icon}
             />
           }
-          label={kpi.label}
+          label={kpi.label.toUpperCase()}
           onClick={() => {
             if (kpi.id === "oee" && onOeeClick) {
               onOeeClick();
@@ -427,7 +427,7 @@ const KPIBar: React.FC<KPIBarProps> = ({
           aria-label={card.ariaLabel}
           delayIndex={index}
           icon={<Icon size={17} strokeWidth={1.8} />}
-          label={card.label}
+          label={card.label.toUpperCase()}
           onClick={card.onClick}
           status={card.status}
           statusTone={card.statusTone}

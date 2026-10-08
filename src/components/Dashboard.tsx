@@ -182,7 +182,6 @@ const Dashboard: React.FC<{ headerSlot?: React.ReactNode }> = ({ headerSlot }) =
             onOnboardingClick={() => setOnboardingOpen(true)}
             onGatewayTwinClick={() => setGwTwinOpen(true)}
             onVideoClick={() => setVideoOpen(true)}
-            onLanggraphClick={() => setLanggraphOpen(true)}
             predAlertCount={predAlertCount}
           />
           <section className="operations-twin" aria-label="Interactive factory digital twin">

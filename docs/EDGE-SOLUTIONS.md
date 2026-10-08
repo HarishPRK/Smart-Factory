@@ -12,7 +12,7 @@ This extends the incumbent interface: `.integration-scope`, `src/integrations/de
 
 ## Telemetry contract
 
-`server/hardware-metrics-routes.ts` registers `GET /api/hardware-metrics/anomalies`; `server/influxSource.ts` validates the query, requests InfluxDB, and parses the result. Browser requests use the same-origin API. Configure `INFLUX_URL`, `INFLUX_ORG`, `INFLUX_BUCKET`, and `INFLUX_TOKEN` on the server only. The existing upstream is `http://76.187.201.239:8086/api/v2/query`, organization `Capgemini`, bucket `BGW620`; the token must never enter the frontend bundle.
+`server/hardware-metrics-routes.ts` registers `GET /api/hardware-metrics/anomalies`; `server/influxSource.ts` validates the query, requests InfluxDB, and parses the result. Browser requests use the same-origin API. Configure `INFLUX_URL`, `INFLUX_ORG`, `INFLUX_BUCKET`, and `INFLUX_TOKEN` on the server only. The existing upstream is `http://76.187.202.198:8086/api/v2/query`, organization `Capgemini`, bucket `BGW620`; the token must never enter the frontend bundle.
 
 Hardware anomaly queries remain fixed to serial `R95VA4GP000041`. The response retains anomaly flags, reconstruction error, learned thresholds, reason codes, and every tagged connection-tracking series for `conntrack_total`, `conntrack_tcp`, `conntrack_udp`, `conntrack_icmp`, and `conntrack_other`.
 

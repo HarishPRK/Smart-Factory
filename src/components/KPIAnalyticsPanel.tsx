@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { Activity, ArrowDownToLine, ArrowUpRight, ChartNoAxesCombined, Clock3, Database, GitCompareArrows, Radio, SlidersHorizontal, TriangleAlert, X } from "lucide-react";
 import { usePLCAnalyticsHistory, ANALYTICS_RANGES, ANALYTICS_RANGE_CONFIGS, type AnalyticsTimeRange } from "../hooks/usePLCAnalyticsHistory";
+import { usePLCTrendHistory, type PLCTrendHistory } from "../hooks/usePLCTrendHistory";
 import { fetchMetrics, isSiteWiseConfigured, type MetricsResult, type SiteWiseProperty } from "../services/siteWiseService";
 import { chartDomain, distributionBins, summarizeDigital, summarizeSeries } from "./analytics/analyticsModel";
 
@@ -28,12 +29,13 @@ const VIEWS = [
   { id: "digital", label: "Digital I/O", icon: Radio }, { id: "alerts", label: "Alerts", icon: TriangleAlert },
   { id: "shifts", label: "Shift comparison", icon: GitCompareArrows },
 ] as const;
-type History = ReturnType<typeof usePLCAnalyticsHistory>;
+type History = PLCTrendHistory;
 const fmt = (value: number | null | undefined, digits = 2) => value == null || !Number.isFinite(value) ? "—" : value.toLocaleString(undefined, { maximumFractionDigits: digits });
 const time = (timestamp: number) => new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 const accent = (color: string) => ({ "--signal": color } as CSSProperties);
 
 function SourceState({ history }: { history: History }) {
+  if (history.source === "hourly-preview") return <span className="plc-analysis-source" data-state="ready"><i aria-hidden="true" />Last hour</span>;
   const stale = history.source === "mqtt" && history.lastUpdated !== null && history.windowEnd - history.lastUpdated > 15_000;
   const text = history.loading ? "Loading history" : history.state === "unconfigured" ? "Historian not configured" : history.state === "error" ? "History unavailable" : history.source === "sitewise" ? "SiteWise history" : history.source === "mqtt+sitewise" ? "SiteWise + MQTT history" : history.state === "empty" ? "Awaiting readings" : stale ? "Last received" : "MQTT readings";
   return <span className="plc-analysis-source" data-state={stale ? "stale" : history.state}><i aria-hidden="true" />{text}</span>;
@@ -71,7 +73,7 @@ function SignalPlot({ history, param, deviation = false, fullRange = false, comp
   const inspected = inspection && points.some((point) => point.timestamp === inspection.timestamp && point.value === inspection.value) ? inspection : null;
   const inspectedValue = inspected ? digital ? inspected.value >= .5 ? 1 : 0 : deviation ? inspected.value - param.nominal : inspected.value : null;
   return <div ref={ref} className="plc-analysis-plot" style={accent(param.color)}>{!points.length ? <EmptyHistory history={history} /> : <>
-    <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${param.label} ${digital ? "state history" : deviation ? "deviation from nominal" : "received history"}, ${points.length} timestamped readings`}>
+    <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${param.label} ${digital ? "state history" : deviation ? "deviation from nominal" : history.source === "hourly-preview" ? "trend history" : "received history"}, ${points.length} timestamped readings`}>
       <defs><linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={param.color} stopOpacity=".12" /><stop offset="100%" stopColor={param.color} stopOpacity="0" /></linearGradient><clipPath id={`${fillId}-plot`}><rect x={pad.left} y={pad.top} width={width - pad.left - pad.right} height={bottom - pad.top} /></clipPath></defs>
       {(digital ? [0, 1] : [0, .25, .5, .75, 1].map((fraction) => domain[0] + (domain[1] - domain[0]) * fraction)).map((value) => <g key={value}><line x1={pad.left} x2={width - pad.right} y1={y(value)} y2={y(value)} className="plc-analysis-gridline" /><text x={pad.left - 9} y={y(value) + 4} textAnchor="end">{digital ? value ? "ON" : "OFF" : fmt(value, 1)}</text></g>)}
       {!digital && <g className="plc-analysis-reference"><line x1={pad.left} x2={width - pad.right} y1={y(baseline)} y2={y(baseline)} /><text x={width - pad.right} y={y(baseline) - 7} textAnchor="end">{deviation ? "Nominal" : `Nominal ${fmt(param.nominal)} ${param.unit}`}</text></g>}
@@ -98,7 +100,7 @@ function SignalPlot({ history, param, deviation = false, fullRange = false, comp
       if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return; event.preventDefault();
       const current = inspected ? points.findIndex((point) => point.timestamp === inspected.timestamp) : points.length - 1;
       setInspection(points[Math.max(0, Math.min(points.length - 1, current + (event.key === "ArrowLeft" ? -1 : 1)))]);
-    }}><span>{inspected ? time(inspected.timestamp) : "Hover to inspect · arrow keys supported"}</span><strong aria-live="polite" aria-atomic="true">{inspected ? `${fmt(inspectedValue)} ${param.unit}` : `${points.length} received samples`}</strong></div>}
+    }}><span>{inspected ? time(inspected.timestamp) : "Hover to inspect · arrow keys supported"}</span><strong aria-live="polite" aria-atomic="true">{inspected ? `${fmt(inspectedValue)} ${param.unit}` : `${points.length} ${history.source === "hourly-preview" ? "samples" : "received samples"}`}</strong></div>}
   </>}</div>;
 }
 
@@ -109,16 +111,16 @@ function StatsStrip({ history, param }: { history: History; param: Param }) {
 function SignalDistribution({ history, param }: { history: History; param: Param }) {
   const stats = summarizeSeries(history.points, param.nominal); const bins = distributionBins(history.points); const most = Math.max(1, ...bins.map((bin) => bin.count));
   const position = (value: number) => Math.max(0, Math.min(100, (value - param.min) / (param.max - param.min) * 100));
-  return <aside className="plc-analysis-detail" style={accent(param.color)} aria-label="Signal characteristics"><section><h4>Reading distribution</h4><p>How often each value was received</p>
+  return <aside className="plc-analysis-detail" style={accent(param.color)} aria-label="Signal characteristics"><section><h4>Reading distribution</h4><p>{history.source === "hourly-preview" ? "Frequency of values in this window" : "How often each value was received"}</p>
     <svg viewBox="0 0 240 110" role="img" aria-label={stats.count ? `${stats.count} readings in ${bins.length} distribution bins` : "Distribution awaiting readings"}><line x1="0" x2="240" y1="88" y2="88" className="plc-analysis-gridline" />{bins.map((bin, index) => <rect key={index} x={index * 240 / bins.length + 2} y={88 - bin.count / most * 70} width={Math.max(1, 240 / bins.length - 4)} height={bin.count / most * 70} fill={param.color} opacity={.35 + bin.count / most * .55}><title>{fmt(bin.low)}–{fmt(bin.high)} {param.unit}: {bin.count} samples</title></rect>)}{bins.length > 0 && <><text x="0" y="108">{fmt(bins[0].low)}</text><text x="240" y="108" textAnchor="end">{fmt(bins.at(-1)!.high)} {param.unit}</text></>}</svg>
     <dl className="plc-analysis-inline"><div><dt>Spread (σ)</dt><dd>{fmt(stats.standardDeviation)} <small>{param.unit}</small></dd></div><div><dt>Samples</dt><dd>{stats.count || "—"}</dd></div></dl></section>
-    <section><h4>Position in range</h4><div className="plc-analysis-ruler" aria-label={`${param.label} position; nominal ${param.nominal} ${param.unit}; latest ${fmt(stats.latest)}`}><span style={{ left: `${position(param.nominal)}%` }} title="Nominal" />{stats.latest !== null && <i style={{ left: `${position(stats.latest)}%` }} title="Latest received reading" />}</div><div className="plc-analysis-ruler-labels"><span>{param.min}</span><span>Nominal {param.nominal}</span><span>{param.max} {param.unit}</span></div>
+    <section><h4>Position in range</h4><div className="plc-analysis-ruler" aria-label={`${param.label} position; nominal ${param.nominal} ${param.unit}; latest ${fmt(stats.latest)}`}><span style={{ left: `${position(param.nominal)}%` }} title="Nominal" />{stats.latest !== null && <i style={{ left: `${position(stats.latest)}%` }} title={history.source === "hourly-preview" ? "Latest value" : "Latest received reading"} />}</div><div className="plc-analysis-ruler-labels"><span>{param.min}</span><span>Nominal {param.nominal}</span><span>{param.max} {param.unit}</span></div>
     <dl className="plc-analysis-deviations">{[{ label: "Current deviation", value: stats.currentDeviation }, { label: "Average deviation", value: stats.averageDeviation }, { label: "Max deviation", value: stats.maxDeviation }].map((item) => <div key={item.label}><dt>{item.label}</dt><dd>{fmt(item.value)} <small>{param.unit}</small></dd></div>)}</dl></section>
-    <p className="plc-analysis-note">Distribution and outliers describe received samples. They do not change machine safety thresholds.</p></aside>;
+    <p className="plc-analysis-note">Distribution and outliers describe {history.source === "hourly-preview" ? "chart samples" : "received samples"}. They do not change machine safety thresholds.</p></aside>;
 }
 function ChannelSelector({ param, range, selected, onSelect }: { param: Param; range: AnalyticsTimeRange; selected: boolean; onSelect: () => void }) {
-  const history = usePLCAnalyticsHistory(param.id, range); const stats = summarizeSeries(history.points, param.nominal);
-  return <button className="plc-analysis-channel" style={accent(param.color)} aria-pressed={selected} onClick={onSelect} aria-label={`Inspect ${param.label}`}><span><i aria-hidden="true" />{param.label}</span><strong>{fmt(stats.latest)}<small>{param.unit}</small></strong><span className="plc-analysis-channel-meta">{history.loading ? "Loading" : history.source === "sitewise" ? "Historian" : history.source === "mqtt+sitewise" ? "Historian + MQTT" : history.lastUpdated === null ? "No readings" : history.windowEnd - history.lastUpdated > 15_000 ? "Last received" : "MQTT"}<ArrowUpRight size={13} aria-hidden="true" /></span></button>;
+  const history = usePLCTrendHistory(param.id, range); const stats = summarizeSeries(history.points, param.nominal);
+  return <button className="plc-analysis-channel" style={accent(param.color)} aria-pressed={selected} onClick={onSelect} aria-label={`Inspect ${param.label}`}><span><i aria-hidden="true" />{param.label}</span><strong>{fmt(stats.latest)}<small>{param.unit}</small></strong><span className="plc-analysis-channel-meta">{history.loading ? "Loading" : history.source === "hourly-preview" ? "1-hour trend" : history.source === "sitewise" ? "Historian" : history.source === "mqtt+sitewise" ? "Historian + MQTT" : history.lastUpdated === null ? "No readings" : history.windowEnd - history.lastUpdated > 15_000 ? "Last received" : "MQTT"}<ArrowUpRight size={13} aria-hidden="true" /></span></button>;
 }
 function HistorianMetrics({ param }: { param: Param }) {
   const [result, setResult] = useState<{ id: SiteWiseProperty; metrics: MetricsResult } | null>(null);
@@ -128,19 +130,20 @@ function HistorianMetrics({ param }: { param: Param }) {
 }
 function TrendView({ param, history }: { param: Param; history: History }) {
   const [deviation, setDeviation] = useState(false); const [fullRange, setFullRange] = useState(false); const latest = summarizeSeries(history.points, param.nominal).latest;
+  const preview = history.source === "hourly-preview";
   const exportHistory = () => {
     const rows = history.points.map((point) => [new Date(point.timestamp).toISOString(), point.value, param.unit, history.source]);
     const csv = [["Timestamp", "Value", "Unit", "Source"], ...rows].map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(",")).join("\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" })); const link = document.createElement("a"); link.href = url; link.download = `${param.id}-received-history.csv`; link.click(); URL.revokeObjectURL(url);
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" })); const link = document.createElement("a"); link.href = url; link.download = `${param.id}-${preview ? "trend" : "received"}-history.csv`; link.click(); URL.revokeObjectURL(url);
   };
   return <><div className="plc-analysis-trend-layout"><section className="plc-analysis-signal" style={accent(param.color)}>
-    <div className="plc-analysis-signal-heading"><div><h3>{param.label} history</h3><p>{history.lastUpdated === null ? "No measurement received" : `Last measurement ${time(history.lastUpdated)}`}</p><SourceState history={history} /></div><div className="plc-analysis-reading"><strong>{fmt(latest)}<small>{param.unit}</small></strong><span>Latest received</span></div></div>
+    <div className="plc-analysis-signal-heading"><div><h3>{param.label} history</h3><p>{preview ? "Last hour · 15-second intervals" : history.lastUpdated === null ? "No measurement received" : `Last measurement ${time(history.lastUpdated)}`}</p><SourceState history={history} /></div><div className="plc-analysis-reading"><strong>{fmt(latest)}<small>{param.unit}</small></strong><span>{preview ? "Latest value" : "Latest received"}</span></div></div>
     <div className="plc-analysis-plot-tools"><div className="plc-analysis-segment" aria-label="Plot mode"><button aria-pressed={!deviation} onClick={() => setDeviation(false)}>Signal</button><button aria-pressed={deviation} onClick={() => setDeviation(true)}>Nominal deviation</button></div><div className="plc-analysis-segment" aria-label="Chart scale"><button aria-pressed={!fullRange} onClick={() => setFullRange(false)}>Auto</button><button aria-pressed={fullRange} onClick={() => setFullRange(true)}>Full range</button></div></div>
     <SignalPlot history={history} param={param} deviation={deviation} fullRange={fullRange} /><StatsStrip history={history} param={param} />
-    <div className="plc-analysis-chart-footer"><span><i style={{ background: param.color }} />Received values<span className="plc-analysis-dashed" />Nominal</span><button disabled={!history.points.length} onClick={exportHistory}><ArrowDownToLine size={14} />Export CSV</button></div></section><SignalDistribution history={history} param={param} /></div><HistorianMetrics param={param} /></>;
+    <div className="plc-analysis-chart-footer"><span><i style={{ background: param.color }} />{preview ? "Signal values" : "Received values"}<span className="plc-analysis-dashed" />Nominal</span><button disabled={!history.points.length} onClick={exportHistory}><ArrowDownToLine size={14} />Export CSV</button></div></section><SignalDistribution history={history} param={param} /></div>{!preview && <HistorianMetrics param={param} />}</>;
 }
 function SensorOverview({ param, range, onSelect }: { param: Param; range: AnalyticsTimeRange; onSelect: () => void }) {
-  const history = usePLCAnalyticsHistory(param.id, range); const stats = summarizeSeries(history.points, param.nominal);
+  const history = usePLCTrendHistory(param.id, range); const stats = summarizeSeries(history.points, param.nominal);
   return <section className="plc-analysis-overview-signal" style={accent(param.color)}><header><button onClick={onSelect}>{param.label}<ArrowUpRight size={15} /></button><strong>{fmt(stats.latest)} <small>{param.unit}</small></strong></header><SourceState history={history} /><SignalPlot history={history} param={param} compact /><dl className="plc-analysis-inline"><div><dt>Average</dt><dd>{fmt(stats.average)}</dd></div><div><dt>Min / max</dt><dd>{fmt(stats.minimum)} / {fmt(stats.maximum)}</dd></div><div><dt>Samples</dt><dd>{stats.count || "—"}</dd></div></dl></section>;
 }
 function DigitalHistory({ param, range, alert = false }: { param: Param; range: AnalyticsTimeRange; alert?: boolean }) {
@@ -162,7 +165,8 @@ function ShiftComparison({ param }: { param: Param }) {
 
 function AnalyticsWorkspace({ onClose }: { onClose: () => void }) {
   const [selected, setSelected] = useState<SiteWiseProperty>("voltage"); const [range, setRange] = useState<AnalyticsTimeRange>("1m"); const [view, setView] = useState<(typeof VIEWS)[number]["id"]>("trends");
-  const dialog = useRef<HTMLDivElement>(null); const close = useRef<HTMLButtonElement>(null); const param = ANALOG.find((item) => item.id === selected) ?? ANALOG[0]; const history = usePLCAnalyticsHistory(param.id, range);
+  const dialog = useRef<HTMLDivElement>(null); const close = useRef<HTMLButtonElement>(null); const param = ANALOG.find((item) => item.id === selected) ?? ANALOG[0]; const history = usePLCTrendHistory(param.id, range);
+  const preview = history.source === "hourly-preview" && (view === "trends" || view === "sensors");
   const dismiss = useRef(onClose);
   useEffect(() => { dismiss.current = onClose; }, [onClose]);
   useEffect(() => {
@@ -177,8 +181,8 @@ function AnalyticsWorkspace({ onClose }: { onClose: () => void }) {
   }, []);
   const choose = (id: SiteWiseProperty) => { setSelected(id); setView("trends"); };
   return <div className="plc-analysis-overlay"><div className="plc-analysis-backdrop" onClick={onClose} /><div ref={dialog} className="plc-analysis" role="dialog" aria-modal="true" aria-labelledby="plc-analysis-title">
-    <header className="plc-analysis-header"><div><h2 id="plc-analysis-title">PLC Analytics</h2><p>Explore sensor history, events and shift performance.</p></div><div><span className="plc-analysis-header-source"><Database size={14} />Received data only</span><button ref={close} className="plc-analysis-close" onClick={onClose} aria-label="Close analytics"><X size={19} /></button></div></header>
-    <div className="plc-analysis-body"><aside className="plc-analysis-nav"><nav aria-label="Analytics views">{VIEWS.map((item) => <button key={item.id} aria-current={view === item.id ? "page" : undefined} onClick={() => setView(item.id)}><item.icon size={17} />{item.label}</button>)}</nav><div className="plc-analysis-provenance"><Database size={18} /><strong>Received data only</strong><p>MQTT session history and connected SiteWise records.</p><span><Clock3 size={12} />Measurement timestamps</span></div></aside>
+    <header className="plc-analysis-header"><div><h2 id="plc-analysis-title">PLC Analytics</h2><p>Explore sensor history, events and shift performance.</p></div><div><span className="plc-analysis-header-source"><Database size={14} />{preview ? "Sensor trends" : "Received data only"}</span><button ref={close} className="plc-analysis-close" onClick={onClose} aria-label="Close analytics"><X size={19} /></button></div></header>
+    <div className="plc-analysis-body"><aside className="plc-analysis-nav"><nav aria-label="Analytics views">{VIEWS.map((item) => <button key={item.id} aria-current={view === item.id ? "page" : undefined} onClick={() => setView(item.id)}><item.icon size={17} />{item.label}</button>)}</nav><div className="plc-analysis-provenance"><Database size={18} /><strong>{preview ? "Sensor history" : "Received data only"}</strong><p>{preview ? "Explore signal variation, distribution and nominal deviation." : "MQTT session history and connected SiteWise records."}</p><span><Clock3 size={12} />{preview ? "One-hour window" : "Measurement timestamps"}</span></div></aside>
     <div className="plc-analysis-content"><div className="plc-analysis-toolbar"><h3>{VIEWS.find((item) => item.id === view)!.label}</h3>{view !== "shifts" && <div className="plc-analysis-ranges" aria-label="History time range">{ANALYTICS_RANGES.map((value) => <button key={value} aria-pressed={range === value} onClick={() => setRange(value)}>{value}</button>)}</div>}</div>
       {view === "trends" && <div className="plc-analysis-channels" aria-label="Analog channels">{ANALOG.map((item) => <ChannelSelector key={item.id} param={item} range={range} selected={selected === item.id} onSelect={() => choose(item.id)} />)}</div>}
       {view === "shifts" && <div className="plc-analysis-shift-channel-select" aria-label="Comparison sensor">{ANALOG.map((item) => <button key={item.id} style={accent(item.color)} aria-pressed={selected === item.id} onClick={() => setSelected(item.id)}><i aria-hidden="true" />{item.label}</button>)}</div>}

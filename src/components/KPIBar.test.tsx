@@ -49,6 +49,7 @@ describe("KPIBar", () => {
       name: /Apply Energy dashboard filter/i,
     });
     expect(energy.getAttribute("aria-pressed")).toBe("false");
+    expect(energy.querySelector(".kpi-card__label")?.textContent).toBe("ENERGY");
 
     fireEvent.click(energy);
 
@@ -66,7 +67,7 @@ describe("KPIBar", () => {
     });
 
     expect(analytics.textContent).not.toContain("Open");
-    expect(analytics.textContent).toBe("Analytics");
+    expect(analytics.textContent).toBe("ANALYTICS");
     expect(analytics.getAttribute("title")).toBe("Trends & sensor history");
 
     fireEvent.click(analytics);
@@ -129,25 +130,32 @@ describe("KPIBar", () => {
     expect(oee.getAttribute("aria-pressed")).toBe("false");
   });
 
-  it("keeps all thirteen workspaces available including LangGraph and LoRaWAN", () => {
+  it("keeps twelve workspaces available with renamed launchers and LoRaWAN", () => {
     const onLaunch = vi.fn();
     render(<FilterProvider><KPIBar
       onOfferingsClick={onLaunch} onEagleClick={onLaunch} onAnalyticsClick={onLaunch}
       onPredictClick={onLaunch} onDpsClick={onLaunch} onRoutingClick={onLaunch}
       onItDevicesClick={onLaunch} onOtDevicesClick={onLaunch} onOnboardingClick={onLaunch}
-      onGatewayTwinClick={onLaunch} onVideoClick={onLaunch} onLanggraphClick={onLaunch}
+      onGatewayTwinClick={onLaunch} onVideoClick={onLaunch}
     /></FilterProvider>);
 
     const workspaces = screen.getByRole("tab", { name: "Workspaces" });
-    expect(workspaces.textContent).toContain("13");
+    expect(workspaces.textContent).toContain("12");
     fireEvent.click(workspaces);
 
     const launchers = screen.getAllByRole("button", { name: /^Open / });
-    expect(launchers).toHaveLength(12);
+    expect(launchers).toHaveLength(11);
     launchers.forEach(button => fireEvent.click(button));
-    expect(onLaunch).toHaveBeenCalledTimes(12);
+    expect(onLaunch).toHaveBeenCalledTimes(11);
     expect(screen.getByRole("button", { name: "LoRaWAN feed" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Open LangGraph AI" }).textContent).toBe("LangGraph AI");
+    expect(screen.queryByRole("button", { name: "Open LangGraph AI" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Open dynamic failover" }).textContent).toBe("DYNAMIC FAILOVER");
+    expect(screen.getByRole("button", { name: "Open video analytics streams" }).textContent).toBe("VIDEO ANALYTICS");
+    launchers.forEach((button) => {
+      const label = button.querySelector(".kpi-card__label")?.textContent;
+      expect(label).toBeTruthy();
+      expect(label).toBe(label?.toUpperCase());
+    });
   });
 
   it("supports keyboard movement between category tabs", async () => {

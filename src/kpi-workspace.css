@@ -65,8 +65,12 @@
   scroll-padding: 2px;
   scroll-snap-type: x proximity;
   animation: none;
-  scrollbar-width: thin;
-  scrollbar-color: #497080 transparent;
+  scrollbar-width: none;
+}
+.plant-console .kpi-deck--instruments .kpi-rail__viewport::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 .plant-console .kpi-deck--instruments .kpi-card {
   --kpi-card-surface: #17232d;
@@ -121,7 +125,7 @@
   font-weight: 550;
   letter-spacing: 0;
   line-height: 1.25;
-  text-transform: none;
+  text-transform: uppercase;
   overflow: visible;
 }
 .plant-console .kpi-deck--instruments .kpi-card__status {

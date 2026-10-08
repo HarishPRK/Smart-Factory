@@ -1,521 +1,131 @@
-import React, { useEffect } from "react";
-import ReactDOM from "react-dom";
-import {
-  useLorawanSensors,
-  syntheticSeries,
-  type LorawanDevice,
-  type SimMetric,
-} from "../hooks/useLorawanSensors";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
+import { Activity, ArrowUpRight, Battery, ChevronDown, Clock3, Code2, Droplets, Radio, RadioTower, Thermometer, Waves, X } from "lucide-react";
+import { useLorawanSensors, type LorawanDevice, type LorawanReading } from "../hooks/useLorawanSensors";
+import { LORA_METRICS, receivedMetric, receivedSeries, receivedSummary, relativePacketAge, type LoraMetric } from "./lorawan/lorawanModel";
+import "./lorawan-workspace.css";
 
-interface LorawanDetailDrawerProps {
-  open: boolean;
-  onClose: () => void;
-}
+interface LorawanDetailDrawerProps { open: boolean; onClose: () => void }
+const METRIC_ICONS = { soilMoisturePct: Droplets, soilTempC: Thermometer, conductivityUsCm: Waves, batteryV: Battery };
 
-/**
- * Side drawer showing the full LoRaWAN soil/irrigation sensor feed:
- *   - Summary stats (devices, avg moisture, avg temp, lowest battery)
- *   - Per-device cards with current temp / moisture / conductivity / battery
- *     and a sparkline for each metric.
- */
-const LorawanDetailDrawer: React.FC<LorawanDetailDrawerProps> = ({ open, onClose }) => {
-  const { list, totalReadings, avgMoisture, avgTemp, minBattery, lastReading } =
-    useLorawanSensors();
-
+/** A received-packet workspace. The existing public component name is retained for callers. */
+export default function LorawanDetailDrawer({ open, onClose }: LorawanDetailDrawerProps) {
+  const { list, totalReadings, lastReading } = useLorawanSensors();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [metric, setMetric] = useState<LoraMetric>("soilMoisturePct");
+  const [now, setNow] = useState(() => Date.now());
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const dismiss = useRef(onClose);
+  useEffect(() => { dismiss.current = onClose; }, [onClose]);
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+    const tick = setInterval(() => setNow(Date.now()), 1000);
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeRef.current?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); dismiss.current(); return; }
+      if (event.key !== "Tab") return;
+      const controls = [...(dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), summary, a[href], [tabindex="0"]') ?? [])].filter((element) => !element.closest("details:not([open])") || element.tagName === "SUMMARY");
+      const first = controls[0]; const last = controls.at(-1);
+      if (event.shiftKey && (document.activeElement === first || !dialogRef.current?.contains(document.activeElement))) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && (document.activeElement === last || !dialogRef.current?.contains(document.activeElement))) { event.preventDefault(); first?.focus(); }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
+    document.addEventListener("keydown", onKey);
+    return () => { clearInterval(tick); document.removeEventListener("keydown", onKey); document.body.style.overflow = previousOverflow; if (previousFocus?.isConnected) previousFocus.focus(); };
+  }, [open]);
   if (!open) return null;
-
-  return ReactDOM.createPortal(
-    <div
-      role="presentation"
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 90,
-        background: "rgba(4, 6, 12, 0.55)",
-        backdropFilter: "blur(3px)",
-        animation: "lora-drawer-fade 160ms ease-out",
-      }}
-    >
-      <style>
-        {`@keyframes lora-drawer-fade { from { opacity: 0; } to { opacity: 1; } }
-          @keyframes lora-drawer-slide {
-            from { transform: translateX(40px); opacity: 0; }
-            to   { transform: translateX(0);    opacity: 1; }
-          }`}
-      </style>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="LoRaWAN sensor detail"
-        className="lorawan-drawer"
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          position: "absolute",
-          top: 0,
-          right: 0,
-          bottom: 0,
-          width: "min(640px, 94vw)",
-          background: "var(--ind-bg-1)",
-          borderLeft: "1px solid var(--ind-edge)",
-          boxShadow: "-12px 0 40px rgba(0,0,0,0.55)",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-          fontFamily: "var(--font-sans)",
-          color: "var(--ind-text)",
-          animation: "lora-drawer-slide 220ms ease-out",
-        }}
-      >
-        <header className="lorawan-header">
-          <div>
-            <div className="lorawan-heading"><SoilGlyph /><div><h2>LoRaWAN sensors</h2><p>Soil and irrigation telemetry</p></div></div>
-            <p className="lorawan-feed-note">{lastReading ? "Latest packet · " + formatRelative(lastReading.receivedAt) : "Waiting for gateway packets"}</p>
-          </div>
-          <button className="workspace-close" onClick={onClose} aria-label="Close LoRaWAN sensors"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg></button>
-        </header>
-        <div className="lorawan-content">
-          {/* Summary stats */}
-          <Section title="Summary">
-            <div className="lorawan-summary">
-              <Stat label="Devices" value={String(list.length)} accent="#65aeeb" />
-              <Stat
-                label="Readings"
-                value={String(totalReadings)}
-                accent="#43d8f1"
-              />
-              <Stat
-                label="Avg moisture"
-                value={avgMoisture != null ? `${avgMoisture.toFixed(1)}%` : "—"}
-                accent="#6ed6a2"
-              />
-              <Stat
-                label="Avg temp"
-                value={avgTemp != null ? `${avgTemp.toFixed(1)}°C` : "—"}
-                accent="#e9bd70"
-              />
-              <Stat
-                label="Min battery"
-                value={minBattery != null ? `${minBattery.toFixed(2)} V` : "—"}
-                accent={
-                  minBattery != null && minBattery < 3.3 ? "#f18b82" : "#bacbd4"
-                }
-              />
-            </div>
-          </Section>
-
-          {/* Device cards */}
-          <Section title={`Devices (${list.length})`}>
-            {list.length === 0 ? (
-              <EmptyHint label="Waiting for first LoRaWAN packet…" />
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {list.map((d) => (
-                  <DeviceCard key={d.devEui} device={d} />
-                ))}
-              </div>
-            )}
-          </Section>
-
-          {lastReading && (
-            <Section title="Last packet">
-              <div
-                style={{
-                  fontSize: "11px",
-                  color: "#a7bbc6",
-                  fontFamily: "var(--font-sans)",
-                  fontVariantNumeric: "tabular-nums",
-                  background: "rgba(255,255,255,0.02)",
-                  border: "1px solid rgba(148, 163, 184, 0.10)",
-                  borderRadius: "8px",
-                  padding: "10px 12px",
-                  lineHeight: 1.5,
-                }}
-              >
-                <div>device_name: {lastReading.deviceName}</div>
-                <div>dev_eui: {lastReading.devEui}</div>
-                {lastReading.sourceTs && <div>timestamp: {lastReading.sourceTs}</div>}
-              </div>
-            </Section>
-          )}
-        </div>
+  const selected = list.find((device) => device.devEui === selectedId) ?? list[0] ?? null;
+  const summary = receivedSummary(list);
+  const recent = lastReading !== null && now - lastReading.receivedAt < 180_000;
+  return createPortal(<div className="lora-workspace-overlay">
+    <div className="lora-workspace-backdrop" data-testid="lorawan-backdrop" onClick={onClose} />
+    <div className="lora-workspace-dialog" role="dialog" aria-modal="true" aria-labelledby="lora-workspace-title" ref={dialogRef}>
+      <header className="lora-workspace-header">
+        <div className="lora-workspace-title"><RadioTower size={26} strokeWidth={1.5} /><div><h2 id="lora-workspace-title">LoRaWAN sensors</h2><p>Soil and irrigation telemetry</p></div></div>
+        <div className="lora-workspace-header-actions"><span className={`lora-workspace-receipt ${recent ? "is-recent" : ""}`}><i />{lastReading ? recent ? "Receiving packets" : "No recent packets" : "Awaiting gateway"}</span><button type="button" ref={closeRef} onClick={onClose} aria-label="Close LoRaWAN sensors"><X size={20} /></button></div>
+      </header>
+      <div className="lora-workspace-summary" aria-label="Received network summary">
+        <div><span>Devices</span><strong>{list.length}</strong></div><div><span>Session packets</span><strong>{totalReadings.toLocaleString()}</strong></div><div><span>Average moisture</span><strong>{summary.moisture === null ? "—" : summary.moisture.toFixed(1)}<small>{summary.moisture === null ? "" : "%"}</small></strong></div><div><span>Lowest battery</span><strong>{summary.battery === null ? "—" : summary.battery.toFixed(2)}<small>{summary.battery === null ? "" : "V"}</small></strong></div><span className="lora-workspace-latest"><Clock3 size={15} />{lastReading ? relativePacketAge(lastReading.receivedAt, now) : "No packet received"}</span>
       </div>
-    </div>,
-    document.body,
-  );
-};
-
-export default LorawanDetailDrawer;
-
-/* ── Sub-components ────────────────────────────────────── */
-
-const SoilGlyph: React.FC = () => (
-  <div className="lorawan-glyph"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v6M9 8c1 2 2 4 3 6 1-2 2-4 3-6M3 14h18M5 14v6h14v-6" /></svg></div>
-);
-
-const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-  <section><h3 className="lorawan-section-title">{title}</h3>{children}</section>
-);
-
-const Stat: React.FC<{ label: string; value: string; accent: string }> = ({ label, value, accent }) => (
-  <div className="lorawan-stat"><span>{label}</span><strong style={{ color: accent }}>{value}</strong></div>
-);
-
-const EmptyHint: React.FC<{ label: string }> = ({ label }) => (
-  <div className="lorawan-empty">{label}</div>
-);
-
-const Sparkline: React.FC<{
-  values: number[];
-  color: string;
-  min?: number;
-  max?: number;
-  /** Draw dashed to mark the series as a stand-in, not measured history. */
-  dashed?: boolean;
-}> = ({ values, color, min, max, dashed }) => {
-  if (values.length < 2) {
-    return (
-      <div
-        style={{
-          height: "20px",
-          fontSize: "9px",
-          color: "#90aab7",
-          fontStyle: "italic",
-          display: "flex",
-          alignItems: "center",
-        }}
-      >
-        gathering…
+      <div className="lora-workspace-body">
+        <aside className="lora-workspace-devices" aria-label="LoRaWAN devices"><div className="lora-workspace-section-title"><h3>Devices</h3><span>{list.length}</span></div>
+          {list.length ? <nav aria-label="Select LoRaWAN device">{list.map((device) => <DeviceButton key={device.devEui} device={device} selected={selected?.devEui === device.devEui} now={now} onSelect={() => setSelectedId(device.devEui)} />)}</nav> : <p className="lora-workspace-device-empty">Devices appear when the gateway sends a packet.</p>}
+          <div className="lora-workspace-source"><Radio size={18} /><strong>Received gateway data</strong><code>lorawan/data</code><p>History contains packets received during this session.</p></div>
+        </aside>
+        <main className="lora-workspace-content">
+          {selected ? <>
+            <div className="lora-workspace-device-heading"><div><h3>{selected.deviceName}</h3><code>{selected.devEui}</code></div><span><Clock3 size={14} />{relativePacketAge(selected.latest.receivedAt, now)}</span></div>
+            <section className="lora-workspace-instruments" aria-label="Selected device measurements">{LORA_METRICS.map((definition) => <MetricInstrument key={definition.key} reading={selected.latest} metric={definition.key} active={metric === definition.key} onSelect={() => setMetric(definition.key)} />)}</section>
+            <div className="lora-workspace-analysis"><HistoryChart device={selected} metric={metric} /><DeviceComparison list={list} selectedId={selected.devEui} metric={metric} onSelect={setSelectedId} /></div>
+            <PacketDetails reading={selected.latest} />
+          </> : <div className="lora-workspace-empty"><RadioTower size={52} strokeWidth={1.2} /><h3>Waiting for the first packet</h3><p>Open this workspace when the LoRaWAN gateway is publishing. Device measurements, comparisons and history will appear here.</p><code>lorawan/data</code></div>}
+        </main>
       </div>
-    );
-  }
-  const W = 90;
-  const H = 20;
-  const lo = min ?? Math.min(...values);
-  const hi = max ?? Math.max(...values);
-  const range = hi - lo || 1;
-  const pts = values.map((v, i) => {
-    const x = (i / (values.length - 1)) * W;
-    const y = H - ((v - lo) / range) * H;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  });
-  return (
-    <svg width={W} height={H} style={{ display: "block", opacity: dashed ? 0.5 : 1 }}>
-      <polyline
-        fill="none"
-        stroke={color}
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeDasharray={dashed ? "3 2" : undefined}
-        points={pts.join(" ")}
-      />
-      <circle
-        cx={W}
-        cy={H - ((values[values.length - 1] - lo) / range) * H}
-        r="2"
-        fill={color}
-      />
-    </svg>
-  );
-};
-
-const MetricRow: React.FC<{
-  label: string;
-  value: string;
-  unit: string;
-  history: number[];
-  color: string;
-  min?: number;
-  max?: number;
-  /** Stand-in value — device never reports this metric. Rendered dimmed. */
-  simulated?: boolean;
-}> = ({ label, value, unit, history, color, min, max, simulated }) => (
-  <div
-    style={{
-      display: "grid",
-      gridTemplateColumns: "1fr 70px 100px",
-      gap: "10px",
-      alignItems: "center",
-      padding: "6px 0",
-    }}
-  >
-    <div style={{ fontSize: "11px", color: "#a7bbc6", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-      {label}
+      <footer className="lora-workspace-footer"><span><i />Received measurements only</span><span>{list.length ? `${list.length} device${list.length === 1 ? "" : "s"} discovered` : "Listening for gateway packets"}</span></footer>
     </div>
-    <div
-      style={{
-        fontSize: "13px",
-        fontWeight: 700,
-        color,
-        fontVariantNumeric: "tabular-nums",
-        textAlign: "right",
-        // Dimmed so a stand-in never reads as a measured value at a glance.
-        opacity: simulated ? 0.55 : 1,
-      }}
-    >
-      {value}
-      <span style={{ fontSize: "10px", color: "#90aab7", marginLeft: "3px" }}>{unit}</span>
-    </div>
-    <Sparkline
-      values={history}
-      color={color}
-      min={min}
-      max={max}
-      dashed={simulated}
-    />
-  </div>
-);
-
-const DeviceCard: React.FC<{ device: LorawanDevice }> = ({ device }) => {
-  const r = device.latest;
-  const sim = r.simulated ?? {};
-  const anySimulated = Object.keys(sim).length > 0;
-
-  /** Real series when the device reports the metric; a back-filled stand-in
-   *  series otherwise, so simulated rows draw a curve instead of "gathering…". */
-  const seriesFor = (metric: SimMetric, pick: (h: typeof r) => number | undefined) =>
-    sim[metric]
-      ? syntheticSeries(device.devEui, metric)
-      : device.history.map(pick).filter((v): v is number => typeof v === "number");
-
-  const tempHistory = seriesFor("soilTempC", (h) => h.soilTempC);
-  const moistHistory = seriesFor("soilMoisturePct", (h) => h.soilMoisturePct);
-  const condHistory = seriesFor("conductivityUsCm", (h) => h.conductivityUsCm);
-  const batHistory = seriesFor("batteryV", (h) => h.batteryV);
-
-  // Battery: red below 3.3V, amber 3.3-3.5, green above
-  const bat = r.batteryV;
-  const batColor =
-    bat == null ? "#a7bbc6" : bat < 3.3 ? "#f18b82" : bat < 3.5 ? "#e9bd70" : "#6ed6a2";
-
-  return (
-    <div className="lorawan-device">
-      {/* Device header */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "8px",
-        }}
-      >
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <span style={{ fontSize: "13px", fontWeight: 700, color: "#eef5f7" }}>
-              {device.deviceName}
-            </span>
-            {anySimulated && <SimBadge />}
-          </div>
-          <div
-            style={{
-              fontSize: "10px",
-              color: "#90aab7",
-              fontFamily: "var(--font-sans)",
-              fontVariantNumeric: "tabular-nums",
-              marginTop: "1px",
-            }}
-          >
-            {device.devEui}
-          </div>
-        </div>
-        <BatteryPill voltage={bat} color={batColor} />
-      </div>
-
-      {/* Metric rows */}
-      <div style={{ borderTop: "1px solid rgba(148,163,184,0.10)", paddingTop: "4px" }}>
-        <MetricRow
-          label="Soil temp"
-          value={r.soilTempC != null ? r.soilTempC.toFixed(1) : "—"}
-          unit="°C"
-          history={tempHistory}
-          color="#e9bd70"
-          simulated={sim.soilTempC}
-        />
-        <MetricRow
-          label="Moisture"
-          value={r.soilMoisturePct != null ? r.soilMoisturePct.toFixed(1) : "—"}
-          unit="%"
-          history={moistHistory}
-          color="#6ed6a2"
-          min={0}
-          max={100}
-          simulated={sim.soilMoisturePct}
-        />
-        <MetricRow
-          label="Conductivity"
-          value={r.conductivityUsCm != null ? r.conductivityUsCm.toFixed(1) : "—"}
-          unit="µS/cm"
-          history={condHistory}
-          color="#65aeeb"
-          simulated={sim.conductivityUsCm}
-        />
-        <MetricRow
-          label="Battery"
-          value={bat != null ? bat.toFixed(2) : "—"}
-          unit="V"
-          history={batHistory}
-          color={batColor}
-          min={3.0}
-          max={3.7}
-          simulated={sim.batteryV}
-        />
-      </div>
-
-      {/* Soil moisture visual indicator */}
-      <SoilMoistureBar pct={r.soilMoisturePct} />
-
-      <div
-        style={{
-          fontSize: "9px",
-          color: "#90aab7",
-          marginTop: "6px",
-          textAlign: "right",
-        }}
-      >
-        Last packet · {formatRelative(r.receivedAt)}
-      </div>
-    </div>
-  );
-};
-
-/** Marks a card whose greyed-out rows are stand-ins, not gateway readings. */
-const SimBadge: React.FC = () => (
-  <span
-    title="This device doesn't report soil metrics — dimmed values are simulated stand-ins"
-    style={{
-      fontSize: "8px",
-      fontWeight: 700,
-      letterSpacing: "0.08em",
-      textTransform: "uppercase",
-      color: "#a9c3ce",
-      background: "#243b46",
-      border: "1px solid #426675",
-      borderRadius: "4px",
-      padding: "1px 4px",
-      whiteSpace: "nowrap",
-    }}
-  >
-    Sim
-  </span>
-);
-
-const BatteryPill: React.FC<{ voltage?: number; color: string }> = ({ voltage, color }) => {
-  // Map 3.0V (empty) → 3.7V (full) onto 0-100% fill
-  const pct = voltage == null ? 0 : Math.max(0, Math.min(100, ((voltage - 3.0) / 0.7) * 100));
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "6px",
-        fontSize: "11px",
-        color,
-        fontWeight: 600,
-      }}
-    >
-      <div
-        style={{
-          position: "relative",
-          width: "26px",
-          height: "12px",
-          border: `1.5px solid ${color}`,
-          borderRadius: "2px",
-        }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            bottom: 0,
-            width: `${pct}%`,
-            background: color,
-            borderRadius: "1px",
-          }}
-        />
-      </div>
-      <div
-        style={{
-          width: "2px",
-          height: "6px",
-          background: color,
-          borderRadius: "0 1px 1px 0",
-          marginLeft: "-5px",
-        }}
-      />
-      {voltage != null ? `${voltage.toFixed(2)}V` : "—"}
-    </div>
-  );
-};
-
-/** Horizontal moisture gauge — green fill, dashed wet/dry zones marked. */
-const SoilMoistureBar: React.FC<{ pct?: number }> = ({ pct }) => {
-  const value = pct ?? 0;
-  // Wet zone shading: 0-20 dry, 20-60 healthy, 60-100 saturated
-  return (
-    <div style={{ marginTop: "8px" }}>
-      <div
-        style={{
-          position: "relative",
-          height: "8px",
-          background:
-            "linear-gradient(90deg, rgba(239, 68, 68, 0.15) 0% 20%, rgba(52, 211, 153, 0.12) 20% 60%, rgba(59, 130, 246, 0.15) 60% 100%)",
-          border: "1px solid rgba(148,163,184,0.15)",
-          borderRadius: "999px",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            bottom: 0,
-            width: `${value}%`,
-            background:
-              value < 20
-                ? "linear-gradient(90deg, #f18b82, #f97316)"
-                : value > 60
-                  ? "linear-gradient(90deg, #6ed6a2, #3b82f6)"
-                  : "linear-gradient(90deg, #6ed6a2, #10b981)",
-          }}
-        />
-      </div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          fontSize: "8px",
-          color: "#90aab7",
-          textTransform: "uppercase",
-          letterSpacing: "0.1em",
-          marginTop: "3px",
-        }}
-      >
-        <span>Dry</span>
-        <span>Healthy</span>
-        <span>Saturated</span>
-      </div>
-    </div>
-  );
-};
-
-function formatRelative(ts: number): string {
-  const diff = Math.max(0, Date.now() - ts);
-  const s = Math.floor(diff / 1000);
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  return `${h}h ago`;
+  </div>, document.body);
 }
+
+function DeviceButton({ device, selected, now, onSelect }: { device: LorawanDevice; selected: boolean; now: number; onSelect: () => void }) {
+  const moisture = receivedMetric(device.latest, "soilMoisturePct");
+  const battery = receivedMetric(device.latest, "batteryV");
+  const recent = now - device.latest.receivedAt < 180_000;
+  return <button type="button" className="lora-workspace-device-button" aria-current={selected ? "true" : undefined} aria-label={`Inspect ${device.deviceName}`} onClick={onSelect}><span className="lora-workspace-device-button-name"><Radio size={16} /><strong>{device.deviceName}</strong><ArrowUpRight size={14} /></span><code>{device.devEui}</code><span className="lora-workspace-device-button-values"><span>{moisture === null ? "No moisture reading" : `${moisture.toFixed(1)}% moisture`}</span><span>{battery === null ? "— V" : `${battery.toFixed(2)} V`}</span></span><span className={`lora-workspace-device-age ${recent ? "is-recent" : ""}`}><i />{relativePacketAge(device.latest.receivedAt, now)}</span></button>;
+}
+
+function MetricInstrument({ reading, metric, active, onSelect }: { reading: LorawanReading; metric: LoraMetric; active: boolean; onSelect: () => void }) {
+  const definition = LORA_METRICS.find((item) => item.key === metric)!;
+  const value = receivedMetric(reading, metric);
+  const Icon = METRIC_ICONS[metric];
+  return <button type="button" className="lora-workspace-instrument" style={{ "--lora-metric-color": definition.color } as CSSProperties} aria-pressed={active} onClick={onSelect} aria-label={`Show ${definition.label.toLowerCase()} history`}><span className="lora-workspace-instrument-label"><Icon size={16} />{definition.label}</span><strong>{value === null ? "—" : value.toFixed(definition.decimals)}<small>{definition.unit}</small></strong><InstrumentGraphic metric={metric} value={value} /><span className="lora-workspace-instrument-caption">{value === null ? "Not reported" : "Latest received"}</span></button>;
+}
+
+function InstrumentGraphic({ metric, value }: { metric: LoraMetric; value: number | null }) {
+  const bounded = (lo: number, hi: number) => value === null ? 0 : Math.max(0, Math.min(1, (value - lo) / (hi - lo)));
+  return <svg className="lora-workspace-instrument-graphic" viewBox="0 0 160 65" aria-hidden="true">
+    {metric === "soilMoisturePct" ? <><path className="lora-workspace-graphic-base" d="M8 14h144v37H8z" /><path className="lora-workspace-graphic-base" d="M8 25h144M8 38h144" />{value !== null && <rect x="8" y={51 - bounded(0, 100) * 37} width="144" height={bounded(0, 100) * 37} className="lora-workspace-graphic-fill" />}<path d={`M8 ${51 - bounded(0, 100) * 37}h144`} stroke="currentColor" strokeWidth="2" strokeDasharray={value === null ? "4 5" : undefined} /><text x="8" y="63">0</text><text x="152" y="63" textAnchor="end">100%</text></> : metric === "soilTempC" ? <><path className="lora-workspace-graphic-base" d="M11 32h139" />{[0, 1, 2, 3, 4, 5, 6].map((i) => <path key={i} className="lora-workspace-graphic-base" d={`M${11 + i * 23} 25v14`} />)}{value !== null && <><path d={`M11 32h${bounded(-20, 60) * 139}`} stroke="currentColor" strokeWidth="5" /><circle cx={11 + bounded(-20, 60) * 139} cy="32" r="6" fill="currentColor" /></>}<text x="11" y="58">−20</text><text x="150" y="58" textAnchor="end">60°C</text></> : metric === "conductivityUsCm" ? <>{Array.from({ length: 12 }, (_, index) => <rect key={index} x={8 + index * 12} y={41 - index * 2} width="7" height={10 + index * 2} rx="1" className={value !== null && index / 12 < bounded(0, 2000) ? "lora-workspace-graphic-fill" : "lora-workspace-graphic-base"} />)}<path className="lora-workspace-graphic-base" d="M8 54h144" /><text x="8" y="65">0</text><text x="152" y="65" textAnchor="end">2,000</text></> : <><rect className="lora-workspace-graphic-base" x="17" y="14" width="123" height="35" rx="4" /><path className="lora-workspace-graphic-base" d="M142 24h6v15h-6" />{[0, 1, 2, 3, 4, 5].map((index) => <rect key={index} x={23 + index * 19} y="20" width="14" height="23" rx="1" className={value !== null && index / 6 < bounded(3, 3.7) ? "lora-workspace-graphic-fill" : "lora-workspace-graphic-base"} />)}<text x="17" y="64">3.0</text><text x="140" y="64" textAnchor="end">3.7 V</text></>}
+  </svg>;
+}
+
+function HistoryChart({ device, metric }: { device: LorawanDevice; metric: LoraMetric }) {
+  const definition = LORA_METRICS.find((item) => item.key === metric)!;
+  const series = receivedSeries(device, metric);
+  const values = series.map((point) => point.value);
+  const minimum = values.length ? Math.min(...values) : null;
+  const maximum = values.length ? Math.max(...values) : null;
+  const average = values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+  const padding = minimum !== null && maximum !== null ? Math.max((maximum - minimum) * .18, Math.abs(maximum) * .02, .2) : 1;
+  const lo = (minimum ?? 0) - padding; const hi = (maximum ?? 1) + padding;
+  const firstTs = series[0]?.timestamp ?? 0; const lastTs = series.at(-1)?.timestamp ?? firstTs;
+  const x = (timestamp: number) => series.length === 1 ? 353 : 48 + (timestamp - firstTs) / Math.max(1, lastTs - firstTs) * 610;
+  const y = (value: number) => 176 - (value - lo) / (hi - lo) * 147;
+  const points = series.map((point) => `${x(point.timestamp)},${y(point.value)}`).join(" ");
+  return <section className="lora-workspace-history" style={{ "--lora-metric-color": definition.color } as CSSProperties}><div className="lora-workspace-section-title"><h3><Activity size={17} />{definition.label} history</h3><span>{series.length} received {series.length === 1 ? "sample" : "samples"}</span></div>
+    {series.length ? <svg className="lora-workspace-history-chart" viewBox="0 0 680 212" role="img" aria-label={`${device.deviceName} ${definition.label.toLowerCase()} history, ${series.length} received samples, minimum ${minimum?.toFixed(definition.decimals)}, maximum ${maximum?.toFixed(definition.decimals)} ${definition.unit}`}>
+      {[0, 1, 2, 3].map((tick) => { const value = lo + (hi - lo) * tick / 3; return <g key={tick}><line x1="48" x2="658" y1={y(value)} y2={y(value)} /><text x="40" y={y(value) + 4} textAnchor="end">{value.toFixed(definition.decimals)}</text></g>; })}
+      {series.length > 1 && <><polygon points={`48,176 ${points} 658,176`} fill="currentColor" opacity=".08" /><polyline points={points} fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" /></>}
+      {series.map((point, index) => <circle key={`${point.timestamp}-${index}`} cx={x(point.timestamp)} cy={y(point.value)} r={index === series.length - 1 ? 3.5 : 2} fill="currentColor"><title>{formatTime(point.timestamp)} · {point.value.toFixed(definition.decimals)} {definition.unit}</title></circle>)}
+      <text x="48" y="204">{formatTime(firstTs)}</text><text x="658" y="204" textAnchor="end">{series.length > 1 ? formatTime(lastTs) : "One packet received"}</text>
+    </svg> : <div className="lora-workspace-history-empty"><Activity size={30} /><h4>No {definition.label.toLowerCase()} reported</h4><p>Only values included in received packets appear in this chart.</p></div>}
+    <dl className="lora-workspace-history-stats"><div><dt>Average</dt><dd>{average === null ? "—" : average.toFixed(definition.decimals)}<small>{definition.unit}</small></dd></div><div><dt>Minimum</dt><dd>{minimum === null ? "—" : minimum.toFixed(definition.decimals)}<small>{definition.unit}</small></dd></div><div><dt>Maximum</dt><dd>{maximum === null ? "—" : maximum.toFixed(definition.decimals)}<small>{definition.unit}</small></dd></div></dl>
+  </section>;
+}
+
+function DeviceComparison({ list, selectedId, metric, onSelect }: { list: LorawanDevice[]; selectedId: string; metric: LoraMetric; onSelect: (id: string) => void }) {
+  const definition = LORA_METRICS.find((item) => item.key === metric)!;
+  const values = list.map((device) => receivedMetric(device.latest, metric));
+  const numeric = values.filter((value): value is number => value !== null);
+  const lo = Math.min(0, ...numeric); const hi = Math.max(1, ...numeric);
+  const origin = (0 - lo) / (hi - lo) * 100;
+  return <section className="lora-workspace-comparison" style={{ "--lora-metric-color": definition.color } as CSSProperties}><div className="lora-workspace-section-title"><h3>Device comparison</h3></div><p>{definition.label} · latest packet</p><div>{list.map((device, index) => { const value = values[index]; const width = value === null ? 0 : Math.abs(value) / (hi - lo) * 100; return <button type="button" key={device.devEui} aria-label={`Compare ${device.deviceName}`} aria-current={selectedId === device.devEui ? "true" : undefined} onClick={() => onSelect(device.devEui)}><span>{device.deviceName}<strong>{value === null ? "—" : value.toFixed(definition.decimals)}<small>{definition.unit}</small></strong></span><span className="lora-workspace-comparison-track">{value !== null && <i style={{ left: `${value < 0 ? origin - width : origin}%`, width: `${width}%` }} />}{value === 0 && <b style={{ left: `${origin}%` }} />}</span>{value === null && <small>Not reported</small>}</button>; })}</div></section>;
+}
+
+function PacketDetails({ reading }: { reading: LorawanReading }) {
+  const payload = { device_name: reading.deviceName, dev_eui: reading.devEui, ...(reading.sourceTs ? { timestamp: reading.sourceTs } : {}), ...Object.fromEntries(LORA_METRICS.flatMap((definition) => { const value = receivedMetric(reading, definition.key); return value === null ? [] : [[definition.payloadKey, value]]; })) };
+  return <details className="lora-workspace-packet"><summary><span><Code2 size={16} />Latest received fields</span><span><Clock3 size={14} />{formatTime(reading.receivedAt)}<ChevronDown size={16} /></span></summary><div><dl><div><dt>Device identifier</dt><dd>{reading.devEui}</dd></div><div><dt>Source timestamp</dt><dd>{reading.sourceTs ?? "Not provided"}</dd></div><div><dt>Received locally</dt><dd>{new Date(reading.receivedAt).toLocaleString()}</dd></div></dl><pre>{JSON.stringify(payload, null, 2)}</pre></div></details>;
+}
+
+function formatTime(timestamp: number) { return new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }); }

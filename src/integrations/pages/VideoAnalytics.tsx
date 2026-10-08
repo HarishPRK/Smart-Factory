@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { PageHeader } from '../components/PageHeader';
 import { Card } from '../components/Card';
 import { useToast } from '../ui/Toast';
@@ -6,7 +6,7 @@ import {
   AlertCircle, Cpu, Loader2, Maximize2, Minimize2, Play, RefreshCw, Square, Video, Wifi,
 } from 'lucide-react';
 
-type StreamGroup = 'Nvidia' | 'Hailo';
+type StreamGroup = 'Dell';
 
 interface VideoStream {
   id: string;
@@ -20,60 +20,52 @@ interface VideoStream {
 /** Stream URLs route through the local Express server at `/api/video/:id`.
  *  In dev, Vite proxies `/api/*` to localhost:3001. In prod, same-origin on EC2.
  *  The server resolves each id to a real upstream URL — configurable per stream
- *  via VIDEO_UPSTREAM_<ID>, or by group via VIDEO_BASE_NVIDIA / VIDEO_BASE_HAILO. */
+ *  via the shared VIDEO_BASE_DELL setting for both feeds and stop APIs. */
 const STREAMS: VideoStream[] = [
-  // ── Nvidia · GPU inference
-  { id: 'nv-nanoowl',  name: 'Inventory Management', description: 'Open-vocabulary object detection',  url: '/api/video/nv-nanoowl',  stopUrl: '/api/video/nv-nanoowl/stop',  group: 'Nvidia' },
-  { id: 'nv-violence', name: 'Violence detection', description: 'Aggressive-behaviour classifier',     url: '/api/video/nv-violence', stopUrl: '/api/video/nv-violence/stop', group: 'Nvidia' },
-  { id: 'nv-fall',     name: 'Fall detection',     description: 'Detects person falls in zones',       url: '/api/video/nv-fall',     stopUrl: '/api/video/nv-fall/stop',     group: 'Nvidia' },
-  { id: 'nv-ppe',      name: 'PPE compliance',     description: 'Hard-hat · vest',                     url: '/api/video/nv-ppe',      stopUrl: '/api/video/nv-ppe/stop',      group: 'Nvidia' },
-  { id: 'nv-table',    name: 'Table monitor',      description: 'Table occupancy and dwell-time',      url: '/api/video/nv-table',    group: 'Nvidia' },
-  { id: 'nv-weapon',   name: 'Weapon detection',   description: 'Firearms and edged-weapon classifier', url: '/api/video/nv-weapon',   group: 'Nvidia' },
-  { id: 'nv-parking',  name: 'Parking monitor',    description: 'Bay occupancy and dwell-time',        url: '/api/video/nv-parking',  group: 'Nvidia' },
-  // ── Hailo · NPU inference
-  { id: 'ha-anpd',     name: 'ANPR',               description: 'Automatic number-plate recognition',  url: '/api/video/ha-anpd',     group: 'Hailo' },
-  { id: 'ha-intruder', name: 'Intruder detection', description: 'Perimeter intrusion alerts',          url: '/api/video/ha-intruder', stopUrl: '/api/video/ha-intruder/stop', group: 'Hailo' },
-  { id: 'ha-hairnet',  name: 'Hairnet monitor',    description: 'Food-safety hairnet compliance',      url: '/api/video/ha-hairnet',  stopUrl: '/api/video/ha-hairnet/stop',  group: 'Hailo' },
-  { id: 'ha-fire',     name: 'Fire detection',     description: 'Smoke and flame classifier',          url: '/api/video/ha-fire',     stopUrl: '/api/video/ha-fire/stop',     group: 'Hailo' },
-  { id: 'ha-crowd',    name: 'Crowd analytics',    description: 'Density and flow analysis',           url: '/api/video/ha-crowd',    stopUrl: '/api/video/ha-crowd/stop',    group: 'Hailo' },
-  { id: 'ha-drive',    name: 'Drive-thru monitor', description: 'Lane occupancy and wait time',        url: '/api/video/ha-drive',    group: 'Hailo' },
+  // ── Dell inference feeds
+  { id: 'nv-nanoowl',  name: 'Inventory Management', description: 'Open-vocabulary object detection',  url: '/api/video/nv-nanoowl',  stopUrl: '/api/video/nv-nanoowl/stop',  group: 'Dell' },
+  { id: 'nv-violence', name: 'Violence detection', description: 'Aggressive-behaviour classifier',     url: '/api/video/nv-violence', stopUrl: '/api/video/nv-violence/stop', group: 'Dell' },
+  { id: 'nv-fall',     name: 'Fall detection',     description: 'Detects person falls in zones',       url: '/api/video/nv-fall',     stopUrl: '/api/video/nv-fall/stop',     group: 'Dell' },
+  { id: 'nv-ppe',      name: 'PPE compliance',     description: 'Hard-hat · vest',                     url: '/api/video/nv-ppe',      stopUrl: '/api/video/nv-ppe/stop',      group: 'Dell' },
+  { id: 'nv-table',    name: 'Table monitor',      description: 'Table occupancy and dwell-time',      url: '/api/video/nv-table',    group: 'Dell' },
+  { id: 'nv-weapon',   name: 'Weapon detection',   description: 'Firearms and edged-weapon classifier', url: '/api/video/nv-weapon',   group: 'Dell' },
+  { id: 'nv-parking',  name: 'Parking monitor',    description: 'Bay occupancy and dwell-time',        url: '/api/video/nv-parking',  group: 'Dell' },
+  // ── Additional Dell inference feeds
+  { id: 'ha-anpd',     name: 'ANPR',               description: 'Automatic number-plate recognition',  url: '/api/video/ha-anpd',     group: 'Dell' },
+  { id: 'ha-intruder', name: 'Intruder detection', description: 'Perimeter intrusion alerts',          url: '/api/video/ha-intruder', stopUrl: '/api/video/ha-intruder/stop', group: 'Dell' },
+  { id: 'ha-hairnet',  name: 'Hairnet monitor',    description: 'Food-safety hairnet compliance',      url: '/api/video/ha-hairnet',  stopUrl: '/api/video/ha-hairnet/stop',  group: 'Dell' },
+  { id: 'ha-fire',     name: 'Fire detection',     description: 'Smoke and flame classifier',          url: '/api/video/ha-fire',     stopUrl: '/api/video/ha-fire/stop',     group: 'Dell' },
+  { id: 'ha-crowd',    name: 'Crowd analytics',    description: 'Density and flow analysis',           url: '/api/video/ha-crowd',    stopUrl: '/api/video/ha-crowd/stop',    group: 'Dell' },
+  { id: 'ha-drive',    name: 'Drive-thru monitor', description: 'Lane occupancy and wait time',        url: '/api/video/ha-drive',    group: 'Dell' },
 ];
 
 const GROUP_META: Record<StreamGroup, { color: string; sub: string }> = {
-  Nvidia: { color: 'var(--ok)',      sub: 'GPU inference pipeline' },
-  Hailo:  { color: 'var(--accent3)', sub: 'NPU inference pipeline' },
+  Dell: { color: 'var(--accent)', sub: 'Dell inference server' },
 };
 
 export function VideoAnalyticsPage() {
-  const nvidia = useMemo(() => STREAMS.filter((s) => s.group === 'Nvidia'), []);
-  const hailo  = useMemo(() => STREAMS.filter((s) => s.group === 'Hailo'),  []);
-
   return (
     <>
       <PageHeader
         title="Video Analytics"
-        subtitle="Live inference feeds from edge GPU and NPU pipelines. Each tile shows a preview — click Open to start the stream in fullscreen."
+        subtitle="Live analytics from the Dell inference server. Open a feed to start watching."
       />
 
       <div className="kpi-strip">
-        <Kpi label="Active pipelines" value={String(STREAMS.length)} sub={`${nvidia.length} Nvidia · ${hailo.length} Hailo`} icon={Video} accent="var(--accent)" />
-        <Kpi label="Nvidia analytics" value={String(nvidia.length)} sub="GPU inference"           icon={Cpu}  accent="var(--ok)" />
-        <Kpi label="Hailo analytics"  value={String(hailo.length)}  sub="NPU inference"           icon={Cpu}  accent="var(--accent3)" />
-        <Kpi label="Transport"        value="MJPEG / HTTP"          sub="loaded on demand"        icon={Wifi} accent="var(--accent2)" />
+        <Kpi label="Available feeds" value={String(STREAMS.length)} sub="on demand" icon={Video} accent="var(--accent)" />
+        <Kpi label="Inference node" value="Dell" sub="one shared server" icon={Cpu} accent="var(--ok)" />
+        <Kpi label="Stop APIs" value={String(STREAMS.filter((stream) => stream.stopUrl).length)} sub="configured pipeline controls" icon={Square} accent="var(--accent3)" />
+        <Kpi label="Transport" value="MJPEG / HTTP" sub="loaded on demand" icon={Wifi} accent="var(--accent2)" />
       </div>
 
       <div className="grid">
         <div className="col-12">
-          <StreamGroupCard group="Nvidia" streams={nvidia} />
-        </div>
-        <div className="col-12">
-          <StreamGroupCard group="Hailo" streams={hailo} />
+          <StreamGroupCard group="Dell" streams={STREAMS} />
         </div>
       </div>
     </>
   );
 }
-
 function StreamGroupCard({ group, streams }: { group: StreamGroup; streams: VideoStream[] }) {
   const meta = GROUP_META[group];
   return (
@@ -453,7 +445,7 @@ function BBox({
   );
 }
 
-/* ── Nvidia ── */
+/* ── Object and safety previews ── */
 
 function SceneNanoOwl() {
   // Friendly cartoon owl with AI-scanner eyes detecting some snacks.
@@ -1339,7 +1331,7 @@ function SceneParking() {
   );
 }
 
-/* ── Hailo ── */
+/* ── Additional analytics previews ── */
 
 function SceneAnpr() {
   // Front view of a BMW driving toward the camera — license plate on the

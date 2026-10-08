@@ -109,12 +109,13 @@ try {
   await writeFile(index, `${await readFile(index, 'utf8')}\n<!-- Smart Factory frontend release ${releaseId} -->\n`);
   await copyFile(join(project, 'deploy/frontend-only-install.sh'), join(payload, 'install.sh'));
   await copyFile(join(project, 'deploy/frontend-only-rollback.sh'), join(payload, 'rollback.sh'));
+  await copyFile(join(project, 'deploy/update-eagle-influx-url.sh'), join(payload, 'update-eagle-influx-url.sh'));
   await writeFile(join(payload, 'release.json'), `${JSON.stringify({
     releaseId, builtAt: new Date().toISOString(), sourceCommit: commit, includesUncommittedChanges: dirty,
     scope: 'static frontend only', plcTransport: 'mosquitto /ws', meterTransport: 'websocket /ws',
     meterTopic, langgraphBase: '/langgraph', sitewiseConfigured: Boolean(sitewiseApi),
   }, null, 2)}\n`);
-  await writeFile(join(payload, 'README.txt'), 'Run sha256sum -c SHA256SUMS, then sudo bash install.sh --web-root /var/www/smart-factory on the existing EC2 host.\nConfirm that this is the active Nginx frontend root before installation.\nNo Node.js, npm, backend update, bridge restart or Nginx configuration change is required.\nThe installer prints the backup path and exact rollback command. See docs/EC2-FRONTEND-UPDATE.md in the source checkout.\n');
+  await writeFile(join(payload, 'README.txt'), 'Run sha256sum -c SHA256SUMS, then sudo bash install.sh --web-root /var/www/smart-factory on the existing EC2 host.\nConfirm that this is the active Nginx frontend root before installation.\nNo Node.js, npm, backend update, bridge restart or Nginx configuration change is required for the frontend.\nThe installer prints the backup path and exact rollback command.\nFor the separately requested EA:GLE address change, then run sudo bash update-eagle-influx-url.sh. This validates the documented backend installation, backs up its environment, changes only INFLUX_URL, and restarts smart-factory-server.service; it rolls back if validation fails.\nSee docs/EC2-FRONTEND-UPDATE.md in the source checkout.\n');
   const files = await filesAt(payload);
   for (const file of files) {
     if (/(^|\/)\.env(?:\.|$)/.test(file) || /\.pem$/i.test(file) || /^(?:server|src|node_modules)\//.test(file)) {
@@ -126,7 +127,7 @@ try {
   await writeFile(join(payload, 'SHA256SUMS'), `${checksums.join('\n')}\n`);
   await mkdir(dirname(output), { recursive: true });
   const stagedArchive = join(temporary, 'smart-factory-frontend.tar.gz');
-  run('tar', ['-czf', stagedArchive, '-C', payload, 'frontend', 'install.sh', 'rollback.sh', 'release.json', 'README.txt', 'SHA256SUMS']);
+  run('tar', ['-czf', stagedArchive, '-C', payload, 'frontend', 'install.sh', 'rollback.sh', 'update-eagle-influx-url.sh', 'release.json', 'README.txt', 'SHA256SUMS']);
   const entries = run('tar', ['-tzf', stagedArchive], true).trim().split(/\r?\n/);
   if (entries.some((entry) => isAbsolute(entry) || entry.split(/[\\/]/).includes('..') || /(^|\/)\.env(?:\.|$)/.test(entry))) {
     throw new Error('Unexpected unsafe path found in generated archive.');

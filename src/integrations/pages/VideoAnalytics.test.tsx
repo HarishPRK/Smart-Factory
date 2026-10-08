@@ -45,6 +45,9 @@ describe('VideoAnalyticsPage stream controls', () => {
     expect(document.querySelectorAll('[data-stream-state="requested"]')).toHaveLength(0);
     expect(document.querySelectorAll('[data-stream-state="idle"]')).toHaveLength(13);
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.getAllByText('Dell')).toHaveLength(2);
+    expect(screen.queryByText('Nvidia')).toBeNull();
+    expect(screen.queryByText('Hailo')).toBeNull();
   });
 
   it('mounts only the feed the user explicitly opens', () => {
