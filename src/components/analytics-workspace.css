@@ -1,0 +1,146 @@
+/* Analytics is an instrument workspace: one dominant trace, quieter evidence. */
+.plc-analysis-overlay { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 24px; }
+.plc-analysis-backdrop { position: absolute; inset: 0; background: rgb(3 11 16 / 76%); backdrop-filter: blur(7px); }
+.plc-analysis { position: relative; display: flex; flex-direction: column; width: min(1420px, 100%); height: min(900px, 94dvh); overflow: hidden; color: #e7eff3; background: #13232d; border: 1px solid #36505e; border-radius: 14px; box-shadow: 0 28px 90px rgb(0 0 0 / 40%); font-family: var(--font-body, "Inter Variable", Inter, sans-serif); font-size: 13px; line-height: 1.5; }
+.plc-analysis * { box-sizing: border-box; }
+.plc-analysis ::selection { color: #05232d; background: #43d8f1; }
+.plc-analysis h2, .plc-analysis h3, .plc-analysis h4, .plc-analysis p, .plc-analysis dl, .plc-analysis dd { margin: 0; }
+.plc-analysis button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid transparent; background: transparent; color: inherit; font: inherit; cursor: pointer; transition: background 140ms ease, border-color 140ms ease; }
+.plc-analysis button:hover { background: #223a47; }
+.plc-analysis button:disabled { opacity: .4; cursor: default; }
+.plc-analysis button:focus-visible, .plc-analysis [tabindex]:focus-visible { outline: 2px solid #43d8f1; outline-offset: 3px; }
+.plc-analysis-header { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 22px 28px; border-bottom: 1px solid #2c424f; background: #152833; }
+.plc-analysis-header h2 { font-size: 26px; letter-spacing: -.9px; font-weight: 650; }
+.plc-analysis-header p { margin-top: 3px; color: #a1b7c3; }
+.plc-analysis-header > div:last-child { display: flex; align-items: center; gap: 18px; }
+.plc-analysis-header-source { display: flex; align-items: center; gap: 7px; font-size: 11px; color: #9fb9c7; }
+.plc-analysis-header-source svg { color: #43d8f1; }
+.plc-analysis-shift-channel-select { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 22px; }
+.plc-analysis-shift-channel-select button { padding: 8px 12px; border: 1px solid #2e4857; border-radius: 5px; font-size: 12px; }
+.plc-analysis-shift-channel-select button[aria-pressed="true"] { background: #1b3543; border-color: var(--signal); }
+.plc-analysis-shift-channel-select i { width: 6px; height: 6px; border-radius: 2px; background: var(--signal); }
+.plc-analysis-close { width: 38px; height: 38px; border: 1px solid #3a5463 !important; border-radius: 8px; flex: none; }
+.plc-analysis-source { display: inline-flex; align-items: center; gap: 7px; color: #a5bbc6; font-size: 11px; line-height: 1.4; }
+.plc-analysis-source i { width: 6px; height: 6px; background: #49ceab; border-radius: 50%; flex: none; }
+.plc-analysis-source[data-state="empty"] i, .plc-analysis-source[data-state="unconfigured"] i { background: #728e9d; }
+.plc-analysis-source[data-state="error"] i { background: #f18b82; }
+.plc-analysis-source[data-state="stale"] i { background: #e9bd70; }
+.plc-analysis-body { display: flex; flex: 1; min-height: 0; }
+.plc-analysis-nav { width: 183px; flex: none; padding: 23px 13px; display: flex; flex-direction: column; justify-content: space-between; border-right: 1px solid #2c424f; background: #10212b; }
+.plc-analysis-nav nav { display: grid; gap: 5px; }
+.plc-analysis-nav nav button { justify-content: start; padding: 12px 11px; border-radius: 6px; text-align: left; color: #a9bfca; font-size: 12px; }
+.plc-analysis-nav nav button[aria-current="page"] { color: #63e1f5; background: #173c4b; border-color: #24566a; }
+.plc-analysis-nav nav button svg { flex: none; }
+.plc-analysis-provenance { display: grid; gap: 8px; padding: 17px 10px 0; color: #8eabba; font-size: 11px; border-top: 1px solid #2c424f; }
+.plc-analysis-provenance > svg { color: #63e1f5; }
+.plc-analysis-provenance strong { color: #d2e1e8; font-size: 12px; font-weight: 550; }
+.plc-analysis-provenance span { display: flex; align-items: center; gap: 5px; font-size: 10px; }
+.plc-analysis-content { min-width: 0; flex: 1; overflow: auto; padding: 23px 26px 28px; scrollbar-color: #416372 transparent; scrollbar-width: thin; }
+.plc-analysis-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 20px; }
+.plc-analysis-toolbar h3 { font-size: 17px; font-weight: 600; letter-spacing: -.3px; }
+.plc-analysis-ranges, .plc-analysis-segment { display: inline-flex; align-items: center; padding: 3px; background: #0d1d27; border: 1px solid #304b5a; border-radius: 7px; }
+.plc-analysis-ranges button { min-width: 40px; padding: 7px 9px; font-size: 11px; color: #a8beca; border-radius: 4px; }
+.plc-analysis-ranges button[aria-pressed="true"] { color: #05232d; background: #43d8f1; font-weight: 600; }
+.plc-analysis-channels { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 24px; border: 1px solid #2e4857; background: #142a36; border-radius: 8px; overflow: hidden; }
+.plc-analysis button.plc-analysis-channel { min-width: 0; position: relative; display: grid; justify-content: stretch; text-align: left; gap: 6px; padding: 13px 17px; border-radius: 0; border-right-color: #2e4857; }
+.plc-analysis-channel:last-child { border-right: 0; }
+.plc-analysis button.plc-analysis-channel[aria-pressed="true"] { background: #1b3543; box-shadow: inset 0 2px var(--signal); }
+.plc-analysis-channel > span:first-child { display: flex; align-items: center; gap: 7px; color: #c2d4dd; font-size: 12px; }
+.plc-analysis-channel i { width: 7px; height: 7px; background: var(--signal); border-radius: 2px; flex: none; }
+.plc-analysis-channel strong { display: flex; align-items: baseline; gap: 6px; font-size: 23px; line-height: 1.2; letter-spacing: -.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.plc-analysis-channel small { color: #a0b7c4; font-size: 11px; font-weight: 400; letter-spacing: 0; }
+.plc-analysis-channel-meta { display: flex; align-items: center; justify-content: space-between; color: #90aebb; font-size: 10px; }
+.plc-analysis-channel-meta svg { color: var(--signal); }
+.plc-analysis-trend-layout { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 24px; }
+.plc-analysis-signal { min-width: 0; }
+.plc-analysis-signal-heading { display: flex; align-items: start; justify-content: space-between; gap: 20px; margin-bottom: 20px; }
+.plc-analysis-signal-heading h3 { font-size: 18px; font-weight: 600; letter-spacing: -.4px; }
+.plc-analysis-signal-heading p { font-size: 11px; color: #94aebb; margin-top: 4px; }
+.plc-analysis-signal-heading .plc-analysis-source { margin-top: 5px; }
+.plc-analysis-reading { flex: none; text-align: right; }
+.plc-analysis-reading strong { display: flex; align-items: baseline; justify-content: end; gap: 6px; color: var(--signal); font-size: 35px; letter-spacing: -1.4px; line-height: 1.15; font-weight: 600; font-variant-numeric: tabular-nums; }
+.plc-analysis-reading small { font-size: 13px; color: #9eb7c5; letter-spacing: 0; font-weight: 450; }
+.plc-analysis-reading > span { font-size: 10px; color: #9bb4c1; }
+.plc-analysis-plot-tools { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.plc-analysis-segment button { padding: 5px 9px; border-radius: 4px; font-size: 10px; color: #a7bfcb; white-space: nowrap; }
+.plc-analysis-segment button[aria-pressed="true"] { background: #25414f; color: #e5f4f9; }
+.plc-analysis-plot { min-width: 0; }
+.plc-analysis-plot svg, .plc-analysis-detail svg { display: block; width: 100%; overflow: visible; }
+.plc-analysis svg text { fill: #92aebb; font-family: inherit; font-size: 10px; font-variant-numeric: tabular-nums; }
+.plc-analysis-gridline { stroke: #2c4553; stroke-width: 1; }
+.plc-analysis-reference line { stroke: #91a8b3; stroke-dasharray: 4 5; opacity: .65; }
+.plc-analysis-reference text { fill: #a8bcc6; font-size: 10px; }
+.plc-analysis-outlier { fill: #13232d; stroke: #f18b82; stroke-width: 1.5; }
+.plc-analysis-crosshair { stroke: #a5bfcf; stroke-dasharray: 3 4; opacity: .6; }
+.plc-analysis-inspect { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 7px 0 10px; color: #8daab9; font-size: 10px; min-height: 33px; }
+.plc-analysis-inspect strong { color: #cbdde6; font-weight: 500; font-variant-numeric: tabular-nums; }
+.plc-analysis-empty { display: grid; justify-items: center; align-content: center; min-height: 290px; padding: 22px; border: 1px dashed #304956; border-radius: 6px; text-align: center; color: #88a5b4; }
+.plc-analysis-empty h4 { margin: 12px 0 7px; color: #c5d9e3; font-size: 15px; font-weight: 500; }
+.plc-analysis-empty p { font-size: 12px; max-width: 310px; line-height: 1.7; }
+.plc-analysis-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 16px 0; border-top: 1px solid #2c4553; border-bottom: 1px solid #2c4553; margin-top: 10px !important; }
+.plc-analysis-stats > div { padding: 0 14px; border-left: 1px solid #2c4553; }
+.plc-analysis-stats > div:first-child { border: 0; padding-left: 0; }
+.plc-analysis-stats dt { color: #9db7c4; font-size: 10px; margin-bottom: 6px; }
+.plc-analysis-stats dd { font-size: 23px; line-height: 1.2; letter-spacing: -.6px; font-variant-numeric: tabular-nums; font-weight: 550; }
+.plc-analysis-stats small { display: block; font-size: 10px; letter-spacing: 0; color: #8ba8b8; font-weight: 400; margin-top: 6px; }
+.plc-analysis-chart-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-top: 15px; font-size: 10px; color: #98b1bf; }
+.plc-analysis-chart-footer > span { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.plc-analysis-chart-footer i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; }
+.plc-analysis-dashed { width: 16px; border-top: 1px dashed #91a8b3; margin-left: 10px; }
+.plc-analysis-chart-footer button { border-color: #365363; border-radius: 5px; padding: 7px 10px; white-space: nowrap; }
+.plc-analysis-detail { min-width: 0; border-left: 1px solid #2c4553; padding-left: 24px; }
+.plc-analysis-detail section + section { margin-top: 24px; padding-top: 22px; border-top: 1px solid #2c4553; }
+.plc-analysis-detail h4 { font-size: 13px; font-weight: 550; }
+.plc-analysis-detail section > p { margin: 3px 0 18px; font-size: 10px; color: #8ba8b8; }
+.plc-analysis-inline { display: flex; justify-content: space-between; gap: 14px; margin-top: 14px !important; font-variant-numeric: tabular-nums; }
+.plc-analysis-inline dt { color: #8ba8b8; font-size: 10px; margin-bottom: 4px; }
+.plc-analysis-inline dd { font-size: 14px; color: #d0e0e8; }
+.plc-analysis-inline small, .plc-analysis-deviations small { color: #8faab9; font-size: 10px; }
+.plc-analysis-ruler { position: relative; height: 5px; margin: 28px 0 10px; background: #2e4756; border-radius: 2px; }
+.plc-analysis-ruler span { position: absolute; height: 15px; width: 1px; background: #a9bac3; top: -5px; }
+.plc-analysis-ruler i { position: absolute; width: 9px; height: 9px; top: -2px; margin-left: -4px; border-radius: 50%; background: var(--signal); box-shadow: 0 0 0 3px #13232d; }
+.plc-analysis-ruler-labels { display: flex; justify-content: space-between; gap: 6px; color: #8ba8b8; font-size: 10px; font-variant-numeric: tabular-nums; }
+.plc-analysis-deviations { margin-top: 22px !important; }
+.plc-analysis-deviations > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 12px; }
+.plc-analysis-deviations dt { color: #9bb5c3; font-size: 11px; }
+.plc-analysis-deviations dd { color: #d1e0e8; font-size: 14px; font-variant-numeric: tabular-nums; }
+.plc-analysis-note { margin-top: 24px !important; font-size: 10px; color: #7f9baa; line-height: 1.7; }
+.plc-analysis-historian { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; border-top: 1px solid #2c4553; margin-top: 24px; padding-top: 18px; color: #8faab9; font-size: 11px; }
+.plc-analysis-historian span { display: flex; align-items: center; gap: 7px; }
+.plc-analysis-historian strong { color: #d2e1e8; font-weight: 500; }
+.plc-analysis-overview, .plc-analysis-digital-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.plc-analysis-overview-signal, .plc-analysis-digital-signal { min-width: 0; padding: 19px; border: 1px solid #2e4857; background: #142833; border-radius: 8px; }
+.plc-analysis-overview-signal header, .plc-analysis-digital-signal header { display: flex; align-items: start; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.plc-analysis-overview-signal header button { justify-content: start; padding: 0; font-size: 15px; font-weight: 550; }
+.plc-analysis-overview-signal header strong { color: var(--signal); font-size: 22px; font-variant-numeric: tabular-nums; }
+.plc-analysis-overview-signal header small { color: #91aebd; font-size: 11px; font-weight: 400; }
+.plc-analysis-overview-signal .plc-analysis-plot, .plc-analysis-digital-signal .plc-analysis-plot { margin-top: 14px; }
+.plc-analysis-overview-signal .plc-analysis-empty, .plc-analysis-digital-signal .plc-analysis-empty, .plc-analysis-shift-plots .plc-analysis-empty { min-height: 150px; padding: 14px; }
+.plc-analysis-overview-signal .plc-analysis-empty p, .plc-analysis-digital-signal .plc-analysis-empty p { font-size: 11px; }
+.plc-analysis-digital-signal h3 { font-size: 15px; font-weight: 550; }
+.plc-analysis-bit { color: #91aebd; font-size: 11px; white-space: nowrap; }
+.plc-analysis-bit[data-active="true"] { color: var(--signal); }
+.plc-analysis-view-note { margin-bottom: 18px !important; color: #8eabba; font-size: 12px; }
+.plc-analysis-shifts { border: 1px solid #2e4857; border-radius: 8px; padding: 22px; background: #142833; }
+.plc-analysis-shifts > header { display: flex; align-items: start; justify-content: space-between; gap: 18px; margin-bottom: 25px; }
+.plc-analysis-shifts h3 { font-size: 17px; font-weight: 550; }
+.plc-analysis-shifts p { font-size: 11px; color: #94afbd; margin-top: 4px; }
+.plc-analysis-shift-plots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.plc-analysis-shift-plots h4 { font-size: 12px; font-weight: 500; margin-bottom: 7px; }
+.plc-analysis-shift-plots .plc-analysis-plot { margin-top: 15px; }
+.plc-analysis-shifts .plc-analysis-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 25px !important; border-bottom: 0; }
+.plc-analysis-relays { margin-top: 24px; padding-top: 22px; border-top: 1px solid #2c4553; }
+.plc-analysis-relays header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 16px; }
+.plc-analysis-relays h3 { font-size: 16px; font-weight: 550; }
+.plc-analysis-relays p { color: #8ba8b8; font-size: 11px; }
+.plc-analysis-relay-grid { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 9px; }
+.plc-analysis-relay-grid > div { display: grid; justify-items: center; gap: 8px; padding: 13px 7px; border: 1px solid #2e4857; border-radius: 5px; color: #91aebd; font-size: 11px; }
+.plc-analysis-relay-grid i { width: 10px; height: 10px; border: 1px solid #658190; border-radius: 50%; }
+.plc-analysis-relay-grid [data-active="true"] i { background: #49ceab; border-color: #49ceab; }
+.plc-analysis-relay-grid strong { font-size: 10px; font-weight: 500; }
+@media (max-width: 700px) { .plc-analysis-header-source { display: none; } }
+@media (min-width: 1600px) { .plc-analysis-content { padding: 28px 34px; } .plc-analysis-trend-layout { gap: 32px; grid-template-columns: minmax(0, 1fr) 270px; } }
+@media (max-width: 1100px) { .plc-analysis-overlay { padding: 16px; } .plc-analysis-nav { width: 158px; padding-inline: 9px; } .plc-analysis-nav nav button { padding-inline: 9px; font-size: 11px; } .plc-analysis-content { padding: 20px; } .plc-analysis-trend-layout { grid-template-columns: minmax(0, 1fr) 210px; gap: 18px; } .plc-analysis-detail { padding-left: 18px; } .plc-analysis-channel { padding-inline: 12px !important; } .plc-analysis-ranges button { min-width: 35px; padding-inline: 7px; } }
+@media (max-width: 900px) { .plc-analysis-trend-layout { grid-template-columns: minmax(0, 1fr); } .plc-analysis-detail { border-left: 0; border-top: 1px solid #2c4553; padding: 22px 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; } .plc-analysis-detail section + section { margin: 0; padding: 0 0 0 22px; border-top: 0; border-left: 1px solid #2c4553; } .plc-analysis-note { grid-column: 1 / -1; margin-top: 0 !important; } .plc-analysis-detail section > p { margin-bottom: 10px; } .plc-analysis-relay-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } .plc-analysis-overview, .plc-analysis-digital-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 700px) { .plc-analysis-overlay { padding: 10px; } .plc-analysis { height: 96dvh; border-radius: 10px; } .plc-analysis-header { padding: 17px 18px; gap: 12px; } .plc-analysis-header h2 { font-size: 22px; } .plc-analysis-header p { font-size: 11px; } .plc-analysis-header > div:last-child { gap: 10px; } .plc-analysis-header > div:last-child > .plc-analysis-source { display: none; } .plc-analysis-body { flex-direction: column; } .plc-analysis-nav { width: 100%; padding: 7px 9px; border-right: 0; border-bottom: 1px solid #2c424f; } .plc-analysis-nav nav { display: flex; overflow-x: auto; gap: 3px; scrollbar-width: none; } .plc-analysis-nav nav button { flex: none; white-space: nowrap; padding: 9px 10px; font-size: 11px; gap: 6px; } .plc-analysis-nav nav button svg { width: 14px; } .plc-analysis-provenance { display: none; } .plc-analysis-content { padding: 18px; } .plc-analysis-toolbar { align-items: start; flex-direction: column; gap: 12px; margin-bottom: 17px; } .plc-analysis-ranges { width: 100%; justify-content: space-between; } .plc-analysis-ranges button { min-width: 0; flex: 1; font-size: 11px; } .plc-analysis-channels { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 21px; } .plc-analysis-channel:nth-child(2) { border-right: 0; } .plc-analysis-channel:nth-child(-n+2) { border-bottom-color: #2e4857; } .plc-analysis-channel strong { font-size: 22px; } .plc-analysis-signal-heading h3 { font-size: 16px; } .plc-analysis-reading strong { font-size: 31px; } .plc-analysis-signal-heading { margin-bottom: 15px; } .plc-analysis-plot-tools { gap: 8px; flex-wrap: wrap; } .plc-analysis-segment button { padding-inline: 7px; } .plc-analysis-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 0; } .plc-analysis-stats > div:nth-child(odd) { border-left: 0; padding-left: 0; } .plc-analysis-stats dd { font-size: 24px; } .plc-analysis-stats dt { font-size: 11px; } .plc-analysis-stats small { font-size: 11px; } .plc-analysis-chart-footer { align-items: start; } .plc-analysis-inspect { font-size: 10px; } .plc-analysis-inspect span { max-width: 55%; } .plc-analysis-detail { grid-template-columns: minmax(0, 1fr); gap: 20px; } .plc-analysis-detail section + section { padding: 20px 0 0; border-left: 0; border-top: 1px solid #2c4553; } .plc-analysis-detail h4 { font-size: 15px; } .plc-analysis-detail section > p, .plc-analysis-deviations dt { font-size: 12px; } .plc-analysis-detail svg { max-height: 155px; } .plc-analysis-note { grid-column: auto; } .plc-analysis-shifts { padding: 17px; } .plc-analysis-shifts > header { flex-direction: column; } .plc-analysis-shift-plots { grid-template-columns: minmax(0, 1fr); } .plc-analysis-shifts .plc-analysis-stats { grid-template-columns: minmax(0, 1fr); } .plc-analysis-shifts .plc-analysis-stats > div { border: 0; padding: 0; } .plc-analysis-relays header { align-items: start; flex-direction: column; } }
+@media (prefers-reduced-motion: reduce) { .plc-analysis button { transition: none; } }

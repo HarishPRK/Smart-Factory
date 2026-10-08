@@ -102,6 +102,25 @@ describe("received PLC channel provenance", () => {
     ingest(parsePLCPayload({ boardA_voltage_pot_2: 2.5 }));
     const reading = channel("intake_gps");
     expect(reading).toMatchObject({ value: 50, sourceLabel: "Auxiliary input", shared: true });
-    expect(reading.param).toMatchObject({ label: "Auxiliary input", unit: "%" });
+    expect(reading.param).toMatchObject({ label: "Auxiliary input", unit: "", status: "normal" });
+  });
+
+  it("keeps shared distance and auxiliary inputs informational across the sensor monitor mappings", () => {
+    ingest(parsePLCPayload({ boardB_esp32_distance_cm: 12, boardA_voltage_pot_2: .49 }));
+    for (const id of ["quality_lidar", "intake_lidar"]) {
+      expect(channel(id)).toMatchObject({ value: 12, sourceLabel: "Shared distance input", shared: true });
+      expect(channel(id).param).toMatchObject({ unit: "cm", status: "normal" });
+    }
+    for (const id of ["intake_gps", "dispatch_gps"]) {
+      expect(channel(id).value).toBeCloseTo(9.8);
+      expect(channel(id).param).toMatchObject({ label: "Auxiliary input", unit: "", status: "normal" });
+    }
+  });
+
+  it("does not retain obsolete generic critical classification from an upstream mapped input", () => {
+    const state = parsePLCPayload({ boardB_esp32_distance_cm: 12 });
+    state.params.find((param) => param.id === "quality_lidar")!.status = "critical";
+    ingest(state);
+    expect(channel("quality_lidar").param?.status).toBe("normal");
   });
 });

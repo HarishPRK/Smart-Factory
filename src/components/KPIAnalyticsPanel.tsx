@@ -1,1119 +1,193 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
-import { usePLCContext, useMqttBufferContext } from "../context/PLCContext";
-import CountUp from "./CountUp";
-import type { TimeRange } from "../types";
-import {
-  isSiteWiseConfigured,
-  fetchHistory as swFetchHistory,
-  fetchMetrics as swFetchMetrics,
-  type SiteWiseProperty,
-  type MetricsResult,
-} from "../services/siteWiseService";
+import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
+import { Activity, ArrowDownToLine, ArrowUpRight, ChartNoAxesCombined, Clock3, Database, GitCompareArrows, Radio, SlidersHorizontal, TriangleAlert, X } from "lucide-react";
+import { usePLCAnalyticsHistory, ANALYTICS_RANGES, ANALYTICS_RANGE_CONFIGS, type AnalyticsTimeRange } from "../hooks/usePLCAnalyticsHistory";
+import { fetchMetrics, isSiteWiseConfigured, type MetricsResult, type SiteWiseProperty } from "../services/siteWiseService";
+import { chartDomain, distributionBins, summarizeDigital, summarizeSeries } from "./analytics/analyticsModel";
 
-/* ── PLC Parameter Definitions ───────────────────────── */
-
-interface PLCParam {
-  id: SiteWiseProperty;
-  label: string;
-  unit: string;
-  color: string;
-  min: number;
-  max: number;
-  nominal: number;
-  kind: "analog" | "digital";
-}
-
-const ANALOG_PARAMS: PLCParam[] = [
-  { id: "voltage", label: "Voltage", unit: "V", color: "#e9bd70", min: 0, max: 12, nominal: 5.0, kind: "analog" },
-  { id: "current", label: "Current", unit: "A", color: "#43d8f1", min: 0, max: 10, nominal: 6.0, kind: "analog" },
-  { id: "pH", label: "pH", unit: "pH", color: "#4ac2be", min: 0, max: 14, nominal: 7.0, kind: "analog" },
-  { id: "temperature", label: "Temperature", unit: "°C", color: "#f18b82", min: 0, max: 100, nominal: 25.0, kind: "analog" },
+type Param = { id: SiteWiseProperty; label: string; unit: string; color: string; min: number; max: number; nominal: number };
+const ANALOG: Param[] = [
+  { id: "voltage", label: "Voltage", unit: "V", color: "#e9bd70", min: 0, max: 12, nominal: 5 },
+  { id: "current", label: "Current", unit: "A", color: "#43d8f1", min: 0, max: 10, nominal: 6 },
+  { id: "pH", label: "pH", unit: "", color: "#4ac2be", min: 0, max: 14, nominal: 7 },
+  { id: "temperature", label: "Temperature", unit: "°C", color: "#f18b82", min: 0, max: 100, nominal: 25 },
 ];
-
-const DIGITAL_PARAMS: PLCParam[] = [
-  { id: "photoE_sensor", label: "Photo-E Sensor", unit: "", color: "#6ed6a2", min: 0, max: 1, nominal: 0, kind: "digital" },
-  { id: "metal_sensor", label: "Metal Detector", unit: "", color: "#3b82f6", min: 0, max: 1, nominal: 0, kind: "digital" },
-  { id: "motor", label: "Motor Fan", unit: "", color: "#43d8f1", min: 0, max: 1, nominal: 0, kind: "digital" },
-  { id: "push_button", label: "Push Button", unit: "", color: "#e9bd70", min: 0, max: 1, nominal: 0, kind: "digital" },
+const DIGITAL: Param[] = [
+  { id: "photoE_sensor", label: "Photoelectric", unit: "", color: "#6ed6a2", min: 0, max: 1, nominal: 0 },
+  { id: "metal_sensor", label: "Metal detector", unit: "", color: "#82b5f6", min: 0, max: 1, nominal: 0 },
+  { id: "motor", label: "Motor fan", unit: "", color: "#43d8f1", min: 0, max: 1, nominal: 0 },
+  { id: "push_button", label: "Push button", unit: "", color: "#e9bd70", min: 0, max: 1, nominal: 0 },
 ];
-
-const ALERT_PARAMS: PLCParam[] = [
-  { id: "alert_0", label: "Alert Ch-0", unit: "", color: "#f18b82", min: 0, max: 1, nominal: 0, kind: "digital" },
-  { id: "alert_1", label: "Alert Ch-1", unit: "", color: "#f97316", min: 0, max: 1, nominal: 0, kind: "digital" },
-  { id: "alert_2", label: "Alert Ch-2", unit: "", color: "#eab308", min: 0, max: 1, nominal: 0, kind: "digital" },
-  { id: "alert_3", label: "Alert Ch-3 (Emergency)", unit: "", color: "#f18b82", min: 0, max: 1, nominal: 0, kind: "digital" },
+const ALERTS: Param[] = [
+  { id: "alert_0", label: "Alert channel 0", unit: "", color: "#f18b82", min: 0, max: 1, nominal: 0 },
+  { id: "alert_1", label: "Alert channel 1", unit: "", color: "#e9bd70", min: 0, max: 1, nominal: 0 },
+  { id: "alert_2", label: "Alert channel 2", unit: "", color: "#6ed6a2", min: 0, max: 1, nominal: 0 },
+  { id: "alert_3", label: "Emergency light channel", unit: "", color: "#f18b82", min: 0, max: 1, nominal: 0 },
 ];
+const VIEWS = [
+  { id: "trends", label: "Trends", icon: ChartNoAxesCombined }, { id: "sensors", label: "All sensors", icon: SlidersHorizontal },
+  { id: "digital", label: "Digital I/O", icon: Radio }, { id: "alerts", label: "Alerts", icon: TriangleAlert },
+  { id: "shifts", label: "Shift comparison", icon: GitCompareArrows },
+] as const;
+type History = ReturnType<typeof usePLCAnalyticsHistory>;
+const fmt = (value: number | null | undefined, digits = 2) => value == null || !Number.isFinite(value) ? "—" : value.toLocaleString(undefined, { maximumFractionDigits: digits });
+const time = (timestamp: number) => new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+const accent = (color: string) => ({ "--signal": color } as CSSProperties);
 
-const ALL_PARAMS = [...ANALOG_PARAMS, ...DIGITAL_PARAMS];
-
-/* ── Time config ─────────────────────────────────────── */
-
-type AnalyticsTimeRange = TimeRange | "1m" | "5m" | "30m";
-
-const TIME_CONFIGS: Record<AnalyticsTimeRange, { points: number; label: string; ms: number; tickFormat: (i: number, total: number) => string }> = {
-  "1m": { points: 60, ms: 60_000, label: "Last 1 Minute", tickFormat: (i, t) => `${Math.round((i / (t - 1)) * 60)}s` },
-  "5m": { points: 100, ms: 300_000, label: "Last 5 Minutes", tickFormat: (i, t) => `${Math.round((i / (t - 1)) * 5)}m` },
-  "30m": { points: 100, ms: 1_800_000, label: "Last 30 Minutes", tickFormat: (i, t) => `${Math.round((i / (t - 1)) * 30)}m` },
-  "1h": { points: 100, ms: 3_600_000, label: "Last 1 Hour", tickFormat: (i, t) => `${Math.round((i / (t - 1)) * 60)}m` },
-  "6h": { points: 200, ms: 21_600_000, label: "Last 6 Hours", tickFormat: (i, t) => `${Math.round((i / (t - 1)) * 6)}h` },
-  "24h": { points: 300, ms: 86_400_000, label: "Last 24 Hours", tickFormat: (i, t) => `${Math.round((i / (t - 1)) * 24)}h` },
-  "7d": { points: 500, ms: 604_800_000, label: "Last 7 Days", tickFormat: (i, t) => `D${Math.round((i / (t - 1)) * 7) + 1}` },
-};
-
-const ALL_TIME_RANGES: AnalyticsTimeRange[] = ["1m", "5m", "30m", "1h", "6h", "24h", "7d"];
-
-/* ── Mock data generator ─────────────────────────────── */
-
-function generateMockHistory(param: PLCParam, points: number, seed: number): number[] {
-  const result: number[] = [];
-  for (let i = 0; i < points; i++) {
-    const noise = Math.sin(seed * 13.7 + i * 2.1) * (param.max - param.min) * 0.08
-      + Math.cos(seed * 7.3 + i * 1.3) * (param.max - param.min) * 0.05;
-    const drift = Math.sin(i / points * Math.PI) * (param.max - param.min) * 0.1;
-    let val = param.nominal + noise + drift;
-    val = Math.max(param.min, Math.min(param.max, val));
-    result.push(Math.round(val * 100) / 100);
-  }
-  return result;
+function SourceState({ history }: { history: History }) {
+  const stale = history.source === "mqtt" && history.lastUpdated !== null && history.windowEnd - history.lastUpdated > 15_000;
+  const text = history.loading ? "Loading history" : history.state === "unconfigured" ? "Historian not configured" : history.state === "error" ? "History unavailable" : history.source === "sitewise" ? "SiteWise history" : history.source === "mqtt+sitewise" ? "SiteWise + MQTT history" : history.state === "empty" ? "Awaiting readings" : stale ? "Last received" : "MQTT readings";
+  return <span className="plc-analysis-source" data-state={stale ? "stale" : history.state}><i aria-hidden="true" />{text}</span>;
 }
-
-function detectAnomalies(data: number[]): number[] {
-  if (data.length < 3) return [];
-  const mean = data.reduce((s, v) => s + v, 0) / data.length;
-  const std = Math.sqrt(data.reduce((s, v) => s + (v - mean) ** 2, 0) / data.length);
-  const threshold = std * 1.8;
-  return data.reduce<number[]>((acc, v, i) => {
-    if (Math.abs(v - mean) > threshold) acc.push(i);
-    return acc;
-  }, []);
+function EmptyHistory({ history }: { history: History }) {
+  return <div className="plc-analysis-empty" role="status"><Activity size={28} strokeWidth={1.25} aria-hidden="true" />
+    <h4>{history.loading ? "Loading received history" : history.state === "unconfigured" ? "Historical data is not connected" : history.state === "error" ? "Could not load this history" : "Waiting for this sensor"}</h4>
+    <p>{history.state === "unconfigured" ? "Choose 1m or 5m to inspect received MQTT readings. Longer ranges need the existing SiteWise historian." : history.state === "error" ? "The historian request failed. Select another range or reopen this view to retry." : "The plot will appear when readings arrive. No sample values are substituted."}</p></div>;
 }
-
-/* ── SVG Area Chart ──────────────────────────────────── */
-
-/** Match chart coordinates to CSS pixels so axes keep their size as panels resize. */
-function useChartWidth() {
-  const ref = useRef<SVGSVGElement>(null);
-  const [width, setWidth] = useState(500);
-
+function usePlotWidth() {
+  const ref = useRef<HTMLDivElement>(null); const [width, setWidth] = useState(800);
   useEffect(() => {
-    const element = ref.current;
-    if (!element || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(([entry]) => {
-      const measured = Math.round(entry.contentRect.width);
-      if (measured > 0) setWidth(measured);
-    });
-    observer.observe(element);
-    return () => observer.disconnect();
+    if (!ref.current || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entry]) => setWidth(Math.max(260, entry.contentRect.width)));
+    observer.observe(ref.current); return () => observer.disconnect();
   }, []);
-
   return { ref, width };
 }
 
-interface ChartProps {
-  data: number[];
-  color: string;
-  anomalies?: number[];
-  timeRange: AnalyticsTimeRange;
-  height?: number;
-  unit?: string;
-  nominal?: number;
-  /** Identifies the selected parameter and range for the rendered path. */
-  drawKey?: string;
-}
-
-const AreaChart: React.FC<ChartProps> = ({
-  data, color, anomalies = [], timeRange, height = 160, unit, nominal, drawKey,
-}) => {
-  const { ref, width: W } = useChartWidth();
-  const H = height;
-  const pad = { top: 16, right: 44, bottom: 28, left: unit ? 76 : 48 };
-  const cw = W - pad.left - pad.right;
-  const ch = H - pad.top - pad.bottom;
-
-  const min = Math.min(...data) * 0.92;
-  const max = Math.max(...data) * 1.08;
-  const range = max - min || 1;
-
-  const toX = (i: number) => pad.left + (i / Math.max(1, data.length - 1)) * cw;
-  const toY = (v: number) => pad.top + ch - ((v - min) / range) * ch;
-
-  const pts = data.map((v, i) => ({ x: toX(i), y: toY(v) }));
-  let path = `M${pts[0].x},${pts[0].y}`;
-  for (let i = 1; i < pts.length; i++) {
-    const p = pts[i - 1], c = pts[i];
-    path += ` C${p.x + (c.x - p.x) * 0.4},${p.y} ${p.x + (c.x - p.x) * 0.6},${c.y} ${c.x},${c.y}`;
-  }
-
-  const tcfg = TIME_CONFIGS[timeRange];
-  const numTicks = Math.min(6, data.length);
-
-  return (
-    <svg ref={ref} viewBox={`0 0 ${W} ${H}`} className="analytics-chart" style={{ height }}>
-      <defs>
-        <linearGradient id={`chart-fill-${color.replace("#", "")}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.25" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-
-      {/* Grid lines */}
-      {[0, 0.25, 0.5, 0.75, 1].map((frac) => {
-        const y = pad.top + ch * (1 - frac);
-        const val = min + range * frac;
-        return (
-          <g key={frac}>
-            <line x1={pad.left} y1={y} x2={W - pad.right} y2={y} stroke="#29414e" strokeWidth="1" />
-            <text x={pad.left - 8} y={y + 4} textAnchor="end" fill="#90aab7" fontSize="11" fontFamily="Inter">
-              {val >= 100 ? Math.round(val) : val.toFixed(1)}{unit ? ` ${unit}` : ""}
-            </text>
-          </g>
-        );
+/** Coordinates follow measurement timestamps; MQTT receipt gaps break the trace. */
+function SignalPlot({ history, param, deviation = false, fullRange = false, compact = false, digital = false }: { history: History; param: Param; deviation?: boolean; fullRange?: boolean; compact?: boolean; digital?: boolean }) {
+  const { ref, width } = usePlotWidth(); const [inspection, setInspection] = useState<{ timestamp: number; value: number } | null>(null);
+  const fillId = useId().replace(/:/g, ""); const points = history.points; const height = compact ? 140 : 290;
+  const pad = { left: compact ? 36 : 48, right: 20, top: 24, bottom: 30 }; const baseline = deviation ? 0 : param.nominal;
+  const values = points.map((point) => ({ ...point, value: digital ? point.value >= .5 ? 1 : 0 : deviation ? point.value - param.nominal : point.value }));
+  const domain = digital ? [-.2, 1.2] : fullRange ? [deviation ? param.min - param.nominal : param.min, deviation ? param.max - param.nominal : param.max] : chartDomain(values, baseline);
+  const x = (timestamp: number) => pad.left + (timestamp - history.windowStart) / Math.max(1, history.windowEnd - history.windowStart) * (width - pad.left - pad.right);
+  const y = (value: number) => pad.top + (1 - (value - domain[0]) / (domain[1] - domain[0])) * (height - pad.top - pad.bottom);
+  const bottom = height - pad.bottom; const outliers = summarizeSeries(points, param.nominal).outlierIndices;
+  const segments: string[] = []; let path = "";
+  values.forEach((point, index) => {
+    if (!index || (history.source === "mqtt" && point.timestamp - values[index - 1].timestamp > 15_000)) { if (path) segments.push(path); path = `M${x(point.timestamp)},${y(point.value)}`; }
+    else path += digital ? `H${x(point.timestamp)}V${y(point.value)}` : `L${x(point.timestamp)},${y(point.value)}`;
+  }); if (path) segments.push(path);
+  const inspected = inspection && points.some((point) => point.timestamp === inspection.timestamp && point.value === inspection.value) ? inspection : null;
+  const inspectedValue = inspected ? digital ? inspected.value >= .5 ? 1 : 0 : deviation ? inspected.value - param.nominal : inspected.value : null;
+  return <div ref={ref} className="plc-analysis-plot" style={accent(param.color)}>{!points.length ? <EmptyHistory history={history} /> : <>
+    <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${param.label} ${digital ? "state history" : deviation ? "deviation from nominal" : "received history"}, ${points.length} timestamped readings`}>
+      <defs><linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={param.color} stopOpacity=".12" /><stop offset="100%" stopColor={param.color} stopOpacity="0" /></linearGradient><clipPath id={`${fillId}-plot`}><rect x={pad.left} y={pad.top} width={width - pad.left - pad.right} height={bottom - pad.top} /></clipPath></defs>
+      {(digital ? [0, 1] : [0, .25, .5, .75, 1].map((fraction) => domain[0] + (domain[1] - domain[0]) * fraction)).map((value) => <g key={value}><line x1={pad.left} x2={width - pad.right} y1={y(value)} y2={y(value)} className="plc-analysis-gridline" /><text x={pad.left - 9} y={y(value) + 4} textAnchor="end">{digital ? value ? "ON" : "OFF" : fmt(value, 1)}</text></g>)}
+      {!digital && <g className="plc-analysis-reference"><line x1={pad.left} x2={width - pad.right} y1={y(baseline)} y2={y(baseline)} /><text x={width - pad.right} y={y(baseline) - 7} textAnchor="end">{deviation ? "Nominal" : `Nominal ${fmt(param.nominal)} ${param.unit}`}</text></g>}
+      {Array.from({ length: compact || width < 430 ? 3 : 5 }, (_, index) => {
+        const count = compact || width < 430 ? 3 : 5; const timestamp = history.windowStart + index / (count - 1) * (history.windowEnd - history.windowStart);
+        const duration = history.windowEnd - history.windowStart;
+        const label = duration > 86_400_000 ? new Date(timestamp).toLocaleDateString([], { month: "short", day: "numeric" }) : new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", ...(duration <= 300_000 ? { second: "2-digit" as const } : {}) });
+        return <text key={index} x={x(timestamp)} y={height - 6} textAnchor={!index ? "start" : index === count - 1 ? "end" : "middle"}>{label}</text>;
       })}
-
-      {/* Nominal line */}
-      {nominal !== undefined && nominal >= min && nominal <= max && (
-        <g>
-          <line
-            x1={pad.left} y1={toY(nominal)} x2={W - pad.right} y2={toY(nominal)}
-            stroke={color} strokeWidth="1" strokeDasharray="6 4" opacity="0.4"
-          />
-          <text x={W - pad.right + 7} y={toY(nominal) + 4} fill={color} fontSize="11" fontFamily="Inter">
-            nom
-          </text>
-        </g>
-      )}
-
-      {/* X-axis labels */}
-      {Array.from({ length: numTicks }, (_, i) => {
-        const idx = Math.round((i / Math.max(1, numTicks - 1)) * (data.length - 1));
-        return (
-          <text key={i} x={toX(idx)} y={H - 5} textAnchor="middle" fill="#90aab7" fontSize="11" fontFamily="Inter">
-            {tcfg.tickFormat(idx, data.length)}
-          </text>
-        );
-      })}
-
-      {/* Data geometry uses the measured plot width; no decorative motion. */}
-      <path
-        d={`${path} L${pts[pts.length - 1].x},${pad.top + ch} L${pts[0].x},${pad.top + ch} Z`}
-        fill={`url(#chart-fill-${color.replace("#", "")})`}
-      />
-      <path
-        key={drawKey}
-        d={path} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round"
-      />
-      <circle
-        cx={pts[pts.length - 1].x} cy={pts[pts.length - 1].y} r="3" fill={color}
-      />
-
-      {/* Anomaly markers */}
-      {anomalies.map((idx) => {
-        const x = toX(idx);
-        const y = toY(data[idx]);
-        return (
-          <g key={`anom-${idx}`} style={{ transition: "transform 0.8s ease" }}>
-            <circle cx={x} cy={y} r="6" fill="rgba(239,68,68,0.15)" stroke="#f18b82" strokeWidth="1.5" style={{ transition: "cx 0.8s ease, cy 0.8s ease" }} />
-            <circle cx={x} cy={y} r="2.5" fill="#f18b82" style={{ transition: "cx 0.8s ease, cy 0.8s ease" }} />
-            <line x1={x} y1={y + 8} x2={x} y2={pad.top + ch} stroke="#f18b82" strokeWidth="1" strokeDasharray="3 3" opacity="0.3" style={{ transition: "x1 0.8s ease, y1 0.8s ease" }} />
-          </g>
-        );
-      })}
+      <g clipPath={`url(#${fillId}-plot)`}>
+      {!digital && segments.length === 1 && values.length > 1 && <path d={`${segments[0]}L${x(values.at(-1)!.timestamp)},${bottom}L${x(values[0].timestamp)},${bottom}Z`} fill={`url(#${fillId})`} />}
+      {segments.map((segment, index) => <path key={index} d={segment} fill="none" stroke={param.color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />)}
+      {!digital && outliers.map((index) => <circle key={index} cx={x(values[index].timestamp)} cy={y(values[index].value)} r="4" className="plc-analysis-outlier" />)}
+      <circle cx={x(values.at(-1)!.timestamp)} cy={y(values.at(-1)!.value)} r="3.5" fill={param.color} />
+      {inspected && <g><line x1={x(inspected.timestamp)} x2={x(inspected.timestamp)} y1={pad.top} y2={bottom} className="plc-analysis-crosshair" /><circle cx={x(inspected.timestamp)} cy={y(inspectedValue!)} r="5" fill={param.color} stroke="#101c25" strokeWidth="2" /></g>}
+      </g>
+      {!compact && <rect x={pad.left} y={pad.top} width={width - pad.left - pad.right} height={bottom - pad.top} fill="transparent" onPointerMove={(event) => {
+        const box = event.currentTarget.ownerSVGElement!.getBoundingClientRect(); const position = (event.clientX - box.left) / box.width * width;
+        const timestamp = history.windowStart + (position - pad.left) / (width - pad.left - pad.right) * (history.windowEnd - history.windowStart);
+        setInspection(points.reduce((nearest, point) => Math.abs(point.timestamp - timestamp) < Math.abs(nearest.timestamp - timestamp) ? point : nearest));
+      }} onPointerLeave={() => setInspection(null)} />}
     </svg>
-  );
-};
-
-/* ── Data source types ────────────────────────────────── */
-
-type DataSource = "mqtt" | "sitewise" | "mock";
-
-interface HistoryResult {
-  data: number[];
-  loading: boolean;
-  source: DataSource;
-  lastUpdated: Date | null;
+    {!compact && <div className="plc-analysis-inspect" tabIndex={0} role="group" aria-label={`Inspect ${param.label} readings with left and right arrow keys`} onKeyDown={(event) => {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return; event.preventDefault();
+      const current = inspected ? points.findIndex((point) => point.timestamp === inspected.timestamp) : points.length - 1;
+      setInspection(points[Math.max(0, Math.min(points.length - 1, current + (event.key === "ArrowLeft" ? -1 : 1)))]);
+    }}><span>{inspected ? time(inspected.timestamp) : "Hover to inspect · arrow keys supported"}</span><strong aria-live="polite" aria-atomic="true">{inspected ? `${fmt(inspectedValue)} ${param.unit}` : `${points.length} received samples`}</strong></div>}
+  </>}</div>;
 }
 
-// Short ranges use MQTT buffer, long ranges use SiteWise
-const MQTT_RANGES: AnalyticsTimeRange[] = ["1m", "5m"];
-const REFRESH_INTERVALS: Partial<Record<AnalyticsTimeRange, number>> = {
-  "1m": 1000,
-  "5m": 1000,
-  "30m": 5000,
-  "1h": 5000,
-  "6h": 30000,
-  "24h": 60000,
-  "7d": 60000,
-};
+function StatsStrip({ history, param }: { history: History; param: Param }) {
+  const stats = summarizeSeries(history.points, param.nominal);
+  return <dl className="plc-analysis-stats" aria-label={`${param.label} summary`}>{[{ label: "Average", value: stats.average, unit: param.unit }, { label: "Peak", value: stats.maximum, unit: param.unit }, { label: "Minimum", value: stats.minimum, unit: param.unit }, { label: "Statistical outliers", value: stats.count ? stats.outlierIndices.length : null, unit: "samples · 1.8σ" }].map((stat) => <div key={stat.label}><dt>{stat.label}</dt><dd>{fmt(stat.value)}<small>{stat.unit}</small></dd></div>)}</dl>;
+}
+function SignalDistribution({ history, param }: { history: History; param: Param }) {
+  const stats = summarizeSeries(history.points, param.nominal); const bins = distributionBins(history.points); const most = Math.max(1, ...bins.map((bin) => bin.count));
+  const position = (value: number) => Math.max(0, Math.min(100, (value - param.min) / (param.max - param.min) * 100));
+  return <aside className="plc-analysis-detail" style={accent(param.color)} aria-label="Signal characteristics"><section><h4>Reading distribution</h4><p>How often each value was received</p>
+    <svg viewBox="0 0 240 110" role="img" aria-label={stats.count ? `${stats.count} readings in ${bins.length} distribution bins` : "Distribution awaiting readings"}><line x1="0" x2="240" y1="88" y2="88" className="plc-analysis-gridline" />{bins.map((bin, index) => <rect key={index} x={index * 240 / bins.length + 2} y={88 - bin.count / most * 70} width={Math.max(1, 240 / bins.length - 4)} height={bin.count / most * 70} fill={param.color} opacity={.35 + bin.count / most * .55}><title>{fmt(bin.low)}–{fmt(bin.high)} {param.unit}: {bin.count} samples</title></rect>)}{bins.length > 0 && <><text x="0" y="108">{fmt(bins[0].low)}</text><text x="240" y="108" textAnchor="end">{fmt(bins.at(-1)!.high)} {param.unit}</text></>}</svg>
+    <dl className="plc-analysis-inline"><div><dt>Spread (σ)</dt><dd>{fmt(stats.standardDeviation)} <small>{param.unit}</small></dd></div><div><dt>Samples</dt><dd>{stats.count || "—"}</dd></div></dl></section>
+    <section><h4>Position in range</h4><div className="plc-analysis-ruler" aria-label={`${param.label} position; nominal ${param.nominal} ${param.unit}; latest ${fmt(stats.latest)}`}><span style={{ left: `${position(param.nominal)}%` }} title="Nominal" />{stats.latest !== null && <i style={{ left: `${position(stats.latest)}%` }} title="Latest received reading" />}</div><div className="plc-analysis-ruler-labels"><span>{param.min}</span><span>Nominal {param.nominal}</span><span>{param.max} {param.unit}</span></div>
+    <dl className="plc-analysis-deviations">{[{ label: "Current deviation", value: stats.currentDeviation }, { label: "Average deviation", value: stats.averageDeviation }, { label: "Max deviation", value: stats.maxDeviation }].map((item) => <div key={item.label}><dt>{item.label}</dt><dd>{fmt(item.value)} <small>{param.unit}</small></dd></div>)}</dl></section>
+    <p className="plc-analysis-note">Distribution and outliers describe received samples. They do not change machine safety thresholds.</p></aside>;
+}
+function ChannelSelector({ param, range, selected, onSelect }: { param: Param; range: AnalyticsTimeRange; selected: boolean; onSelect: () => void }) {
+  const history = usePLCAnalyticsHistory(param.id, range); const stats = summarizeSeries(history.points, param.nominal);
+  return <button className="plc-analysis-channel" style={accent(param.color)} aria-pressed={selected} onClick={onSelect} aria-label={`Inspect ${param.label}`}><span><i aria-hidden="true" />{param.label}</span><strong>{fmt(stats.latest)}<small>{param.unit}</small></strong><span className="plc-analysis-channel-meta">{history.loading ? "Loading" : history.source === "sitewise" ? "Historian" : history.source === "mqtt+sitewise" ? "Historian + MQTT" : history.lastUpdated === null ? "No readings" : history.windowEnd - history.lastUpdated > 15_000 ? "Last received" : "MQTT"}<ArrowUpRight size={13} aria-hidden="true" /></span></button>;
+}
+function HistorianMetrics({ param }: { param: Param }) {
+  const [result, setResult] = useState<{ id: SiteWiseProperty; metrics: MetricsResult } | null>(null);
+  useEffect(() => { if (!isSiteWiseConfigured()) return; let cancelled = false; fetchMetrics(param.id).then((metrics) => { if (!cancelled) setResult({ id: param.id, metrics }); }).catch(() => { if (!cancelled) setResult(null); }); return () => { cancelled = true; }; }, [param.id]);
+  if (!isSiteWiseConfigured()) return null; const metrics = result?.id === param.id ? result.metrics : null;
+  return <section className="plc-analysis-historian"><span><Database size={15} />SiteWise computed · 1h</span><span>Average <strong>{fmt(metrics?.avg_1h?.value)} {param.unit}</strong></span><span>Maximum <strong>{fmt(metrics?.max_1h?.value)} {param.unit}</strong></span></section>;
+}
+function TrendView({ param, history }: { param: Param; history: History }) {
+  const [deviation, setDeviation] = useState(false); const [fullRange, setFullRange] = useState(false); const latest = summarizeSeries(history.points, param.nominal).latest;
+  const exportHistory = () => {
+    const rows = history.points.map((point) => [new Date(point.timestamp).toISOString(), point.value, param.unit, history.source]);
+    const csv = [["Timestamp", "Value", "Unit", "Source"], ...rows].map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(",")).join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" })); const link = document.createElement("a"); link.href = url; link.download = `${param.id}-received-history.csv`; link.click(); URL.revokeObjectURL(url);
+  };
+  return <><div className="plc-analysis-trend-layout"><section className="plc-analysis-signal" style={accent(param.color)}>
+    <div className="plc-analysis-signal-heading"><div><h3>{param.label} history</h3><p>{history.lastUpdated === null ? "No measurement received" : `Last measurement ${time(history.lastUpdated)}`}</p><SourceState history={history} /></div><div className="plc-analysis-reading"><strong>{fmt(latest)}<small>{param.unit}</small></strong><span>Latest received</span></div></div>
+    <div className="plc-analysis-plot-tools"><div className="plc-analysis-segment" aria-label="Plot mode"><button aria-pressed={!deviation} onClick={() => setDeviation(false)}>Signal</button><button aria-pressed={deviation} onClick={() => setDeviation(true)}>Nominal deviation</button></div><div className="plc-analysis-segment" aria-label="Chart scale"><button aria-pressed={!fullRange} onClick={() => setFullRange(false)}>Auto</button><button aria-pressed={fullRange} onClick={() => setFullRange(true)}>Full range</button></div></div>
+    <SignalPlot history={history} param={param} deviation={deviation} fullRange={fullRange} /><StatsStrip history={history} param={param} />
+    <div className="plc-analysis-chart-footer"><span><i style={{ background: param.color }} />Received values<span className="plc-analysis-dashed" />Nominal</span><button disabled={!history.points.length} onClick={exportHistory}><ArrowDownToLine size={14} />Export CSV</button></div></section><SignalDistribution history={history} param={param} /></div><HistorianMetrics param={param} /></>;
+}
+function SensorOverview({ param, range, onSelect }: { param: Param; range: AnalyticsTimeRange; onSelect: () => void }) {
+  const history = usePLCAnalyticsHistory(param.id, range); const stats = summarizeSeries(history.points, param.nominal);
+  return <section className="plc-analysis-overview-signal" style={accent(param.color)}><header><button onClick={onSelect}>{param.label}<ArrowUpRight size={15} /></button><strong>{fmt(stats.latest)} <small>{param.unit}</small></strong></header><SourceState history={history} /><SignalPlot history={history} param={param} compact /><dl className="plc-analysis-inline"><div><dt>Average</dt><dd>{fmt(stats.average)}</dd></div><div><dt>Min / max</dt><dd>{fmt(stats.minimum)} / {fmt(stats.maximum)}</dd></div><div><dt>Samples</dt><dd>{stats.count || "—"}</dd></div></dl></section>;
+}
+function DigitalHistory({ param, range, alert = false }: { param: Param; range: AnalyticsTimeRange; alert?: boolean }) {
+  const history = usePLCAnalyticsHistory(param.id, range); const stats = summarizeDigital(history.points); const stale = history.source === "mqtt" && history.lastUpdated !== null && history.windowEnd - history.lastUpdated > 15_000;
+  return <section className="plc-analysis-digital" style={accent(param.color)}><header><div><h3>{param.label}</h3><SourceState history={history} /></div><span className="plc-analysis-bit" data-active={stats.latest === 1}>{stats.latest === null ? "No history" : `${stale ? "Last: " : ""}${stats.latest ? alert ? "Active" : "ON" : alert ? "Clear" : "OFF"}`}</span></header><SignalPlot history={history} param={param} compact digital /><dl className="plc-analysis-inline"><div><dt>{alert ? "Activations" : "Transitions"}</dt><dd>{stats.totalSamples ? alert ? stats.activations : stats.transitions : "—"}</dd></div><div><dt>ON samples</dt><dd>{fmt(stats.onSamplePercent, 1)}{stats.onSamplePercent !== null ? "%" : ""}</dd></div><div><dt>Received samples</dt><dd>{stats.totalSamples || "—"}</dd></div></dl></section>;
+}
+function RelayChannel({ index, range }: { index: number; range: AnalyticsTimeRange }) {
+  const history = usePLCAnalyticsHistory(`relay_ch${index}`, range); const latest = summarizeDigital(history.points).latest;
+  return <div data-active={latest === 1}><span>CH{index}</span><i aria-hidden="true" /><strong>{latest === null ? "—" : latest ? "ON" : "OFF"}</strong></div>;
+}
+function RelayStatus({ range }: { range: AnalyticsTimeRange }) {
+  return <section className="plc-analysis-relays"><header><h3>8-channel relay feedback</h3><p>Last reported state in the selected window</p></header><div className="plc-analysis-relay-grid">{Array.from({ length: 8 }, (_, index) => <RelayChannel key={index} index={index} range={range} />)}</div></section>;
+}
+function ShiftComparison({ param }: { param: Param }) {
+  const [duration, setDuration] = useState<"1h" | "6h" | "24h">("6h"); const current = usePLCAnalyticsHistory(param.id, duration); const previous = usePLCAnalyticsHistory(param.id, duration, ANALYTICS_RANGE_CONFIGS[duration].durationMs);
+  const currentStats = summarizeSeries(current.points, param.nominal), previousStats = summarizeSeries(previous.points, param.nominal); const delta = currentStats.average !== null && previousStats.average !== null ? currentStats.average - previousStats.average : null;
+  return <section className="plc-analysis-shifts"><header><div><h3>Compare adjacent periods</h3><p>Current window and the immediately preceding window, from the historian.</p></div><div className="plc-analysis-segment" aria-label="Comparison duration">{(["1h", "6h", "24h"] as const).map((value) => <button key={value} aria-pressed={duration === value} onClick={() => setDuration(value)}>{value}</button>)}</div></header><div className="plc-analysis-shift-plots">{[{ label: "Current period", history: current }, { label: "Previous period", history: previous }].map((period) => <section key={period.label}><h4>{period.label}</h4><SourceState history={period.history} /><SignalPlot param={param} history={period.history} compact /></section>)}</div><dl className="plc-analysis-stats"><div><dt>Current average</dt><dd>{fmt(currentStats.average)}<small>{param.unit}</small></dd></div><div><dt>Previous average</dt><dd>{fmt(previousStats.average)}<small>{param.unit}</small></dd></div><div><dt>Difference</dt><dd>{delta === null ? "—" : `${delta > 0 ? "+" : ""}${fmt(delta)}`}<small>{param.unit}</small></dd></div></dl></section>;
+}
 
-/* ── Unified data hook: MQTT buffer → SiteWise → Mock ── */
-
-function usePLCHistory(
-  param: PLCParam,
-  timeRange: AnalyticsTimeRange,
-  _pointCount: number
-): HistoryResult {
-  const buffer = useMqttBufferContext();
-  const useMqtt = MQTT_RANGES.includes(timeRange);
-  const refreshMs = REFRESH_INTERVALS[timeRange] ?? 5000;
-
-  // ── MQTT buffer state (for short ranges) ──
-  const [mqttData, setMqttData] = useState<number[]>([]);
-  const [mqttUpdated, setMqttUpdated] = useState<Date | null>(null);
-
+function AnalyticsWorkspace({ onClose }: { onClose: () => void }) {
+  const [selected, setSelected] = useState<SiteWiseProperty>("voltage"); const [range, setRange] = useState<AnalyticsTimeRange>("1m"); const [view, setView] = useState<(typeof VIEWS)[number]["id"]>("trends");
+  const dialog = useRef<HTMLDivElement>(null); const close = useRef<HTMLButtonElement>(null); const param = ANALOG.find((item) => item.id === selected) ?? ANALOG[0]; const history = usePLCAnalyticsHistory(param.id, range);
+  const dismiss = useRef(onClose);
+  useEffect(() => { dismiss.current = onClose; }, [onClose]);
   useEffect(() => {
-    if (!useMqtt) return;
-
-    const poll = () => {
-      const points = buffer.getHistory(param.id, TIME_CONFIGS[timeRange].ms);
-      if (points.length > 0) {
-        setMqttData(points.map((p) => p.value));
-        setMqttUpdated(new Date());
-      }
+    const prior = document.activeElement instanceof HTMLElement ? document.activeElement : null; const priorOverflow = document.body.style.overflow; document.body.style.overflow = "hidden"; close.current?.focus();
+    const keyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); dismiss.current(); } if (event.key !== "Tab") return;
+      const controls = Array.from(dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled), [tabindex="0"], a[href], input, select') ?? []).filter((element) => element.getClientRects().length > 0);
+      if (!controls.length) return; const first = controls[0], last = controls.at(-1)!;
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     };
-
-    poll();
-    const interval = setInterval(poll, refreshMs);
-    return () => clearInterval(interval);
-  }, [buffer, param.id, timeRange, useMqtt, refreshMs]);
-
-  // ── SiteWise state (for long ranges) ──
-  const [swResult, setSwResult] = useState<{ data: number[]; lastUpdated: Date } | null>(null);
-  const [loading, setLoading] = useState(false);
-  const paramId = param.id;
-
-  // Clear stale SiteWise data on param/range change
-  useEffect(() => {
-    setSwResult(null);
-  }, [paramId, timeRange]);
-
-  useEffect(() => {
-    if (useMqtt) return; // Don't fetch SiteWise for short ranges
-    if (!isSiteWiseConfigured()) return;
-
-    let cancelled = false;
-
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const end = new Date();
-        const start = new Date(end.getTime() - TIME_CONFIGS[timeRange].ms);
-        const points = await swFetchHistory(paramId as SiteWiseProperty, start, end, _pointCount);
-
-        if (!cancelled && points.length > 0) {
-          setSwResult({ data: points.map((p) => p.value), lastUpdated: new Date() });
-        }
-      } catch (err) {
-        console.error("[SiteWise] Fetch failed:", err);
-        if (!cancelled) setSwResult(null);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    fetchData();
-    const interval = setInterval(fetchData, refreshMs);
-    return () => { cancelled = true; clearInterval(interval); };
-  }, [paramId, timeRange, _pointCount, useMqtt, refreshMs]);
-
-  // ── Mock fallback ──
-  const mockData = useMemo(
-    () => generateMockHistory(param, _pointCount, ANALOG_PARAMS.indexOf(param) + 1),
-    [param, _pointCount]
-  );
-
-  // Hybrid: for 30m, merge SiteWise bulk + MQTT buffer tail
-  const hybridData = useMemo(() => {
-    if (timeRange !== "30m" || !swResult || swResult.data.length === 0) return null;
-    // Get last 5 min from MQTT buffer to fill the ingestion gap at the right edge
-    const tail = buffer.getHistory(param.id, 300_000); // 5 min
-    if (tail.length === 0) return null;
-    const tailValues = tail.map((p) => p.value);
-    // Append tail, remove duplicates at overlap (keep SiteWise for bulk, MQTT for edge)
-    return [...swResult.data, ...tailValues];
-  }, [swResult, buffer, param.id, timeRange]);
-
-  // Priority: MQTT buffer → Hybrid 30m → SiteWise → Mock
-  if (useMqtt && mqttData.length > 0) {
-    return { data: mqttData, loading: false, source: "mqtt", lastUpdated: mqttUpdated };
-  }
-  if (hybridData && hybridData.length > 0) {
-    return { data: hybridData, loading, source: "sitewise", lastUpdated: swResult?.lastUpdated ?? null };
-  }
-  if (!useMqtt && swResult && swResult.data.length > 0) {
-    return { data: swResult.data, loading, source: "sitewise", lastUpdated: swResult.lastUpdated };
-  }
-  return { data: mockData, loading, source: "mock", lastUpdated: null };
+    window.addEventListener("keydown", keyDown); return () => { document.body.style.overflow = priorOverflow; window.removeEventListener("keydown", keyDown); prior?.focus(); };
+  }, []);
+  const choose = (id: SiteWiseProperty) => { setSelected(id); setView("trends"); };
+  return <div className="plc-analysis-overlay"><div className="plc-analysis-backdrop" onClick={onClose} /><div ref={dialog} className="plc-analysis" role="dialog" aria-modal="true" aria-labelledby="plc-analysis-title">
+    <header className="plc-analysis-header"><div><h2 id="plc-analysis-title">PLC Analytics</h2><p>Explore sensor history, events and shift performance.</p></div><div><span className="plc-analysis-header-source"><Database size={14} />Received data only</span><button ref={close} className="plc-analysis-close" onClick={onClose} aria-label="Close analytics"><X size={19} /></button></div></header>
+    <div className="plc-analysis-body"><aside className="plc-analysis-nav"><nav aria-label="Analytics views">{VIEWS.map((item) => <button key={item.id} aria-current={view === item.id ? "page" : undefined} onClick={() => setView(item.id)}><item.icon size={17} />{item.label}</button>)}</nav><div className="plc-analysis-provenance"><Database size={18} /><strong>Received data only</strong><p>MQTT session history and connected SiteWise records.</p><span><Clock3 size={12} />Measurement timestamps</span></div></aside>
+    <div className="plc-analysis-content"><div className="plc-analysis-toolbar"><h3>{VIEWS.find((item) => item.id === view)!.label}</h3>{view !== "shifts" && <div className="plc-analysis-ranges" aria-label="History time range">{ANALYTICS_RANGES.map((value) => <button key={value} aria-pressed={range === value} onClick={() => setRange(value)}>{value}</button>)}</div>}</div>
+      {view === "trends" && <div className="plc-analysis-channels" aria-label="Analog channels">{ANALOG.map((item) => <ChannelSelector key={item.id} param={item} range={range} selected={selected === item.id} onSelect={() => choose(item.id)} />)}</div>}
+      {view === "shifts" && <div className="plc-analysis-shift-channel-select" aria-label="Comparison sensor">{ANALOG.map((item) => <button key={item.id} style={accent(item.color)} aria-pressed={selected === item.id} onClick={() => setSelected(item.id)}><i aria-hidden="true" />{item.label}</button>)}</div>}
+      {view === "trends" && <TrendView param={param} history={history} />}
+      {view === "sensors" && <div className="plc-analysis-overview">{ANALOG.map((item) => <SensorOverview key={item.id} param={item} range={range} onSelect={() => choose(item.id)} />)}</div>}
+      {view === "digital" && <><p className="plc-analysis-view-note">Timestamped state transitions. ON percentage counts received samples.</p><div className="plc-analysis-digital-grid">{DIGITAL.map((item) => <DigitalHistory key={item.id} param={item} range={range} />)}</div><RelayStatus range={range} /></>}
+      {view === "alerts" && <><p className="plc-analysis-view-note">Activations count OFF → ON transitions. An active lamp is not itself a dedicated emergency-stop input.</p><div className="plc-analysis-digital-grid">{ALERTS.map((item) => <DigitalHistory key={item.id} param={item} range={range} alert />)}</div></>}
+      {view === "shifts" && <ShiftComparison param={param} />}
+    </div></div>
+  </div></div>;
 }
-
-/* ── CSV Export ───────────────────────────────────────── */
-
-function exportCSV(filename: string, headers: string[], rows: (string | number)[][]) {
-  const csvContent = [
-    headers.join(","),
-    ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
-  ].join("\n");
-
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
-/* ── Sub-components using live data hooks ────────────── */
-
-const SensorCard: React.FC<{
-  param: PLCParam;
-  timeRange: AnalyticsTimeRange;
-  selected: boolean;
-  onClick: () => void;
-}> = ({ param, timeRange, selected, onClick }) => {
-  const tcfg = TIME_CONFIGS[timeRange];
-  const history = usePLCHistory(param, timeRange, tcfg.points);
-  const anoms = detectAnomalies(history.data);
-  const avg = history.data.length > 0 ? history.data.reduce((s, v) => s + v, 0) / history.data.length : 0;
-  const latest = history.data[history.data.length - 1] ?? 0;
-
-  return (
-    <div
-      className={`card p-4 cursor-pointer transition-all duration-200 hover:border-white/[0.15] ${
-        selected ? "ring-1 ring-white/10" : ""
-      }`}
-      onClick={onClick}
-    >
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: param.color }} />
-          <h4 className="text-[13px] font-semibold text-cyan-50">{param.label}</h4>
-          {history.source !== "mock" && (
-            <span className={`px-1 py-0.5 rounded text-[7px] font-bold uppercase ${
-              history.source === "mqtt" ? "bg-cyan-500/15 text-cyan-400" : "bg-emerald-500/15 text-emerald-400"
-            }`}>{history.source === "mqtt" ? "LIVE" : "SW"}</span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[18px] font-semibold tabular-nums" style={{ color: param.color }}>
-            <CountUp value={latest} decimals={1} />
-          </span>
-          <span className="text-[10px] text-sky-200/50">{param.unit}</span>
-        </div>
-      </div>
-      <AreaChart data={history.data} color={param.color} anomalies={anoms} timeRange={timeRange} height={100} nominal={param.nominal} />
-      <div className="flex justify-between mt-2 text-[10px]">
-        <span className="text-sky-200/50">Avg: <span className="text-cyan-100 font-medium">{avg.toFixed(1)} {param.unit}</span></span>
-        <span className="text-sky-200/50">Nom: <span className="text-cyan-100 font-medium">{param.nominal} {param.unit}</span></span>
-        {anoms.length > 0 && <span className="text-red-400">{anoms.length} anomal{anoms.length === 1 ? "y" : "ies"}</span>}
-      </div>
-    </div>
-  );
-};
-
-const DigitalChannel: React.FC<{ param: PLCParam; timeRange: AnalyticsTimeRange }> = ({ param, timeRange }) => {
-  const { ref, width } = useChartWidth();
-  const tcfg = TIME_CONFIGS[timeRange];
-  const history = usePLCHistory(param, timeRange, tcfg.points);
-  const digitalData = history.data.map((v) => (v >= 0.5 ? 1 : 0));
-  const toggleCount = digitalData.reduce<number>((acc, v, i) => i > 0 && v !== digitalData[i - 1] ? acc + 1 : acc, 0);
-  const activePercent = digitalData.length > 0 ? ((digitalData.filter((v) => v === 1).length / digitalData.length) * 100).toFixed(0) : "0";
-  const isOn = digitalData[digitalData.length - 1] === 1;
-
-  return (
-    <div className="card p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2.5">
-          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: param.color }} />
-          <h4 className="text-[13px] font-semibold text-cyan-50">{param.label}</h4>
-          {history.source !== "mock" && (
-            <span className={`px-1 py-0.5 rounded text-[7px] font-bold uppercase ${
-              history.source === "mqtt" ? "bg-cyan-500/15 text-cyan-400" : "bg-emerald-500/15 text-emerald-400"
-            }`}>{history.source === "mqtt" ? "LIVE" : "SW"}</span>
-          )}
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="text-center">
-            <div className="text-[9px] text-sky-200/45 uppercase">Toggles</div>
-            <div className="text-[16px] font-semibold text-cyan-100">{toggleCount}</div>
-          </div>
-          <div className="text-center">
-            <div className="text-[9px] text-sky-200/45 uppercase">Active</div>
-            <div className="text-[16px] font-semibold" style={{ color: param.color }}>{activePercent}%</div>
-          </div>
-          <span className={`px-2 py-1 rounded-md text-[10px] font-semibold ${
-            isOn ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20" : "bg-white/[0.04] text-sky-200/50 border border-white/[0.06]"
-          }`}>{isOn ? "ON" : "OFF"}</span>
-        </div>
-      </div>
-      <svg ref={ref} viewBox={`0 0 ${width} 60`} className="analytics-chart" style={{ height: 60 }}>
-        {digitalData.map((v, i) => {
-          if (i === 0) return null;
-          const x1 = 56 + ((i - 1) / (digitalData.length - 1)) * (width - 68);
-          const x2 = 56 + (i / (digitalData.length - 1)) * (width - 68);
-          const yPrev = digitalData[i - 1] === 1 ? 12 : 48;
-          const y1 = v === 1 ? 12 : 48;
-          return (
-            <g key={i}>
-              <line x1={x1} y1={yPrev} x2={x2} y2={yPrev} stroke={param.color} strokeWidth="2" opacity="0.7" />
-              {v !== digitalData[i - 1] && <line x1={x2} y1={yPrev} x2={x2} y2={y1} stroke={param.color} strokeWidth="2" opacity="0.7" />}
-            </g>
-          );
-        })}
-        <text x="4" y="16" fill="#90aab7" fontSize="11" fontFamily="Inter">ON</text>
-        <text x="2" y="52" fill="#90aab7" fontSize="11" fontFamily="Inter">OFF</text>
-      </svg>
-    </div>
-  );
-};
-
-const AlertChannel: React.FC<{ param: PLCParam; timeRange: AnalyticsTimeRange }> = ({ param, timeRange }) => {
-  const { ref, width } = useChartWidth();
-  const tcfg = TIME_CONFIGS[timeRange];
-  const history = usePLCHistory(param, timeRange, tcfg.points);
-  const alertData = history.data.map((v) => (v >= 0.5 ? 1 : 0));
-  const activations = alertData.filter((v) => v === 1).length;
-  const activePercent = alertData.length > 0 ? ((activations / alertData.length) * 100).toFixed(0) : "0";
-  const isActive = alertData[alertData.length - 1] === 1;
-
-  return (
-    <div className={`card p-4 border-l-2 ${isActive ? "border-l-red-500" : "border-l-transparent"}`}>
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2.5">
-          <div className={`w-8 h-8 rounded-lg flex items-center justify-center border ${
-            isActive ? "bg-red-500/15 border-red-500/25 shadow-[0_0_12px_rgba(239,68,68,0.15)]" : "bg-white/[0.03] border-white/[0.06]"
-          }`}>
-            <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
-              <path d="M10 2L1 18h18L10 2z" stroke={isActive ? param.color : "#90aab7"} strokeWidth="1.5" strokeLinejoin="round" />
-              <path d="M10 8v4M10 14.5v.5" stroke={isActive ? param.color : "#90aab7"} strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </div>
-          <div>
-            <h4 className="text-[13px] font-semibold text-cyan-50">{param.label}</h4>
-            <p className="text-[10px] text-sky-200/45 mt-0.5">
-              {param.id === "alert_3" ? "Emergency light trigger channel" : `Alert monitoring channel ${param.id.split("_")[1]}`}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="text-center">
-            <div className="text-[9px] text-sky-200/45 uppercase">Activations</div>
-            <div className="text-[16px] font-semibold" style={{ color: activations > 0 ? param.color : "#90aab7" }}>{activations}</div>
-          </div>
-          <div className="text-center">
-            <div className="text-[9px] text-sky-200/45 uppercase">Active</div>
-            <div className="text-[16px] font-semibold" style={{ color: param.color }}>{activePercent}%</div>
-          </div>
-          <span className={`px-2.5 py-1 rounded-md text-[11px] font-semibold ${
-            isActive ? "bg-red-500/15 text-red-400 border border-red-500/25" : "bg-white/[0.04] text-sky-200/50 border border-white/[0.06]"
-          }`}>{isActive ? "TRIGGERED" : "CLEAR"}</span>
-        </div>
-      </div>
-      <svg ref={ref} viewBox={`0 0 ${width} 50`} className="analytics-chart" style={{ height: 50 }}>
-        {alertData.map((v, i) => {
-          if (i === 0) return null;
-          const x1 = 56 + ((i - 1) / (alertData.length - 1)) * (width - 68);
-          const x2 = 56 + (i / (alertData.length - 1)) * (width - 68);
-          const yPrev = alertData[i - 1] === 1 ? 8 : 42;
-          const y1 = v === 1 ? 8 : 42;
-          return (
-            <g key={i}>
-              <line x1={x1} y1={yPrev} x2={x2} y2={yPrev} stroke={param.color} strokeWidth="2" opacity={alertData[i - 1] === 1 ? "0.8" : "0.3"} />
-              {v !== alertData[i - 1] && <line x1={x2} y1={yPrev} x2={x2} y2={y1} stroke={param.color} strokeWidth="2" opacity="0.6" />}
-              {v === 1 && alertData[i - 1] === 0 && <circle cx={x2} cy={8} r="3" fill={param.color} opacity="0.6" />}
-            </g>
-          );
-        })}
-        <text x="4" y="12" fill="#f18b82" fontSize="11" fontFamily="Inter">ALERT</text>
-        <text x="2" y="46" fill="#90aab7" fontSize="11" fontFamily="Inter">CLEAR</text>
-      </svg>
-    </div>
-  );
-};
-
-/* ── SiteWise computed metrics hook ───────────────────── */
-
-function useSiteWiseMetrics(paramId: SiteWiseProperty) {
-  const [metrics, setMetrics] = useState<MetricsResult | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!isSiteWiseConfigured()) return;
-
-    let cancelled = false;
-
-    const fetch = async () => {
-      setLoading(true);
-      try {
-        const result = await swFetchMetrics(paramId);
-        if (!cancelled) setMetrics(result);
-      } catch {
-        if (!cancelled) setMetrics(null);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    fetch();
-    const interval = setInterval(fetch, 60000); // Refresh every 60s (hourly aggregates)
-    return () => { cancelled = true; clearInterval(interval); };
-  }, [paramId]);
-
-  return { metrics, loading };
-}
-
-const SiteWiseMetricsCard: React.FC<{ param: PLCParam }> = ({ param }) => {
-  const { metrics, loading } = useSiteWiseMetrics(param.id);
-
-  if (!isSiteWiseConfigured()) return null;
-
-  const isAnalog = param.kind === "analog";
-  const items = isAnalog
-    ? [
-        { label: "Avg (1h)", value: metrics?.avg_1h?.value, unit: param.unit, color: param.color },
-        { label: "Max (1h)", value: metrics?.max_1h?.value, unit: param.unit, color: "#f18b82" },
-      ]
-    : [
-        { label: "Toggles (1h)", value: metrics?.toggle_count_1h?.value, unit: "times", color: param.color },
-      ];
-
-  const timestamp = metrics?.avg_1h?.timestamp ?? metrics?.toggle_count_1h?.timestamp;
-  const stale = timestamp ? (Date.now() - timestamp) > 7_200_000 : false; // > 2 hours
-
-  return (
-    <div className="card p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-cyan-300/60">
-            <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.2" />
-            <path d="M5 10V7M8 10V5M11 10V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-          <h4 className="text-[13px] font-semibold text-cyan-50">SiteWise Computed Metrics</h4>
-        </div>
-        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
-          loading ? "bg-blue-500/15 text-blue-400 border border-blue-500/20" :
-          stale ? "bg-amber-500/15 text-amber-400 border border-amber-500/20" :
-          "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
-        }`}>
-          {loading ? "Loading..." : stale ? "Stale" : "Server-Computed"}
-        </span>
-      </div>
-      <div className={`grid gap-3 ${isAnalog ? "grid-cols-2" : "grid-cols-1"}`}>
-        {items.map((item) => (
-          <div key={item.label} className="card-inner p-3.5">
-            <div className="text-[10px] text-sky-200/55 uppercase tracking-[0.12em] font-semibold">{item.label}</div>
-            <div className="flex items-baseline gap-1.5 mt-1.5">
-              <span className="text-[22px] font-semibold leading-none" style={{ color: item.color }}>
-                {item.value != null ? (typeof item.value === "number" ? item.value.toFixed(1) : item.value) : "—"}
-              </span>
-              <span className="text-[10px] text-sky-200/45">{item.unit}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-      {timestamp && (
-        <p className="text-[9px] text-sky-200/35 mt-2">
-          Computed at {new Date(timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })}
-          {stale && " — metric may be outdated"}
-        </p>
-      )}
-    </div>
-  );
-};
-
-/* ── Shift Comparison ─────────────────────────────────── */
-
-const SHIFTS = [
-  { id: "day", label: "Day Shift", hours: [6, 14], color: "#e9bd70" },
-  { id: "evening", label: "Evening Shift", hours: [14, 22], color: "#67d9eb" },
-  { id: "night", label: "Night Shift", hours: [22, 6], color: "#3b82f6" },
-] as const;
-
-function getShiftBoundaries(shiftId: string, offset = 0) {
-  const shift = SHIFTS.find((s) => s.id === shiftId) ?? SHIFTS[0];
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-  const startHour = shift.hours[0];
-  const endHour = shift.hours[1];
-
-  const start = new Date(today);
-  start.setHours(startHour, 0, 0, 0);
-  start.setDate(start.getDate() - offset);
-
-  const end = new Date(today);
-  end.setHours(endHour, 0, 0, 0);
-  end.setDate(end.getDate() - offset);
-
-  // Night shift crosses midnight
-  if (endHour < startHour) {
-    end.setDate(end.getDate() + 1);
-  }
-
-  return { start, end };
-}
-
-const ShiftComparisonSection: React.FC<{ param: PLCParam }> = ({ param }) => {
-  const { ref, width } = useChartWidth();
-  const [selectedShift, setSelectedShift] = useState("day");
-  const shift = SHIFTS.find((s) => s.id === selectedShift) ?? SHIFTS[0];
-
-  const currentBounds = getShiftBoundaries(selectedShift, 0);
-  const prevBounds = getShiftBoundaries(selectedShift, 1);
-
-  // Generate mock shift data (will use SiteWise when data accumulates)
-  const currentData = useMemo(() => generateMockHistory(param, 48, 100), [param]);
-  const prevData = useMemo(() => generateMockHistory(param, 48, 200), [param]);
-
-  const currentAvg = currentData.reduce((s, v) => s + v, 0) / currentData.length;
-  const prevAvg = prevData.reduce((s, v) => s + v, 0) / prevData.length;
-  const delta = currentAvg - prevAvg;
-  const deltaPct = prevAvg !== 0 ? ((delta / prevAvg) * 100).toFixed(1) : "0.0";
-  const improved = param.id === "temperature" ? delta < 0 : Math.abs(currentAvg - param.nominal) < Math.abs(prevAvg - param.nominal);
-
-  return (
-    <div className="space-y-5">
-      {/* Shift selector */}
-      <div className="flex items-center gap-3">
-        {SHIFTS.map((s) => (
-          <button
-            key={s.id}
-            onClick={() => setSelectedShift(s.id)}
-            className={`px-4 py-2 rounded-lg text-[11px] font-semibold border transition-all duration-200 flex items-center gap-2 ${
-              selectedShift === s.id
-                ? "bg-white/[0.08] border-white/[0.12] text-white"
-                : "border-transparent text-sky-200/50 hover:text-sky-100/70 hover:bg-white/[0.03]"
-            }`}
-          >
-            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
-            {s.label}
-            <span className="text-[9px] text-sky-200/40">{s.hours[0]}:00–{s.hours[1]}:00</span>
-          </button>
-        ))}
-      </div>
-
-      {/* Overlaid chart */}
-      <div className="card p-5 analytics-main-chart">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h3 className="text-[14px] font-semibold text-cyan-50">{param.label} — {shift.label}</h3>
-            <p className="text-[11px] text-sky-200/55 mt-0.5">
-              Current shift vs previous shift · {currentBounds.start.toLocaleDateString()} vs {prevBounds.start.toLocaleDateString()}
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1.5">
-              <span className="w-3 h-[2px] rounded-full" style={{ backgroundColor: shift.color }} />
-              <span className="text-[9px] text-sky-200/55">Current</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-3 h-[2px] rounded-full opacity-40" style={{ backgroundColor: shift.color }} />
-              <span className="text-[9px] text-sky-200/55">Previous</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Dual chart */}
-        <svg ref={ref} viewBox={`0 0 ${width} 220`} className="analytics-chart" style={{ height: 220 }}>
-          <defs>
-            <linearGradient id="shift-fill-current" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={shift.color} stopOpacity="0.2" />
-              <stop offset="100%" stopColor={shift.color} stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          {(() => {
-            const pad = { top: 16, right: 20, bottom: 28, left: 55 };
-            const cw = width - pad.left - pad.right;
-            const ch = 220 - pad.top - pad.bottom;
-            const allVals = [...currentData, ...prevData];
-            const min = Math.min(...allVals) * 0.92;
-            const max = Math.max(...allVals) * 1.08;
-            const range = max - min || 1;
-            const toX = (i: number) => pad.left + (i / (currentData.length - 1)) * cw;
-            const toY = (v: number) => pad.top + ch - ((v - min) / range) * ch;
-
-            const buildPath = (data: number[]) => {
-              const pts = data.map((v, i) => ({ x: toX(i), y: toY(v) }));
-              let p = `M${pts[0].x},${pts[0].y}`;
-              for (let i = 1; i < pts.length; i++) {
-                const prev = pts[i - 1], c = pts[i];
-                p += ` C${prev.x + (c.x - prev.x) * 0.4},${prev.y} ${prev.x + (c.x - prev.x) * 0.6},${c.y} ${c.x},${c.y}`;
-              }
-              return { path: p, pts };
-            };
-
-            const curr = buildPath(currentData);
-            const prev = buildPath(prevData);
-
-            return (
-              <>
-                {[0, 0.25, 0.5, 0.75, 1].map((frac) => {
-                  const y = pad.top + ch * (1 - frac);
-                  const val = min + range * frac;
-                  return (
-                    <g key={frac}>
-                      <line x1={pad.left} y1={y} x2={width - pad.right} y2={y} stroke="#29414e" strokeWidth="1" />
-                      <text x={pad.left - 6} y={y + 3} textAnchor="end" fill="#90aab7" fontSize="11" fontFamily="Inter">
-                        {val.toFixed(1)}
-                      </text>
-                    </g>
-                  );
-                })}
-                {/* Previous shift (dashed, transparent) */}
-                <path d={prev.path} fill="none" stroke={shift.color} strokeWidth="1.5" strokeDasharray="6 4" opacity="0.35" />
-                {/* Current shift (solid, with fill) */}
-                <path
-                  d={`${curr.path} L${curr.pts[curr.pts.length - 1].x},${pad.top + ch} L${curr.pts[0].x},${pad.top + ch} Z`}
-                  fill="url(#shift-fill-current)"
-                />
-                <path d={curr.path} fill="none" stroke={shift.color} strokeWidth="2" strokeLinecap="round" />
-              </>
-            );
-          })()}
-        </svg>
-      </div>
-
-      {/* Comparison stats */}
-      <div className="grid grid-cols-4 gap-3">
-        {[
-          { label: "Current Avg", value: currentAvg.toFixed(1), color: shift.color },
-          { label: "Previous Avg", value: prevAvg.toFixed(1), color: `${shift.color}80` },
-          { label: "Delta", value: `${delta > 0 ? "+" : ""}${delta.toFixed(2)}`, color: improved ? "#6ed6a2" : "#f18b82" },
-          { label: "Change", value: `${Number(deltaPct) > 0 ? "+" : ""}${deltaPct}%`, color: improved ? "#6ed6a2" : "#f18b82" },
-        ].map((s) => (
-          <div key={s.label} className="card-inner p-3.5">
-            <div className="text-[10px] text-sky-200/55 uppercase tracking-[0.12em] font-semibold">{s.label}</div>
-            <div className="text-[22px] font-semibold mt-1 leading-none" style={{ color: s.color }}>{s.value}</div>
-            <div className="text-[10px] text-sky-200/45 mt-0.5">{param.unit}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Performance summary */}
-      <div className="card p-4">
-        <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-            improved ? "bg-emerald-500/10 border border-emerald-500/20" : "bg-red-500/10 border border-red-500/20"
-          }`}>
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-              <path d={improved ? "M10 15V5M6 9l4-4 4 4" : "M10 5v10M6 11l4 4 4-4"}
-                stroke={improved ? "#6ed6a2" : "#f18b82"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
-          <div>
-            <h4 className="text-[13px] font-semibold text-cyan-50">
-              {improved ? "Performance Improved" : "Performance Declined"}
-            </h4>
-            <p className="text-[11px] text-sky-200/55 mt-0.5">
-              {param.label} {improved ? "moved closer to" : "deviated further from"} nominal ({param.nominal} {param.unit}) compared to previous {shift.label.toLowerCase()}.
-              Delta: {Math.abs(delta).toFixed(2)} {param.unit} ({Math.abs(Number(deltaPct))}%)
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const DigitalIOSection: React.FC<{ timeRange: AnalyticsTimeRange }> = ({ timeRange }) => {
-  const { outputs } = usePLCContext();
-
-  return (
-    <div className="space-y-4">
-      {DIGITAL_PARAMS.map((p) => (
-        <DigitalChannel key={p.id} param={p} timeRange={timeRange} />
-      ))}
-
-      {/* Relay States — real PLC data */}
-      <div className="card p-4">
-        <h4 className="text-[13px] font-semibold text-cyan-50 mb-3">8-Channel Relay Status</h4>
-        <div className="grid grid-cols-8 gap-2">
-          {outputs.relay.map((active, i) => (
-            <div key={i} className={`rounded-lg p-2.5 text-center border transition-all duration-300 ${
-              active ? "bg-emerald-500/10 border-emerald-500/20" : "bg-white/[0.02] border-white/[0.05]"
-            }`}>
-              <div className={`text-[9px] font-medium ${active ? "text-emerald-400" : "text-sky-200/40"}`}>CH{i}</div>
-              <div className={`w-3 h-3 rounded-full mx-auto mt-1.5 transition-all duration-300 ${
-                active ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]" : "bg-white/[0.08]"
-              }`} />
-              <div className={`text-[8px] mt-1 font-semibold ${active ? "text-emerald-400" : "text-sky-200/30"}`}>
-                {active ? "ON" : "OFF"}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-/* ── Main Panel ──────────────────────────────────────── */
-
-interface KPIAnalyticsPanelProps {
-  open: boolean;
-  onClose: () => void;
-}
-
-const KPIAnalyticsPanel: React.FC<KPIAnalyticsPanelProps> = ({ open, onClose }) => {
-  const [selectedParam, setSelectedParam] = useState<SiteWiseProperty>("voltage");
-  const [localTimeRange, setLocalTimeRange] = useState<AnalyticsTimeRange>("1m");
-  const [activeSection, setActiveSection] = useState<"trends" | "all-params" | "digital" | "alerts" | "shifts">("trends");
-
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
-
-  const param = ALL_PARAMS.find((p) => p.id === selectedParam) ?? ANALOG_PARAMS[0];
-  const tcfg = TIME_CONFIGS[localTimeRange];
-
-  const historyData = usePLCHistory(param, localTimeRange, tcfg.points);
-  const anomalies = useMemo(() => detectAnomalies(historyData.data), [historyData.data]);
-
-  // Stats
-  const stats = useMemo(() => {
-    const d = historyData.data;
-    const avg = d.reduce((s, v) => s + v, 0) / d.length;
-    return {
-      avg: avg.toFixed(param.kind === "analog" ? 1 : 0),
-      peak: Math.max(...d).toFixed(param.kind === "analog" ? 1 : 0),
-      min: Math.min(...d).toFixed(param.kind === "analog" ? 1 : 0),
-      latest: d[d.length - 1]?.toFixed(param.kind === "analog" ? 1 : 0) ?? "—",
-    };
-  }, [historyData.data, param.kind]);
-
-  if (!open) return null;
-
-  return (
-    <div className="analytics-overlay">
-      <div className="analytics-backdrop" onClick={onClose} style={{ animation: "fadeIn 0.25s ease" }} />
-
-      <div
-        className="analytics-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-label="PLC Analytics"
-        style={{ animation: "modalIn 0.32s cubic-bezier(0.16, 1, 0.3, 1)" }}
-      >
-        <header className="analytics-header">
-          <div className="analytics-title">
-            <h2>PLC Analytics</h2>
-            <p>Explore sensor history, events and shift performance.</p>
-          </div>
-          <div className="analytics-header-actions">
-            <span className="analytics-source" data-source={historyData.source}><i />{historyData.loading ? "Loading history" : historyData.source === "mqtt" ? "MQTT buffer" : historyData.source === "sitewise" ? "SiteWise history" : "Sample data"}</span>
-            <button className="workspace-close" aria-label="Close analytics" onClick={onClose}>
-              <svg width="17" height="17" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
-            </button>
-          </div>
-        </header>
-        <nav className="analytics-sections" aria-label="Analytics views">
-          {(["trends", "all-params", "digital", "alerts", "shifts"] as const).map((sec) => (
-            <button key={sec} onClick={() => setActiveSection(sec)} aria-current={activeSection === sec ? "page" : undefined}>
-              {sec === "trends" ? "Trends" : sec === "all-params" ? "All sensors" : sec === "digital" ? "Digital I/O" : sec === "alerts" ? "Alerts" : "Shift comparison"}
-            </button>
-          ))}
-        </nav>
-
-        {/* Content */}
-        <div className="analytics-content">
-          {/* ── Parameter Selector + Time Toggle ── */}
-          <div className="analytics-filters">
-            <div className="analytics-parameters">
-              {(activeSection === "digital" ? DIGITAL_PARAMS : ANALOG_PARAMS).map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => setSelectedParam(p.id)}
-                  className="analytics-parameter"
-                  aria-pressed={selectedParam === p.id}
-                >
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
-                  {p.label}
-                </button>
-              ))}
-            </div>
-            <div className="analytics-ranges">
-              {ALL_TIME_RANGES.map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setLocalTimeRange(t)}
-                  className="analytics-range"
-                  aria-pressed={localTimeRange === t}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* ── TRENDS Section ── */}
-          {activeSection === "trends" && (
-            <div className="space-y-5">
-              <div className="card p-5 analytics-main-chart">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <h3 className="text-[14px] font-semibold text-cyan-50">
-                      {param.label} — {tcfg.label}
-                    </h3>
-                    <p className="text-[11px] text-sky-200/55 mt-0.5 flex items-center gap-2">
-                      Range: {param.min}–{param.max} {param.unit} · Nominal: {param.nominal} {param.unit}
-                      {(historyData.loading || historyData.source !== "mock") && (
-                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
-                          historyData.loading
-                            ? "bg-blue-500/15 text-blue-400 border border-blue-500/20"
-                            : historyData.source === "mqtt"
-                              ? "bg-cyan-500/15 text-cyan-400 border border-cyan-500/20"
-                              : "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
-                        }`}>
-                          {historyData.loading ? "Loading..." : historyData.source === "mqtt" ? "MQTT Live" : "SiteWise"}
-                        </span>
-                      )}
-                      {anomalies.length > 0 && (
-                        <span className="text-red-400/80">
-                          {anomalies.length} anomal{anomalies.length === 1 ? "y" : "ies"}
-                        </span>
-                      )}
-                    </p>
-                    {historyData.lastUpdated && (
-                      <p className="text-[10px] text-sky-200/40 mt-1 flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        Last updated: {historyData.lastUpdated.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true })}
-                        · Refreshes every {(REFRESH_INTERVALS[localTimeRange] ?? 5000) / 1000}s
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => {
-                        const rows = historyData.data.map((v, i) => [i + 1, v.toFixed(2), param.unit]);
-                        exportCSV(
-                          `${param.id}_${localTimeRange}_${new Date().toISOString().slice(0, 10)}.csv`,
-                          ["Index", `${param.label} (${param.unit})`, "Unit"],
-                          rows
-                        );
-                      }}
-                      className="px-2.5 py-1.5 rounded-lg text-[10px] font-semibold text-sky-200/50 hover:text-white border border-white/[0.06] hover:border-white/[0.12] hover:bg-white/[0.04] transition-all duration-200 flex items-center gap-1.5"
-                    >
-                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                        <path d="M8 2v8M5 7l3 3 3-3M3 12h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                      CSV
-                    </button>
-                    <div className="text-right">
-                      <div className="text-[28px] font-semibold leading-none tabular-nums" style={{ color: param.color }}>
-                        <CountUp value={Number(stats.latest)} decimals={param.kind === "analog" ? 1 : 0} fallback={stats.latest} />
-                      </div>
-                      <div className="text-[11px] text-sky-200/55 mt-0.5">{param.unit} latest</div>
-                    </div>
-                  </div>
-                </div>
-                <AreaChart
-                  data={historyData.data}
-                  color={param.color}
-                  anomalies={anomalies}
-                  timeRange={localTimeRange}
-                  height={220}
-                  unit={param.unit}
-                  nominal={param.nominal}
-                  drawKey={`${param.id}-${localTimeRange}`}
-                />
-              </div>
-
-              {/* Stats Row */}
-              <div className="grid grid-cols-4 gap-3">
-                {[
-                  { label: "Average", value: Number(stats.avg), color: param.color },
-                  { label: "Peak", value: Number(stats.peak), color: "#f18b82" },
-                  { label: "Minimum", value: Number(stats.min), color: "#6ed6a2" },
-                  { label: "Anomalies", value: anomalies.length, color: anomalies.length > 0 ? "#f18b82" : "#6ed6a2" },
-                ].map((stat, i) => (
-                  <div
-                    key={stat.label}
-                    className="card-inner p-3.5 animate-fade-in transition-all duration-300 hover:-translate-y-0.5"
-                    style={{ animationDelay: `${80 + i * 60}ms` }}
-                  >
-                    <div className="text-[10px] text-sky-200/55 uppercase tracking-[0.12em] font-semibold">{stat.label}</div>
-                    <div className="text-[22px] font-semibold mt-1 leading-none tabular-nums" style={{ color: stat.color }}>
-                      <CountUp value={stat.value} decimals={stat.label === "Anomalies" ? 0 : param.kind === "analog" ? 1 : 0} />
-                    </div>
-                    <div className="text-[10px] text-sky-200/45 mt-0.5">{stat.label === "Anomalies" ? "detected" : param.unit}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Nominal deviation table */}
-              <div className="card p-4">
-                <h4 className="text-[13px] font-semibold text-cyan-50 mb-3">Deviation from Nominal ({param.nominal} {param.unit})</h4>
-                <div className="grid grid-cols-3 gap-4">
-                  {[
-                    { label: "Current Deviation", value: Math.abs(Number(stats.latest) - param.nominal).toFixed(2), pct: (Math.abs(Number(stats.latest) - param.nominal) / (param.max - param.min) * 100).toFixed(1) },
-                    { label: "Avg Deviation", value: Math.abs(Number(stats.avg) - param.nominal).toFixed(2), pct: (Math.abs(Number(stats.avg) - param.nominal) / (param.max - param.min) * 100).toFixed(1) },
-                    { label: "Max Deviation", value: Math.max(Math.abs(Number(stats.peak) - param.nominal), Math.abs(Number(stats.min) - param.nominal)).toFixed(2), pct: (Math.max(Math.abs(Number(stats.peak) - param.nominal), Math.abs(Number(stats.min) - param.nominal)) / (param.max - param.min) * 100).toFixed(1) },
-                  ].map((d) => {
-                    const severity = Number(d.pct) > 40 ? "critical" : Number(d.pct) > 20 ? "warning" : "normal";
-                    const sColor = severity === "critical" ? "#f18b82" : severity === "warning" ? "#e9bd70" : "#6ed6a2";
-                    return (
-                      <div key={d.label} className="card-inner p-3">
-                        <div className="text-[10px] text-sky-200/55 font-medium">{d.label}</div>
-                        <div className="flex items-baseline gap-1.5 mt-1.5">
-                          <span className="text-[18px] font-semibold" style={{ color: sColor }}>{d.value}</span>
-                          <span className="text-[10px] text-sky-200/45">{param.unit}</span>
-                        </div>
-                        <div className="flex items-center gap-2 mt-1.5">
-                          <div className="flex-1 h-1.5 rounded-full bg-white/[0.04] overflow-hidden">
-                            <div className="h-full rounded-full" style={{ width: `${Math.min(100, Number(d.pct))}%`, backgroundColor: sColor }} />
-                          </div>
-                          <span className="text-[9px] font-semibold" style={{ color: sColor }}>{d.pct}%</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* SiteWise Computed Metrics */}
-              <SiteWiseMetricsCard param={param} />
-            </div>
-          )}
-
-          {/* ── ALL SENSORS Section (live data) ── */}
-          {activeSection === "all-params" && (
-            <div className="grid grid-cols-2 gap-4">
-              {ANALOG_PARAMS.map((p) => (
-                <SensorCard
-                  key={p.id}
-                  param={p}
-                  timeRange={localTimeRange}
-                  selected={selectedParam === p.id}
-                  onClick={() => { setSelectedParam(p.id); setActiveSection("trends"); }}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* ── DIGITAL I/O Section (live data) ── */}
-          {activeSection === "digital" && (
-            <DigitalIOSection timeRange={localTimeRange} />
-          )}
-
-          {/* ── ALERTS Section (live data) ── */}
-          {activeSection === "alerts" && (
-            <div className="space-y-4">
-              {ALERT_PARAMS.map((p) => (
-                <AlertChannel key={p.id} param={p} timeRange={localTimeRange} />
-              ))}
-            </div>
-          )}
-
-          {/* ── SHIFT COMPARISON Section ── */}
-          {activeSection === "shifts" && (
-            <ShiftComparisonSection param={param} />
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default KPIAnalyticsPanel;
+export default function KPIAnalyticsPanel({ open, onClose }: { open: boolean; onClose: () => void }) { return open ? <AnalyticsWorkspace onClose={onClose} /> : null; }

@@ -4,6 +4,15 @@ This release contains the new dashboard, Classic UI toggle, digital twins and
 static widgets. Both interfaces use the existing PLC provider and live EC2 data
 source. Switching UI changes presentation, not the connection or device state.
 
+The updated New UI also includes a vertical UNS hierarchy chart and compact tree
+views, search, topic activity and payload inspection. UNS discovers only the
+`prplHome/#` factory namespace (`prplHome` contains a lowercase letter **l**).
+The `meter/data` topic remains exclusive to the separate Smart Meter and does
+not appear in UNS. PLC Analytics includes interactive
+received-data trends, distributions and nominal comparisons. The package builds
+the current local files, including uncommitted changes; it does not depend on a
+commit, push or `git pull` on EC2.
+
 New UI telemetry, the in-twin sensor monitor and machine inspection use received
 PLC values only. Missing inputs stay unavailable; retained readings become
 `Last received` after 15 seconds without a matching channel update. Histories
@@ -33,8 +42,17 @@ restart is needed. Do not use the broader `deploy.sh` for this update.
 Run in PowerShell from the project directory after local changes are complete:
 
 ```powershell
-node scripts/package-frontend-release.mjs
+.\scripts\upload-frontend-release.ps1 `
+  -Destination 'ec2-user@3.239.12.96' `
+  -IdentityFile 'C:\path\to\your-key.pem' `
+  -WebRoot '/var/www/smart-factory'
 ```
+
+Replace the key path with your EC2 key and use your actual SSH login if it differs
+from `ec2-user`. Confirm that `/var/www/smart-factory` is the existing frontend
+root; the script deliberately refuses another path. The wrapper builds and
+checks the archive, then uploads only the archive and checksum to your login's
+home directory. It prints the EC2 commands below, but does not run them remotely.
 
 The build typechecks the host and Smart Meter and creates:
 
@@ -47,32 +65,36 @@ through `/langgraph`, and the existing same-origin `/api` integrations. It reads
 only the public `VITE_SITEWISE_API_URL` and exact `VITE_METER_TOPIC` from
 `.env.production`; the public SiteWise endpoint is preserved when configured.
 No `.env` file or credentials are included. An optional explicit public SiteWise
-endpoint can be supplied with `--sitewise-api https://YOUR-PUBLIC-ENDPOINT`.
+endpoint can be supplied to the wrapper as
+`-SiteWiseApi 'https://YOUR-PUBLIC-ENDPOINT'`.
 
-Replace the key path below with your EC2 key. `ec2-user` follows the existing
-deployment scripts; use your actual SSH login if different.
+To build without uploading, use the existing packaging script:
 
 ```powershell
-scp -i "C:\path\to\your-key.pem" .\dist\releases\smart-factory-frontend.tar.gz .\dist\releases\smart-factory-frontend.tar.gz.sha256 ec2-user@3.239.12.96:~/
+node scripts/package-frontend-release.mjs
 ```
+
+To upload that already-built release, add `-SkipBuild` to the wrapper command.
+Use that option only after rebuilding for your latest local source changes.
 
 ## 2. Run after logging into EC2
 
 These commands assume the current Nginx frontend root is
 `/var/www/smart-factory`, `/ws` already reaches the existing bridge, and the
 existing `/api` and `/langgraph` proxies remain configured. The installer checks
-the web root and current Nginx configuration before replacing files. It refuses
+the explicit web root, current Nginx configuration and a matching served entry
+document before replacing files. It refuses
 a symlinked web root or public files rather than guessing where to install.
 
 ```bash
+set -euo pipefail
 cd "$HOME"
 sha256sum -c smart-factory-frontend.tar.gz.sha256
-release_dir="$HOME/smart-factory-frontend-$(date -u +%Y%m%dT%H%M%SZ)"
-mkdir -m 700 "$release_dir"
+release_dir=$(mktemp -d "$HOME/smart-factory-frontend.XXXXXXXX")
 tar -xzf smart-factory-frontend.tar.gz -C "$release_dir"
 cd "$release_dir"
-sha256sum --check --quiet SHA256SUMS
-sudo bash install.sh
+sha256sum --check --strict --quiet SHA256SUMS
+sudo bash install.sh --web-root /var/www/smart-factory
 ```
 
 No `git pull`, `npm install` or `npm run build` is needed on EC2. The installer
@@ -88,6 +110,12 @@ Confirm both show matching real PLC readings and digital states, the connection
 is live, and the Smart Meter opens its own visualization. The UI choice is
 remembered only in that browser. The factory animation may still be modeled;
 that does not turn modeled values into live PLC readings.
+
+Open **UNS Explorer** and verify its vertical chart and compact tree discover the
+same received `prplHome/#` topics, without Smart Meter topics. Search a topic,
+expand its branch and inspect its actual payload.
+Open **PLC Analytics** and verify its current values match telemetry; unavailable
+or unconfigured history should remain unavailable rather than generate a trend.
 
 Do not click motor, relay or emergency commands just to verify the visual
 deployment. Read-only telemetry and UI switching are sufficient for this check.

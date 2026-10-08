@@ -114,7 +114,7 @@ try {
     scope: 'static frontend only', plcTransport: 'mosquitto /ws', meterTransport: 'websocket /ws',
     meterTopic, langgraphBase: '/langgraph', sitewiseConfigured: Boolean(sitewiseApi),
   }, null, 2)}\n`);
-  await writeFile(join(payload, 'README.txt'), 'Run sha256sum -c SHA256SUMS, then sudo bash install.sh on the existing EC2 host.\nNo Node.js, npm, backend update, bridge restart or Nginx configuration change is required.\nThe installer prints the backup path and exact rollback command. See docs/EC2-FRONTEND-UPDATE.md in the source checkout.\n');
+  await writeFile(join(payload, 'README.txt'), 'Run sha256sum -c SHA256SUMS, then sudo bash install.sh --web-root /var/www/smart-factory on the existing EC2 host.\nConfirm that this is the active Nginx frontend root before installation.\nNo Node.js, npm, backend update, bridge restart or Nginx configuration change is required.\nThe installer prints the backup path and exact rollback command. See docs/EC2-FRONTEND-UPDATE.md in the source checkout.\n');
   const files = await filesAt(payload);
   for (const file of files) {
     if (/(^|\/)\.env(?:\.|$)/.test(file) || /\.pem$/i.test(file) || /^(?:server|src|node_modules)\//.test(file)) {

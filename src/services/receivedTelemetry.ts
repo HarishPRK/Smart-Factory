@@ -63,6 +63,15 @@ const SHARED_INPUTS: Record<string, { id: string; label: string }> = {
   operator_rfid: { id: "operator_rfid", label: "Shared RFID authorization" },
 };
 
+/** These IDs currently carry a shared board distance or auxiliary pot reading.
+ * They are not calibrated station-specific dimensional error / GPS signals.
+ * Preserve their telemetry, but never apply the illustrative process thresholds
+ * to those received values. Physical hazard inputs retain their own thresholds. */
+export function isInformationalPLCInput(sensorId: string): boolean {
+  return sensorId === "quality_lidar" || sensorId === "intake_lidar"
+    || sensorId === "intake_gps" || sensorId === "dispatch_gps";
+}
+
 export interface ReceivedSensorChannel {
   param: PLCParameter | null;
   value: number | null;
@@ -91,8 +100,13 @@ export function readSensorPLCChannel(sensorId: string, state: ReceivedTelemetryS
   const sourceHistory = state.receivedHistories[sourceId] ?? state.receivedHistories[param.id] ?? [];
   const receivedAt = param.receivedAt ?? state.lastReceivedAt;
   const fresh = receivedAt !== null && now - receivedAt < PLC_TELEMETRY_STALE_MS;
-  const displayedParam = param.id === "intake_gps" || param.id === "dispatch_gps"
-    ? { ...param, label: "Auxiliary input", unit: "%" } : param;
+  const displayedParam = isInformationalPLCInput(param.id)
+    ? { ...param, status: "normal" as const,
+        label: param.id.endsWith("_gps") ? "Auxiliary input" : "Distance input",
+        // The distance payload explicitly declares cm. The auxiliary pot's
+        // existing normalized value has no confirmed engineering unit.
+        unit: param.id.endsWith("_gps") ? "" : "cm" }
+    : param;
   return {
     param: displayedParam, value, history: sourceHistory.filter(Number.isFinite), available: true,
     state: fresh ? "live" : "stale", sourceId,

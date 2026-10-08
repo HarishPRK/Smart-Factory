@@ -161,6 +161,21 @@ describe("Hardware-only sensor monitor", () => {
     expect(screen.getByTitle(/current state unknown/)).toBeTruthy();
   });
 
+  it("shows ordinary shared distance and auxiliary values without critical or warning badges", () => {
+    receive({ boardB_esp32_distance_cm: 12, boardA_voltage_pot_2: .49 });
+    render(<SensorHUD />);
+    for (const station of ["Material intake", "Inspection"]) {
+      const reading = screen.getByRole("button", { name: `${station} LiDAR: 12.0 cm, Normal, Live PLC input, shared input. Focus station` });
+      expect(reading.getAttribute("data-state")).toBe("normal");
+    }
+    for (const station of ["Material intake", "Dispatch"]) {
+      const reading = screen.getByRole("button", { name: `${station} Auxiliary input: 9.8 , Normal, Live PLC input, shared input. Focus station` });
+      expect(reading.getAttribute("data-state")).toBe("normal");
+    }
+    expect(screen.queryByText("Critical")).toBeNull();
+    expect(screen.queryByText("Warning")).toBeNull();
+  });
+
   it("never accepts the PLC service's mock samples as hardware telemetry", () => {
     const fake = parsePLCPayload({ boardA_ph_sensor: 8.9 });
     usePLCStore.getState().updateFromPLC(fake.params, { ...DEFAULT_OUTPUTS }, { source: "simulation", receivedAt: Date.now() });

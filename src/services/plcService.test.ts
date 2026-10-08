@@ -97,6 +97,24 @@ describe("parsePLCPayload fire and authentication semantics", () => {
   });
 });
 
+describe("parsePLCPayload shared board input semantics", () => {
+  it.each([0, 12, 51, 123.4])("preserves distance %s in its declared centimetres without inventing bottle defects", (value) => {
+    const state = parsePLCPayload({ boardB_esp32_distance_cm: value });
+    for (const id of ["quality_lidar", "intake_lidar"]) {
+      expect(state.params.find((param) => param.id === id)).toMatchObject({ value, unit: "cm", status: "normal", placeholder: false });
+    }
+  });
+
+  it("keeps ordinary auxiliary input informational without claiming GPS distance or another engineering unit", () => {
+    const state = parsePLCPayload({ boardA_voltage_pot_2: .49 });
+    for (const id of ["intake_gps", "dispatch_gps"]) {
+      const param = state.params.find((candidate) => candidate.id === id)!;
+      expect(param.value).toBeCloseTo(9.8);
+      expect(param).toMatchObject({ label: "Auxiliary input", unit: "", status: "normal", placeholder: false });
+    }
+  });
+});
+
 describe("parsePLCPayload relay availability", () => {
   it("does not treat analog-only frames as relay feedback, including subsequent frames", () => {
     const first = parsePLCPayload({ boardA_voltage_pot_1: 4.31 });
@@ -118,6 +136,59 @@ describe("parsePLCPayload relay availability", () => {
   it("leaves unset relay sentinels unavailable", () => {
     const state = parsePLCPayload({ boardA_relay_motor: -1, boardA_alert_relays_green: -1 });
     expect(state.params.find((param) => param.id === "relay")?.placeholder).toBe(true);
+  });
+});
+
+describe("parsePLCPayload digital receipt provenance", () => {
+  it("marks only a received motor bit, including a real OFF value", () => {
+    const state = parsePLCPayload({ boardA_relay_motor: 0 }, null, { keyReceivedAt: { boardA_relay_motor: 99_000 } });
+    expect(state.outputs.receivedBits).toEqual({
+      relay_ch0: { value: false, receivedAt: 99_000 },
+      motor: { value: false, receivedAt: 99_000 },
+    });
+    expect(state.outputs.relay).toHaveLength(8);
+    expect(state.outputs.alerts).toHaveLength(4);
+  });
+
+  it("retains each bit's original receipt across unrelated and independent output frames", () => {
+    const first = parsePLCPayload({ boardA_relay_motor: 1 }, null, { keyReceivedAt: { boardA_relay_motor: 99_000 } });
+    const second = parsePLCPayload({ boardA_alert_relays_yellow: 0 }, first, { keyReceivedAt: { boardA_alert_relays_yellow: 100_000 } });
+    const third = parsePLCPayload({ boardA_voltage_pot_1: 4.31 }, second, { keyReceivedAt: { boardA_voltage_pot_1: 101_000 } });
+    expect(third.outputs.receivedBits).toEqual({
+      relay_ch0: { value: true, receivedAt: 99_000 }, motor: { value: true, receivedAt: 99_000 },
+      relay_ch3: { value: false, receivedAt: 100_000 }, alert_1: { value: false, receivedAt: 100_000 },
+    });
+  });
+
+  it("uses the same raw alias priority for a bit's value and originating timestamp", () => {
+    const state = parsePLCPayload({ boardA_alert_relays_red: 0, boardB_io_output_red: 1 }, null, {
+      keyReceivedAt: { boardA_alert_relays_red: 99_000, boardB_io_output_red: 100_000 },
+    });
+    expect(state.outputs.alerts[0]).toBe(false);
+    expect(state.outputs.receivedBits?.alert_0).toEqual({ value: false, receivedAt: 99_000 });
+    expect(state.outputs.receivedBits?.relay_ch2).toEqual({ value: false, receivedAt: 99_000 });
+    const fallback = parsePLCPayload({ boardA_alert_relays_red: -1, boardB_io_output_red: 1 }, null, {
+      keyReceivedAt: { boardA_alert_relays_red: 99_000, boardB_io_output_red: 100_000 },
+    });
+    expect(fallback.outputs.receivedBits?.alert_0).toEqual({ value: true, receivedAt: 100_000 });
+  });
+
+  it("records the explicit start-button and metal input positions without inventing other relay bits", () => {
+    const state = parsePLCPayload({ push_button: [0], metal_sensor: [1] }, null, {
+      keyReceivedAt: { push_button: 100_000, metal_sensor: 101_000 },
+    });
+    expect(state.outputs.receivedBits).toEqual({
+      relay_ch6: { value: false, receivedAt: 100_000 },
+      push_button: { value: false, receivedAt: 100_000 },
+      relay_ch7: { value: true, receivedAt: 101_000 },
+    });
+  });
+
+  it("does not fabricate receipts for unset bits or timestamp-less cached raw keys", () => {
+    const state = parsePLCPayload({ boardA_relay_motor: -1, boardA_relay_alarm: 0, boardA_alert_relays_red: 1 }, null, {
+      keyReceivedAt: { boardA_relay_motor: 100_000 },
+    });
+    expect(state.outputs.receivedBits).toEqual({});
   });
 });
 

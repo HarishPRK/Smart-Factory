@@ -68,11 +68,11 @@ export interface GatewayTwinEmbedProps {
   onTwinEvent?: (event: TwinEvent) => void
 }
 
-const DEFAULT_SRC = 'http://ce-public-alb-1719524608.us-east-1.elb.amazonaws.com/'
+const DEFAULT_SRC = 'http://ce-public-alb-1719524608.us-east-1.elb.amazonaws.com:8080/'
 // The widget entry document is intentionally versioned so an already-open
 // Smart Factory session cannot resurrect an older cached iframe bundle after
 // a Twin deployment. Hashed JS/CSS assets remain immutable once selected.
-const TWIN_EMBED_BUILD = 'live-http-20260910'
+const TWIN_EMBED_BUILD = 'live-http-20261008'
 
 export const GatewayTwinEmbed = forwardRef<GatewayTwinHandle, GatewayTwinEmbedProps>(
   function GatewayTwinEmbed(props, ref) {

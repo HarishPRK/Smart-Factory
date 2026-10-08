@@ -5,6 +5,27 @@ set -Eeuo pipefail
 release=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
 web_root=/var/www/smart-factory
 web_parent=/var/www
+requested_web_root=
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --web-root)
+      [[ $# -ge 2 ]] || { echo 'Missing value for --web-root.' >&2; exit 1; }
+      requested_web_root=$2
+      shift 2
+      ;;
+    --help)
+      echo 'Usage: sudo bash install.sh --web-root /var/www/smart-factory'
+      echo 'Updates only the existing static frontend at that documented Nginx root.'
+      exit 0
+      ;;
+    *) echo "Unknown option: $1" >&2; exit 1 ;;
+  esac
+done
+[[ "$requested_web_root" == "$web_root" ]] || {
+  echo 'Confirm the current Nginx root, then pass --web-root /var/www/smart-factory.' >&2
+  echo 'This installer deliberately refuses other frontend paths.' >&2
+  exit 1
+}
 backup_root=$web_parent/.smart-factory-frontend-backups
 stage=
 backup=
@@ -37,6 +58,16 @@ if [[ -n $(find "$release/frontend" -type f \( -name '.env' -o -name '.env.*' -o
   echo 'The frontend payload contains a forbidden environment or key file.' >&2; exit 1;
 fi
 nginx -t
+
+# Confirm this Nginx route serves the existing frontend before any file moves.
+# A valid nginx.conf alone does not prove its selected server uses this root.
+curl --fail --silent --show-error --max-time 10 \
+  "http://127.0.0.1/index.html?frontend_preflight=$(date +%s)" \
+  | cmp -s - "$web_root/index.html" || {
+    echo 'Nginx does not serve the selected existing entry document on loopback port 80.' >&2
+    echo 'No frontend files were changed. Check the active root/server configuration first.' >&2
+    exit 1
+  }
 
 cleanup() {
   if [[ -n "$stage" && -d "$stage" && "$stage" == "$web_parent"/.smart-factory-frontend-stage.* ]]; then

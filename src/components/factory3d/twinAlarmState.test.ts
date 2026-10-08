@@ -78,7 +78,30 @@ describe("Twin threshold presentation response", () => {
   it("uses the sensor effect rather than stopping on any critical reading", () => {
     const stage = stageFixture("quality");
     sensorIn(stage, "quality_lidar").value = 25;
-    expect(summarizeTwinAlarm([stage], { isSensorLive: () => true })).toMatchObject({ severity: "critical", lineStopped: false, speedLimit: 1 });
+    expect(summarizeTwinAlarm([stage], { isSensorLive: () => false })).toMatchObject({ severity: "critical", lineStopped: false, speedLimit: 1 });
+  });
+
+  it("does not apply modeled bottle dimensional thresholds to shared received board readings", () => {
+    const intake = stageFixture("intake"), quality = stageFixture("quality"), dispatch = stageFixture("dispatch");
+    sensorIn(intake, "intake_gps").value = 9.8;
+    sensorIn(dispatch, "dispatch_gps").value = 9.8;
+    sensorIn(intake, "intake_lidar").value = 12;
+    const lidar = sensorIn(quality, "quality_lidar");
+    lidar.value = 12;
+    lidar.status = "critical"; // Obsolete simulator classification must not leak.
+    for (const effect of quality.thresholdEffects.filter((effect) => effect.sensorId === lidar.sensorId)) {
+      expect(isTwinThresholdTriggered(lidar, effect, true)).toBe(false);
+    }
+    expect(summarizeTwinAlarm([intake, quality, dispatch], { isSensorLive: () => true })).toMatchObject({ severity: "normal", lineStopped: false, speedLimit: 1, reasons: [] });
+  });
+
+  it("still honors physical hazards while shared uncalibrated distance remains informational", () => {
+    const quality = stageFixture("quality"), curing = stageFixture("curing");
+    sensorIn(quality, "quality_lidar").value = 12;
+    sensorIn(curing, "curing_fire").value = 50;
+    const alarm = summarizeTwinAlarm([quality, curing], { isSensorLive: () => true });
+    expect(alarm).toMatchObject({ severity: "critical", lineStopped: true, speedLimit: 0 });
+    expect(alarm.reasons.map((reason) => reason.sensorId)).toEqual(["curing_fire"]);
   });
 
   it("continues for an ordinary quality warning and slows only a configured slowdown", () => {

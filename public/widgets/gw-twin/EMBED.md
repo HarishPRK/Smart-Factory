@@ -1,7 +1,7 @@
 # GW Operational Twin — Embeddable Widget
 
 Smart Factory's React wrapper now defaults to the live dashboard at
-`http://ce-public-alb-1719524608.us-east-1.elb.amazonaws.com/` (September 10,
+`http://ce-public-alb-1719524608.us-east-1.elb.amazonaws.com:8080/` (October 8,
 2026). It requires no login and receives the same live AWS telemetry as the
 HTTPS Twin. Open Smart Factory over HTTP when using this temporary embed;
 HTTPS pages cannot embed HTTP frames. AI requests and physical controls remain

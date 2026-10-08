@@ -1,387 +1,174 @@
-import React, { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState, type CSSProperties } from "react";
+import { Activity, ArrowRight, Building2, ChevronDown, ChevronRight, Clock3, Code2, Database, Factory, FolderTree, GitBranch, Layers3, ListTree, Maximize2, Minimize2, PanelRight, Radio, Search, Server, X } from "lucide-react";
 import { subscribeAnyMessage } from "../services/plcService";
+import { UIVersionContext } from "./ui-version/UIVersionContext";
+import UNSExplorerClassic from "../legacy/components/UNSExplorerPanel";
+import { createNamespaceNode, FACTORY_UNS_FILTER, findNamespaceNode, formatNamespaceValue, ingestNamespace, isFactoryNamespaceTopic, namespaceActivity, namespaceChildren, namespaceMatches, namespaceTopics, payloadEntries, type NamespaceNode } from "./uns/namespaceModel";
+import NamespaceChart from "./uns/NamespaceTreeChart";
 
-interface UNSExplorerPanelProps {
-  open: boolean;
-  onClose: () => void;
+interface UNSExplorerPanelProps { open: boolean; onClose: () => void }
+const LEVELS = ["Enterprise", "Site", "Line", "Device"];
+const NODE_COLORS = ["#43d8f1", "#82b5f6", "#e9bd70", "#6ed6a2"];
+
+function ageLabel(timestamp: number | null, now: number): string {
+  if (timestamp === null) return "No receipts";
+  const seconds = Math.max(0, Math.floor((now - timestamp) / 1000));
+  if (seconds < 1) return "Just now";
+  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  return `${Math.floor(seconds / 3600)}h ago`;
+}
+function NodeIcon({ node }: { node: NamespaceNode }) {
+  const Icon = node.isTopic ? Database : [Building2, Factory, Layers3, Server][Math.min(node.depth - 1, 3)] ?? FolderTree;
+  return <Icon size={18} aria-hidden="true" />;
+}
+function ReceiptState({ node, now }: { node: NamespaceNode; now: number }) {
+  const receiving = node.lastSeen !== null && now - node.lastSeen < 5000;
+  return <span className={`uns-workspace-receipt ${receiving ? "is-receiving" : ""}`}><i />{receiving ? "Receiving" : "Quiet"}</span>;
 }
 
-/* ── Namespace trie ─────────────────────────────────────
- * Built live from broker traffic: every `{topic, payload}` envelope grows
- * the tree, so new lines/devices appear with zero configuration — the whole
- * point of a Unified Namespace. Nothing here is hardcoded to plc1.
- */
-interface UNSNode {
-  name: string;
-  path: string;
-  depth: number;
-  children: Map<string, UNSNode>;
-  /** A message has terminated exactly at this path (topic node, not group). */
-  isTopic: boolean;
-  msgCount: number;
-  /** Last activity in this subtree (bubbles up to ancestors for the pulse rail). */
-  lastSeen: number;
-  /** Recent arrival timestamps, topic nodes only — sliding window for Hz. */
-  hits: number[];
-  lastPayload: unknown;
-}
-
-const RATE_WINDOW_MS = 10_000;
-
-function makeNode(name: string, path: string, depth: number): UNSNode {
-  return {
-    name,
-    path,
-    depth,
-    children: new Map(),
-    isTopic: false,
-    msgCount: 0,
-    lastSeen: 0,
-    hits: [],
-    lastPayload: null,
-  };
-}
-
-function ingest(root: UNSNode, topic: string, payload: unknown) {
-  const now = Date.now();
-  const segments = topic.split("/").filter(Boolean);
-  let node = root;
-  root.lastSeen = now;
-  for (const seg of segments) {
-    let child = node.children.get(seg);
-    if (!child) {
-      child = makeNode(seg, node.path ? `${node.path}/${seg}` : seg, node.depth + 1);
-      node.children.set(seg, child);
-    }
-    child.lastSeen = now;
-    node = child;
-  }
-  node.isTopic = true;
-  node.msgCount += 1;
-  node.lastPayload = payload;
-  node.hits.push(now);
-  const cutoff = now - RATE_WINDOW_MS;
-  while (node.hits.length && node.hits[0] < cutoff) node.hits.shift();
-}
-
-function rateHz(node: UNSNode): number {
-  const now = Date.now();
-  const recent = node.hits.filter((t) => t >= now - RATE_WINDOW_MS);
-  return recent.length / (RATE_WINDOW_MS / 1000);
-}
-
-/* ── ISA-95 level annotation ────────────────────────────
- * In a UNS the topic path encodes the equipment hierarchy. The first four
- * levels get their standard names; deeper levels are data-class/source
- * nodes and stay unlabeled.
- */
-const ISA95_LEVELS = ["Enterprise", "Site", "Line", "Device"];
-
-function ageLabel(lastSeen: number): string {
-  if (!lastSeen) return "—";
-  const s = Math.max(0, Math.round((Date.now() - lastSeen) / 1000));
-  if (s < 1) return "now";
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
-  return m < 60 ? `${m}m ago` : `${Math.floor(m / 60)}h ago`;
-}
-
-function formatValue(v: unknown): string {
-  if (typeof v === "number") return Number.isInteger(v) ? String(v) : String(+v.toFixed(3));
-  if (typeof v === "string") return v;
-  if (typeof v === "boolean") return v ? "true" : "false";
-  if (v === null || v === undefined) return "—";
-  return JSON.stringify(v);
-}
-
-/* ── Row components ─────────────────────────────────────── */
-
-const PulseDot: React.FC<{ lastSeen: number }> = ({ lastSeen }) => {
-  const live = lastSeen && Date.now() - lastSeen < 5000;
-  return (
-    <span className="relative w-1.5 h-1.5 flex-none">
-      <span
-        className={`absolute inset-0 rounded-full ${live ? "bg-emerald-400/90" : "bg-white/15"}`}
-      />
-      {live ? (
-        // key restarts the ripple on every observed message — this is the
-        // pulse rail: watching data physically travel down the namespace.
-        <span key={lastSeen} className="uns-pulse-ring absolute inset-0 rounded-full bg-emerald-400/70" />
-      ) : null}
-    </span>
-  );
-};
-
-const TagGrid: React.FC<{ payload: unknown }> = ({ payload }) => {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-    return (
-      <div className="uns-explorer__payload pl-9 pr-3 py-1.5 font-mono text-sky-200/65 break-words">
-        {formatValue(payload)}
-      </div>
-    );
-  }
-  const entries = Object.entries(payload as Record<string, unknown>).filter(
-    ([k]) => !k.startsWith("_"),
-  );
-  return (
-    <div className="pl-9 pr-3 pb-2 pt-0.5 grid grid-cols-1 md:grid-cols-2 gap-x-6">
-      {entries.map(([k, v]) => (
-        <div
-          key={k}
-          className="flex items-baseline justify-between gap-3 py-[3px] border-b border-white/[0.03] last:border-0"
-        >
-          <span className="uns-explorer__payload min-w-0 font-mono text-sky-200/60 truncate">{k}</span>
-          {/* key = value → the flash restarts only when the reading changes */}
-          <span
-            key={formatValue(v)}
-            className="uns-explorer__payload uns-value-flash max-w-[65%] truncate font-mono tabular-nums text-cyan-50/95 rounded px-1"
-            title={formatValue(v)}
-          >
-            {formatValue(v)}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-};
-
-const TreeRow: React.FC<{
-  node: UNSNode;
-  collapsed: Set<string>;
-  openTopics: Set<string>;
-  onToggle: (node: UNSNode) => void;
-}> = ({ node, collapsed, openTopics, onToggle }) => {
-  const hasChildren = node.children.size > 0;
-  const isOpen = hasChildren ? !collapsed.has(node.path) : openTopics.has(node.path);
-  const levelLabel = !node.isTopic && node.depth <= ISA95_LEVELS.length
-    ? ISA95_LEVELS[node.depth - 1]
-    : null;
-  const tagCount =
-    node.isTopic && node.lastPayload && typeof node.lastPayload === "object" && !Array.isArray(node.lastPayload)
-      ? Object.keys(node.lastPayload as object).filter((k) => !k.startsWith("_")).length
-      : null;
-  const stale = !node.lastSeen || Date.now() - node.lastSeen > 15_000;
-
-  return (
-    <div>
-      <button
-        onClick={() => onToggle(node)}
-        className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-left transition-colors duration-150 hover:bg-white/[0.04] ${
-          stale ? "opacity-45" : ""
-        }`}
-        style={{ paddingLeft: `${12 + (node.depth - 1) * 18}px` }}
-      >
-        {/* chevron / spacer */}
-        <span className="w-3 flex-none text-white/30">
-          {hasChildren || node.isTopic ? (
-            <svg
-              width="8"
-              height="8"
-              viewBox="0 0 8 8"
-              className={`transition-transform duration-200 ${isOpen ? "rotate-90" : ""}`}
-            >
-              <path d="M2 1l4 3-4 3z" fill="currentColor" />
-            </svg>
-          ) : null}
-        </span>
-
-        <PulseDot lastSeen={node.lastSeen} />
-
-        <span className={`uns-explorer__node min-w-0 font-mono truncate ${node.isTopic ? "text-cyan-50/95" : "text-white/80"}`}>
-          {node.name}
-        </span>
-
-        {levelLabel && (
-          <span className="uns-explorer__level flex-none uppercase tracking-[0.08em] text-cyan-300/65 border border-cyan-300/20 rounded px-1.5 py-0.5">
-            {levelLabel}
-          </span>
-        )}
-
-        <span className="flex-1" />
-
-        {node.isTopic && (
-          <>
-            <span className="uns-explorer__metadata flex-none font-mono tabular-nums text-sky-200/70 w-16 text-right">
-              {rateHz(node).toFixed(1)} Hz
-            </span>
-            {tagCount !== null && (
-              <span className="uns-explorer__metadata uns-explorer__metadata--secondary flex-none font-mono tabular-nums text-white/55 w-16 text-right">
-                {tagCount} tags
-              </span>
-            )}
-            <span className="uns-explorer__metadata uns-explorer__metadata--secondary flex-none font-mono text-white/50 w-16 text-right">
-              {ageLabel(node.lastSeen)}
-            </span>
-          </>
-        )}
+function NamespaceBranch({ node, collapsed, selectedPath, search, now, onToggle, onSelect }: {
+  node: NamespaceNode; collapsed: Set<string>; selectedPath: string | null; search: string; now: number;
+  onToggle: (path: string) => void; onSelect: (path: string) => void;
+}) {
+  if (!namespaceMatches(node, search)) return null;
+  const children = namespaceChildren(node);
+  const isExpanded = search.trim() !== "" || !collapsed.has(node.path);
+  const activity = namespaceActivity(node, now);
+  const level = !node.isTopic ? LEVELS[node.depth - 1] : undefined;
+  const color = NODE_COLORS[Math.min(node.depth - 1, 3)];
+  const tags = node.payload !== null && typeof node.payload === "object" && !Array.isArray(node.payload) ? payloadEntries(node.payload).length : null;
+  return <li className="uns-workspace-branch" style={{ "--node-color": color } as CSSProperties}>
+    <div className={`uns-workspace-node ${selectedPath === node.path ? "is-selected" : ""}`}>
+      {children.length ? <button type="button" className="uns-workspace-expand" aria-label={`${isExpanded ? "Collapse" : "Expand"} ${node.path}`} aria-expanded={isExpanded} onClick={() => onToggle(node.path)} disabled={Boolean(search.trim())}>{isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}</button> : <span className="uns-workspace-branch-end" />}
+      <button type="button" className="uns-workspace-node-select" onClick={() => onSelect(node.path)} aria-current={selectedPath === node.path ? "true" : undefined} title={node.path}>
+        <span className="uns-workspace-node-icon"><NodeIcon node={node} /></span>
+        <span className="uns-workspace-node-name">{node.name}<small>{node.isTopic ? tags !== null ? `${tags} tags` : "Payload value" : level ?? "Namespace group"}</small></span>
+        <span className="uns-workspace-node-activity"><span>{activity.rateHz.toFixed(1)} <small>Hz</small></span><span>{ageLabel(node.lastSeen, now)}</span></span>
+        <span className={`uns-workspace-node-dot ${node.lastSeen !== null && now - node.lastSeen < 5000 ? "is-receiving" : ""}`} />
       </button>
-
-      {/* children, with a hairline depth guide that encodes the hierarchy */}
-      {hasChildren && isOpen && (
-        <div
-          className="relative"
-          style={{ marginLeft: `${12 + (node.depth - 1) * 18 + 5}px` }}
-        >
-          <div className="absolute left-0 top-0 bottom-1 w-px bg-cyan-300/[0.08]" />
-          <div style={{ marginLeft: `-${12 + (node.depth - 1) * 18 + 5}px` }}>
-            {[...node.children.values()]
-              .sort((a, b) => a.name.localeCompare(b.name))
-              .map((child) => (
-                <TreeRow
-                  key={child.path}
-                  node={child}
-                  collapsed={collapsed}
-                  openTopics={openTopics}
-                  onToggle={onToggle}
-                />
-              ))}
-          </div>
-        </div>
-      )}
-
-      {node.isTopic && isOpen && <TagGrid payload={node.lastPayload} />}
     </div>
-  );
-};
+    {children.length > 0 && isExpanded && <ul>{children.map((child) => <NamespaceBranch key={child.path} node={child} collapsed={collapsed} selectedPath={selectedPath} search={search} now={now} onToggle={onToggle} onSelect={onSelect} />)}</ul>}
+  </li>;
+}
 
-/* ── Panel ──────────────────────────────────────────────── */
+function ArrivalTimeline({ node, now }: { node: NamespaceNode; now: number }) {
+  const { bins } = namespaceActivity(node, now);
+  const peak = Math.max(1, ...bins);
+  const total = bins.reduce((sum, count) => sum + count, 0);
+  return <section className="uns-workspace-activity">
+    <div className="uns-workspace-section-heading"><h3><Activity size={16} />Message activity</h3><span>{total.toLocaleString()} received · last 60s</span></div>
+    <svg className="uns-workspace-timeline" viewBox="0 0 600 100" role="img" aria-label={`${total} messages received in the last 60 seconds. Peak ${Math.max(...bins)} messages in one second.`}>
+      <line x1="0" y1="78" x2="600" y2="78" className="uns-workspace-axis" />
+      <line x1="0" y1="14" x2="600" y2="14" className="uns-workspace-axis uns-workspace-axis-top" />
+      {bins.map((count, index) => count > 0 ? <rect key={index} x={index * 10 + 2} y={78 - count / peak * 57} width="6" height={count / peak * 57} rx="2"><title>{count} {count === 1 ? "message" : "messages"}, {60 - index}s ago</title></rect> : null)}
+      <text x="0" y="98">60s ago</text><text x="300" y="98" textAnchor="middle">30s</text><text x="600" y="98" textAnchor="end">Now</text>
+      {total === 0 && <text x="300" y="46" textAnchor="middle">No messages received in this window</text>}
+    </svg>
+  </section>;
+}
 
-const UNSExplorerPanel: React.FC<UNSExplorerPanelProps> = ({ open, onClose }) => {
-  const rootRef = useRef<UNSNode>(makeNode("", "", 0));
-  const statsRef = useRef({ topics: 0, messages: 0 });
-  const [, setVersion] = useState(0);
+function NamespaceInspector({ node, root, now, onSelect }: { node: NamespaceNode; root: NamespaceNode; now: number; onSelect: (path: string) => void }) {
+  const [rawPayload, setRawPayload] = useState(false);
+  const entries = payloadEntries(node.payload);
+  const activity = namespaceActivity(node, now);
+  const segments = node.path.split("/");
+  const topics = namespaceTopics(node);
+  const tagCount = node.payload !== null && typeof node.payload === "object" && !Array.isArray(node.payload) ? entries.length : null;
+  return <aside className="uns-workspace-inspector" aria-label="Selected namespace details">
+    <nav className="uns-workspace-breadcrumb" aria-label="Selected topic path">{segments.map((segment, index) => <span key={`${index}-${segment}`}><button type="button" onClick={() => onSelect(segments.slice(0, index + 1).join("/"))}>{segment}</button>{index < segments.length - 1 && <ChevronRight size={12} />}</span>)}</nav>
+    <div className="uns-workspace-inspector-title"><span className="uns-workspace-selected-icon"><NodeIcon node={node} /></span><div><h3>{node.name}</h3><p>{node.isTopic ? "Published topic" : `${LEVELS[node.depth - 1] ?? "Namespace"} branch`}</p></div><ReceiptState node={node} now={now} /></div>
+    <code className="uns-workspace-topic-path">{node.path}</code>
+    <dl className="uns-workspace-topic-metrics"><div><dt>Arrival rate</dt><dd>{activity.rateHz.toFixed(1)} <small>Hz</small></dd></div><div><dt>Session messages</dt><dd>{activity.messages.toLocaleString()}</dd></div><div><dt>{node.isTopic ? "Payload tags" : "Published topics"}</dt><dd>{node.isTopic ? tagCount ?? "—" : activity.topics}</dd></div></dl>
+    <ArrivalTimeline node={node} now={now} />
+    {node.isTopic ? <section className="uns-workspace-payload">
+      <div className="uns-workspace-section-heading"><h3><Database size={16} />Latest payload</h3><div className="uns-workspace-payload-controls"><button type="button" aria-pressed={!rawPayload} onClick={() => setRawPayload(false)}>Tags</button><button type="button" aria-pressed={rawPayload} onClick={() => setRawPayload(true)}><Code2 size={13} />JSON</button></div></div>
+      <p className="uns-workspace-received-time"><Clock3 size={13} />Received {node.lastSeen === null ? "—" : new Date(node.lastSeen).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })} · {ageLabel(node.lastSeen, now)}</p>
+      {rawPayload ? <pre>{JSON.stringify(node.payload, null, 2) ?? "—"}</pre> : entries.length ? <dl className="uns-workspace-tags">{entries.map(([key, value]) => <div key={key}><dt>{key}</dt><dd title={formatNamespaceValue(value)}>{formatNamespaceValue(value)}</dd></div>)}</dl> : <div className="uns-workspace-scalar">{formatNamespaceValue(node.payload)}</div>}
+    </section> : <section className="uns-workspace-descendants"><div className="uns-workspace-section-heading"><h3><Database size={16} />Published topics</h3><span>{topics.length}</span></div>{topics.map((topic) => <button type="button" key={topic.path} onClick={() => onSelect(topic.path)}><span>{topic.path.slice(node.path.length + 1) || topic.name}</span><span>{namespaceActivity(topic, now).rateHz.toFixed(1)} Hz <ArrowRight size={14} /></span></button>)}</section>}
+    <p className="uns-workspace-source-note">Discovered from received MQTT envelopes. Arrival rate uses the last 10 seconds.{node.isTopic ? " Values are the latest received payload." : " Hierarchy labels follow topic depth."} {root.lastSeen === null ? "Waiting for messages." : ""}</p>
+  </aside>;
+}
+
+function UNSWorkspace({ open, onClose }: UNSExplorerPanelProps) {
+  const rootRef = useRef(createNamespaceNode());
+  const discoveredDevices = useRef(new Set<string>());
+  const messagesRef = useRef(0);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const dismiss = useRef(onClose);
+  useEffect(() => { dismiss.current = onClose; }, [onClose]);
+  const [snapshot, setSnapshot] = useState(() => ({ root: createNamespaceNode(), messages: 0, now: Date.now() }));
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const [openTopics, setOpenTopics] = useState<Set<string>>(new Set());
-
-  // Ingest every broker envelope; throttle re-renders to ~4 fps — the trie
-  // itself is mutated per message, React only needs to repaint periodically.
+  const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [view, setView] = useState<"chart" | "list">("chart");
+  const [showDetails, setShowDetails] = useState(false);
+  const [focusPath, setFocusPath] = useState<{ path: string; revision: number } | null>(null);
   useEffect(() => {
-    let pending = false;
+    let pending: ReturnType<typeof setTimeout> | undefined;
+    const repaint = () => setSnapshot({ root: rootRef.current, messages: messagesRef.current, now: Date.now() });
     const unsubscribe = subscribeAnyMessage((topic, payload) => {
-      ingest(rootRef.current, topic, payload);
-      statsRef.current.messages += 1;
-      if (!pending) {
-        pending = true;
-        setTimeout(() => {
-          pending = false;
-          setVersion((v) => v + 1);
-        }, 250);
+      if (!isFactoryNamespaceTopic(topic)) return;
+      if (!ingestNamespace(rootRef.current, topic, payload, Date.now())) return;
+      messagesRef.current += 1;
+      // Start with the four hierarchy scopes; deeper topics unfold on demand.
+      // A branch is initialized once, so later receipts never undo user expansion.
+      const devicePath = topic.split("/").filter(Boolean).slice(0, 4).join("/");
+      const device = findNamespaceNode(rootRef.current, devicePath);
+      if (device?.depth === 4 && device.children.size && !discoveredDevices.current.has(devicePath)) {
+        discoveredDevices.current.add(devicePath);
+        setCollapsed((previous) => new Set(previous).add(devicePath));
       }
+      if (pending === undefined) pending = setTimeout(() => { pending = undefined; repaint(); }, 250);
     });
-    // 1s heartbeat keeps ages/rates honest even when a branch goes quiet.
-    const tick = setInterval(() => setVersion((v) => v + 1), 1000);
-    return () => {
-      unsubscribe();
-      clearInterval(tick);
-    };
+    const tick = setInterval(repaint, 1000);
+    return () => { unsubscribe(); clearInterval(tick); if (pending !== undefined) clearTimeout(pending); };
   }, []);
-
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); dismiss.current(); }
+      if (event.key !== "Tab") return;
+      const controls = [...(dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input, [tabindex="0"]') ?? [])].filter((element) => element.getClientRects().length > 0);
+      const first = controls[0]; const last = controls.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => { document.removeEventListener("keydown", onKeyDown); document.body.style.overflow = previousOverflow; previous?.focus(); };
+  }, [open]);
   if (!open) return null;
-
-  const root = rootRef.current;
-  const countTopics = (n: UNSNode): number =>
-    (n.isTopic ? 1 : 0) + [...n.children.values()].reduce((acc, c) => acc + countTopics(c), 0);
-  const topicCount = countTopics(root);
-
-  const onToggle = (node: UNSNode) => {
-    if (node.children.size > 0) {
-      setCollapsed((prev) => {
-        const next = new Set(prev);
-        if (next.has(node.path)) next.delete(node.path);
-        else next.add(node.path);
-        return next;
-      });
-    } else if (node.isTopic) {
-      setOpenTopics((prev) => {
-        const next = new Set(prev);
-        if (next.has(node.path)) next.delete(node.path);
-        else next.add(node.path);
-        return next;
-      });
-    }
+  const { root, messages, now } = snapshot;
+  const topics = namespaceTopics(root);
+  const selected = (selectedPath ? findNamespaceNode(root, selectedPath) : null) ?? topics[0] ?? namespaceChildren(root)[0] ?? null;
+  const branches = namespaceChildren(root).filter((node) => namespaceMatches(node, search));
+  const toggle = (path: string) => setCollapsed((previous) => { const next = new Set(previous); if (next.has(path)) next.delete(path); else next.add(path); return next; });
+  const collapseAll = () => { const paths = new Set<string>(); const visit = (node: NamespaceNode) => { if (node.path && node.children.size) paths.add(node.path); namespaceChildren(node).forEach(visit); }; visit(root); setCollapsed(paths); };
+  const inspect = (path: string) => { setSelectedPath(path); setShowDetails(true); };
+  const navigate = (path: string) => {
+    inspect(path);
+    setCollapsed((previous) => { const next = new Set(previous); const segments = path.split("/"); segments.forEach((_, index) => next.delete(segments.slice(0, index + 1).join("/"))); return next; });
+    setFocusPath((previous) => ({ path, revision: (previous?.revision ?? 0) + 1 }));
   };
+  return <div className="uns-workspace-overlay"><div className="uns-workspace-backdrop" onClick={onClose} /><div className="uns-workspace-dialog" role="dialog" aria-modal="true" aria-labelledby="uns-workspace-title" ref={dialogRef}>
+    <header className="uns-workspace-header"><div><h2 id="uns-workspace-title">UNS Explorer</h2><p>Unified Namespace · <code>{FACTORY_UNS_FILTER}</code></p></div><div className="uns-workspace-header-actions">{root.lastSeen !== null ? <ReceiptState node={root} now={now} /> : <span className="uns-workspace-receipt"><Radio size={14} />Awaiting traffic</span>}<button type="button" ref={closeRef} onClick={onClose} aria-label="Close UNS Explorer"><X size={20} /></button></div></header>
+    <div className="uns-workspace-summary"><span><FolderTree size={16} /><strong>{root.children.size}</strong> root branches</span><span><Database size={16} /><strong>{topics.length}</strong> topics</span><span><Radio size={16} /><strong>{messages.toLocaleString()}</strong> session messages</span><span className="uns-workspace-summary-time"><Clock3 size={15} />{ageLabel(root.lastSeen, now)}</span></div>
+    <div className={`uns-workspace-body ${view === "chart" ? "has-chart" : ""} ${selected && showDetails ? "" : "is-empty"}`}>
+      <section className="uns-workspace-hierarchy"><div className="uns-workspace-tree-tools"><label className="uns-workspace-search"><Search size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search topics or tags" aria-label="Search namespace topics or tags" />{search && <button type="button" onClick={() => setSearch("")} aria-label="Clear namespace search"><X size={14} /></button>}</label><div className="uns-workspace-view-controls" aria-label="Namespace view"><button type="button" aria-pressed={view === "chart"} onClick={() => setView("chart")}><GitBranch size={15} />Chart</button><button type="button" aria-pressed={view === "list"} onClick={() => setView("list")}><ListTree size={15} />List</button></div></div>
+        <div className="uns-workspace-map-tools"><span>{view === "chart" ? "Enterprise → Site → Line → Device" : "Namespace hierarchy"}</span><div className="uns-workspace-tree-actions"><button type="button" onClick={() => setCollapsed(new Set())} disabled={Boolean(search.trim()) || !topics.length} aria-label="Expand all branches" title="Expand all branches"><Maximize2 size={16} /></button><button type="button" onClick={collapseAll} disabled={Boolean(search.trim()) || !topics.length} aria-label="Collapse all branches" title="Collapse all branches"><Minimize2 size={16} /></button><button type="button" className="uns-workspace-details-toggle" onClick={() => setShowDetails((previous) => !previous)} disabled={!selected} aria-pressed={showDetails} aria-label={showDetails ? "Hide namespace details" : "Show namespace details"}><PanelRight size={16} /><span>Details</span></button></div></div>
+        {root.children.size ? branches.length ? view === "chart" ? <NamespaceChart root={root} collapsed={collapsed} search={search} selectedPath={selected?.path ?? null} now={now} focusPath={focusPath} onToggle={toggle} onSelect={inspect} /> : <nav className="uns-workspace-tree-scroll" aria-label="Namespace hierarchy"><ul>{branches.map((node) => <NamespaceBranch key={node.path} node={node} collapsed={collapsed} selectedPath={selected?.path ?? null} search={search} now={now} onToggle={toggle} onSelect={inspect} />)}</ul></nav> : <div className="uns-workspace-no-results"><h3>No matching topics</h3><p>Try a device name, topic segment or payload tag.</p><button type="button" onClick={() => setSearch("")}>Clear search</button></div> : <div className="uns-workspace-empty" role="status"><FolderTree size={44} strokeWidth={1.25} /><h3>Waiting for broker traffic</h3><p>The tree builds from received messages under <code>{FACTORY_UNS_FILTER}</code>. Expand a device to discover its topics, then select a node to inspect its payload.</p><div><Radio size={16} />MQTT discovery is listening</div></div>}
+      </section>
+      {selected && showDetails && <NamespaceInspector key={selected.path} node={selected} root={root} now={now} onSelect={navigate} />}
+    </div><footer className="uns-workspace-footer"><span><i />Received broker data only</span><span>Topic depth → Enterprise / Site / Line / Device</span></footer>
+  </div></div>;
+}
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <style>{`
-        @keyframes uns-pulse {
-          0% { transform: scale(1); opacity: 0.7; }
-          100% { transform: scale(3.2); opacity: 0; }
-        }
-        @keyframes uns-flash {
-          0% { background-color: rgba(103, 232, 249, 0.14); }
-          100% { background-color: transparent; }
-        }
-        .uns-pulse-ring { animation: uns-pulse 0.9s ease-out 1; }
-        .uns-value-flash { animation: uns-flash 0.7s ease-out 1; }
-        @media (prefers-reduced-motion: reduce) {
-          .uns-pulse-ring, .uns-value-flash { animation: none; }
-        }
-      `}</style>
-
-      <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-        style={{ animation: "fadeIn 0.25s ease" }}
-      />
-
-      <div
-        className="relative w-[90vw] max-w-[760px] h-[82vh] bg-[#0a1628]/95 backdrop-blur-2xl border border-cyan-300/12 rounded-2xl shadow-[0_20px_80px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden"
-        style={{ animation: "modalIn 0.32s cubic-bezier(0.16, 1, 0.3, 1)" }}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-cyan-300/[0.08]">
-          <div>
-            <h2 className="uns-explorer__title font-semibold text-cyan-50 tracking-tight">UNS Explorer</h2>
-            <p className="uns-explorer__subtitle text-sky-200/75 font-medium mt-1">
-              Unified Namespace — discovered live from broker traffic
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-lg bg-white/[0.04] border border-cyan-300/[0.08] flex items-center justify-center text-sky-200/60 hover:text-white hover:bg-white/[0.08] hover:rotate-90 transition-all duration-300"
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Tree */}
-        <div className="flex-1 overflow-y-auto px-3 py-3">
-          {root.children.size === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center gap-2.5 text-center px-10">
-              <div className="uns-explorer__empty-title text-sky-100/85 font-semibold">Waiting for broker traffic</div>
-              <div className="uns-explorer__empty-copy text-white/55 max-w-[420px]">
-                The namespace builds itself from live messages — as soon as a device
-                publishes, its branch appears here.
-              </div>
-            </div>
-          ) : (
-            [...root.children.values()]
-              .sort((a, b) => a.name.localeCompare(b.name))
-              .map((child) => (
-                <TreeRow
-                  key={child.path}
-                  node={child}
-                  collapsed={collapsed}
-                  openTopics={openTopics}
-                  onToggle={onToggle}
-                />
-              ))
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="uns-explorer__footer flex flex-wrap items-center gap-x-4 gap-y-1 px-6 py-3 border-t border-cyan-300/[0.08] font-mono tabular-nums text-white/55">
-          <span>{topicCount} topics</span>
-          <span className="text-white/20">|</span>
-          <span>{statsRef.current.messages.toLocaleString()} messages this session</span>
-          <span className="ml-auto uppercase tracking-[0.1em] text-cyan-300/60">ISA-95 · MQTT</span>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default UNSExplorerPanel;
+export default function UNSExplorerPanel(props: UNSExplorerPanelProps) {
+  const context = useContext(UIVersionContext);
+  return context?.version === "classic" ? <UNSExplorerClassic {...props} /> : <UNSWorkspace {...props} />;
+}

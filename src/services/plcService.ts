@@ -254,6 +254,12 @@ let lastEstopSignal = false;
 
 /* ── Shared types ──────────────────────────────────────── */
 
+export interface ReceivedPLCDigitalBit {
+  value: boolean;
+  /** Receipt time of the physical raw input that supplied this bit. */
+  receivedAt: number;
+}
+
 export interface PLCOutputs {
   motorFanOn: boolean;
   emergencyLightOn: boolean;
@@ -265,6 +271,9 @@ export interface PLCOutputs {
   relay: boolean[];
   pushButton: boolean;
   alerts: boolean[];
+  /** Optional per-bit provenance for analytics. Missing entries are unknown;
+   * default output booleans are never evidence that a bit was received. */
+  receivedBits?: Record<string, ReceivedPLCDigitalBit>;
 }
 
 export interface PLCState {
@@ -565,6 +574,48 @@ const PARAM_PAYLOAD_KEYS: Record<string, string[]> = {
   dispatch_gps: ["boardA_voltage_pot_2"],
 };
 
+const PUSH_BUTTON_PAYLOAD_KEYS = ["boardA_green_push_button", "boardB_io_green_button", "push_button"];
+
+/** Keep the established output-array mapping and scalar alias priority. The
+ * final two relay positions mirror the start-button and metal inputs. */
+const OUTPUT_BIT_PAYLOAD_KEYS: Record<string, string[]> = {
+  relay_ch0: ["boardA_relay_motor"],
+  relay_ch1: ["boardA_relay_alarm"],
+  relay_ch2: ["boardA_alert_relays_red", "boardB_io_output_red"],
+  relay_ch3: ["boardA_alert_relays_yellow", "boardB_io_output_yellow"],
+  relay_ch4: ["boardA_alert_relays_green", "boardB_io_output_green"],
+  relay_ch5: ["boardA_alert_relays_buzzer", "boardB_io_output_buzzer"],
+  relay_ch6: PUSH_BUTTON_PAYLOAD_KEYS,
+  relay_ch7: PARAM_PAYLOAD_KEYS.metal,
+  motor: ["boardA_relay_motor"],
+  alert_0: ["boardA_alert_relays_red", "boardB_io_output_red"],
+  alert_1: ["boardA_alert_relays_yellow", "boardB_io_output_yellow"],
+  alert_2: ["boardA_alert_relays_buzzer", "boardB_io_output_buzzer"],
+  alert_3: ["boardA_relay_alarm"],
+  push_button: PUSH_BUTTON_PAYLOAD_KEYS,
+};
+
+function outputBitReceipts(
+  raw: RawPLCPayload,
+  prev: PLCState | null,
+  receipt: { keyReceivedAt: Record<string, number> } | undefined,
+  now: number,
+): Record<string, ReceivedPLCDigitalBit> {
+  const receivedBits = { ...prev?.outputs.receivedBits };
+  for (const [property, keys] of Object.entries(OUTPUT_BIT_PAYLOAD_KEYS)) {
+    const key = keys.find((candidate) => {
+      const value = scalar(raw[candidate]);
+      return value !== null && value !== -1;
+    });
+    if (!key) continue;
+    const receivedAt = receipt ? receipt.keyReceivedAt[key] : now;
+    // A timestamp-less cached key cannot be promoted to a new physical receipt.
+    if (!Number.isFinite(receivedAt)) continue;
+    receivedBits[property] = { value: scalar(raw[key])! >= 0.5, receivedAt };
+  }
+  return receivedBits;
+}
+
 /** Map the raw MQTT JSON from plc/data into our frontend PLCState. Transport
  * key timestamps preserve source freshness while partial board frames merge. */
 export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null, receipt?: { keyReceivedAt: Record<string, number> }): PLCState {
@@ -644,11 +695,7 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null, rece
   // operator starts production; the latch keeps the badge state sticky.
   const pushButton = readBitSignal(
     raw,
-    [
-      "boardA_green_push_button",
-      "boardB_io_green_button",
-      "push_button",
-    ],
+    PUSH_BUTTON_PAYLOAD_KEYS,
     prevState?.outputs.pushButton ?? false,
     prevState?.outputs.pushButton !== undefined,
   );
@@ -840,12 +887,13 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null, rece
     prevKnown(prevState, "curing_o2"),
     (value) => (value <= 25 ? value : scaleLinear(value, 0, 5000, 0, 25)),
   );
-  const lidar = readScaledSignal(
+  // The shared distance probe supplies centimetres, not bottle dimensional
+  // error in mm. Preserve the received engineering value without rescaling.
+  const lidar = readSignal(
     raw,
     ["boardB_esp32_distance_cm"],
     prevNum(prevState, "quality_lidar", 0),
     prevKnown(prevState, "quality_lidar"),
-    (value) => (value <= 50 ? value : scaleLinear(value, 0, 100, 0, 50)),
   );
   const fingerprint = readScaledSignal(
     raw,
@@ -1212,15 +1260,17 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null, rece
     }),
     analogParam({
       id: "quality_lidar",
-      label: "Quality LiDAR",
+      label: "Distance input",
       value: lidar.value,
       hasReal: lidar.hasReal,
-      unit: "mm",
+      unit: "cm",
       min: 0,
       max: 50,
       nominal: 0.5,
       decimals: 1,
       accentHex: "#f59e0b",
+      // A generic distance measurement cannot prove a defective bottle.
+      status: "normal",
     }),
     analogParam({
       id: "quality_light",
@@ -1302,39 +1352,42 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null, rece
     }),
     analogParam({
       id: "intake_gps",
-      label: "Intake GPS",
+      label: "Auxiliary input",
       value: auxGps.value,
       hasReal: auxGps.hasReal,
-      unit: "m",
+      unit: "",
       min: 0,
       max: 100,
       nominal: 50,
       decimals: 1,
       accentHex: "#22c55e",
+      status: "normal",
     }),
     analogParam({
       id: "dispatch_gps",
-      label: "Dispatch GPS",
+      label: "Auxiliary input",
       value: auxGps.value,
       hasReal: auxGps.hasReal,
-      unit: "m",
+      unit: "",
       min: 0,
       max: 100,
       nominal: 50,
       decimals: 1,
       accentHex: "#22c55e",
+      status: "normal",
     }),
     analogParam({
       id: "intake_lidar",
-      label: "Intake LiDAR",
+      label: "Distance input",
       value: lidar.value,
       hasReal: lidar.hasReal,
-      unit: "mm",
+      unit: "cm",
       min: 0,
       max: 50,
       nominal: 25,
       decimals: 1,
       accentHex: "#f59e0b",
+      status: "normal",
     }),
     analogParam({
       id: "intake_fingerprint",
@@ -1441,6 +1494,7 @@ export function parsePLCPayload(raw: RawPLCPayload, prev?: PLCState | null, rece
       relay,
       pushButton: pushButton.value,
       alerts: [alertRed.value, alertYellow.value, alertBuzzer.value, alarmRelay.value],
+      receivedBits: outputBitReceipts(raw, prevState, receipt, now),
     },
   };
 }

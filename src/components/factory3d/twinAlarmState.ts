@@ -2,6 +2,7 @@ import type { ManufacturingStage, SensorReading, StageId, ThresholdEffect } from
 import { isSensorLive } from "../../stores/digitalTwinSimulation";
 import { useDigitalTwinStore } from "../../stores/digitalTwinStore";
 import { usePLCStore } from "../../stores/plcStore";
+import { isInformationalPLCInput } from "../../services/receivedTelemetry";
 
 export type TwinAlarmSeverity = "normal" | "warning" | "critical";
 export type TwinAlarmSource = "live" | "sim" | "mixed" | "unknown";
@@ -46,8 +47,9 @@ const rank: Record<TwinAlarmSeverity, number> = { normal: 0, warning: 1, critica
 const stronger = (a: TwinAlarmSeverity, b: TwinAlarmSeverity): TwinAlarmSeverity => rank[a] >= rank[b] ? a : b;
 
 /** Respect the configured direction and warning band, including inclusive boundaries. */
-export function isTwinThresholdTriggered(sensor: SensorReading, effect: ThresholdEffect): boolean {
+export function isTwinThresholdTriggered(sensor: SensorReading, effect: ThresholdEffect, livePLCInput = false): boolean {
   if (sensor.type === "fingerprint") return false;
+  if (livePLCInput && isInformationalPLCInput(sensor.sensorId)) return false;
   const { value, nominal, warningThreshold: warning, criticalThreshold: critical } = sensor;
   if (![value, nominal, warning, critical].every(Number.isFinite)) return false;
   switch (effect.condition) {
@@ -90,8 +92,10 @@ export function summarizeTwinAlarm(stages: readonly ManufacturingStage[], option
     const alarm: TwinStageAlarm = { severity: "normal", stopRequired: stage.status === "faulted", reasons: [] };
     for (const sensor of stage.sensors) {
       if (!Number.isFinite(sensor.value)) continue;
+      const livePLCInput = options.isSensorLive?.(sensor.sensorId) ?? false;
+      if (livePLCInput && isInformationalPLCInput(sensor.sensorId)) continue;
       let severity = readingSeverity(sensor);
-      const effects = stage.thresholdEffects.filter((effect) => effect.sensorId === sensor.sensorId && isTwinThresholdTriggered(sensor, effect));
+      const effects = stage.thresholdEffects.filter((effect) => effect.sensorId === sensor.sensorId && isTwinThresholdTriggered(sensor, effect, livePLCInput));
       const stop = effects.some((effect) => effect.effect === "stop" || effect.effect === "emergency_stop")
         || (sensor.type === "emergency_stop" && severity === "critical");
       if (stop) {

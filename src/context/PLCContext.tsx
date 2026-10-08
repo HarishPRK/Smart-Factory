@@ -138,7 +138,7 @@ export const PLCProvider: React.FC<{ children: React.ReactNode }> = ({
   // Push every PLC update into the ring buffer
   useEffect(() => {
     if (live.isConnected && live.telemetrySource === "plc") {
-      buffer.push(live.params, live.outputs);
+      buffer.push(live.params, live.outputs, live.lastReceivedAt ?? undefined);
     }
   }, [live.params, live.outputs, live.isConnected, live.telemetrySource, live.lastReceivedAt, buffer]);
 

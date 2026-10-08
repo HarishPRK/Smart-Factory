@@ -44,10 +44,18 @@ describe("Twin alarm notice", () => {
   it("does not describe a quality-only critical reading as a stopped production line", () => {
     const quality = stageFixture("quality");
     setReading(quality, "quality_lidar", 25);
-    render(<TwinAlarmNotice alarm={summarizeTwinAlarm([quality], { isSensorLive: () => true })} />);
+    render(<TwinAlarmNotice alarm={summarizeTwinAlarm([quality], { isSensorLive: () => false })} />);
     expect(screen.getByText("Critical reading")).toBeTruthy();
     expect(screen.queryByText("Twin line stopped")).toBeNull();
     expect(screen.queryByText(/Visual interlock/)).toBeNull();
+  });
+
+  it("does not show a critical dimensional-defect notice for a shared live distance measurement", () => {
+    const quality = stageFixture("quality");
+    setReading(quality, "quality_lidar", 12);
+    render(<TwinAlarmNotice alarm={summarizeTwinAlarm([quality], { isSensorLive: () => true })} />);
+    expect(screen.queryByText("Critical reading")).toBeNull();
+    expect(screen.queryByRole("region", { name: "Twin threshold response" })).toBeNull();
   });
 
   it("labels a simulated warning as Model and a configured slowdown as Process slowed", () => {

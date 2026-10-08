@@ -9,7 +9,7 @@ import { useDigitalTwinStore, pushSensorHistory, commitTick } from "./digitalTwi
 import { STAGE_CONFIGS } from "../components/factory3d/digitalTwinLayout";
 import type { PLCParameter } from "../types";
 import type { PLCOutputs } from "../services/plcService";
-import type { TelemetrySource } from "../services/receivedTelemetry";
+import { isInformationalPLCInput, type TelemetrySource } from "../services/receivedTelemetry";
 import type {
   ManufacturingStage,
   ProductOnBelt,
@@ -435,7 +435,8 @@ function tickSensors(stages: ManufacturingStage[], dt: number) {
 
       // Mutate in place
       sensor.value = newValue;
-      sensor.status = sensorStatus(newValue, sc);
+      sensor.status = externalValue !== undefined && isInformationalPLCInput(sc.sensorId)
+        ? "normal" : sensorStatus(newValue, sc);
       sensor.timestamp = now;
 
       // Only push to ring buffer at ~2 Hz (keeps 100 entries = ~50 seconds)
@@ -481,6 +482,9 @@ function evaluateThresholds(stages: ManufacturingStage[]): number {
     for (const effect of stage.thresholdEffects) {
       const sensor = stage.sensors.find((s) => s.sensorId === effect.sensorId);
       if (!sensor) continue;
+      // Shared board distance / auxiliary input is not a calibrated station
+      // defect measurement. Keep modeled scenarios, omit only live mis-maps.
+      if (isSensorLive(sensor.sensorId) && isInformationalPLCInput(sensor.sensorId)) continue;
 
       const sc = SENSOR_CONFIG_BY_KEY[effect.sensorId];
       if (!sc) continue;
