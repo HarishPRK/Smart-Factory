@@ -4,6 +4,7 @@ import { AiInsightCard } from '../../components/widgets/AiInsightCard';
 import { classifyDevice, controlMatterDevice, controlShellyDevice, refreshMatterDevices, useDevices, type DeviceView } from '../../ui/useDevices';
 import type { Device, Status } from '../../types';
 import { DeviceHistoryChart } from './DeviceHistoryChart';
+import { FleetTelemetryCharts } from './FleetTelemetryCharts';
 import { useDeviceHistory } from './useDeviceHistory';
 import { duration, finite, measurement, scopeInventory, signalBand, signalBands, statusNames, statusOrder, transportNames, type DeviceBranch, type DeviceHistory } from './deviceMetrics';
 
@@ -72,6 +73,7 @@ export function DeviceWorkspace({ domain, branchId }: { domain: 'IT' | 'OT'; bra
       <div className="dw-overview-reading">{domain === 'IT' ? <Wifi size={22} /> : <Power size={22} />}<div><span>{domain === 'IT' ? 'Average Wi-Fi signal' : 'Reported power total'}</span><strong>{domain === 'IT' ? measurement(avgSignal, 0) : measurement(measuredPower.length ? measuredPower.reduce((a, b) => a + b, 0) : undefined)} <small>{domain === 'IT' ? 'dBm' : 'W'}</small></strong><small>{domain === 'IT' ? `${signals.length} / ${wifiDevices.length} Wi-Fi readings` : `${measuredPower.length} / ${devices.length} devices reporting`}</small></div></div>
     </section>
 
+    <FleetTelemetryCharts devices={list} history={history} selectedId={selected?.id} onSelect={setSelectedId} loading={loading} error={error} refresh={refresh} />
     <div className="dw-workbench">
       <section className="dw-fleet" aria-label="Fleet exploration">
         <div className="dw-fleet-heading"><div><h3>Explore the fleet</h3><p>Select a device to inspect its telemetry.</p></div><div className="dw-segment" aria-label="Inventory presentation"><button type="button" aria-label="Device matrix" aria-pressed={view === 'matrix'} onClick={() => setView('matrix')}><LayoutGrid size={16} />Matrix</button><button type="button" aria-label="Device list" aria-pressed={view === 'list'} onClick={() => setView('list')}><List size={16} />List</button></div></div>

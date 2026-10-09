@@ -2,14 +2,19 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DeviceWorkspace } from './DeviceWorkspace';
 import type { DeviceView, UseDevicesResult } from '../../ui/useDevices';
+import { cloneElement, type ReactElement } from 'react';
+import type { DeviceHistory } from './deviceMetrics';
 
-const api = vi.hoisted(() => ({ snapshot: {} as UseDevicesResult, classify: vi.fn(), matter: vi.fn(), shelly: vi.fn(), refresh: vi.fn() }));
+const api = vi.hoisted(() => ({ snapshot: {} as UseDevicesResult, history: {} as DeviceHistory, classify: vi.fn(), matter: vi.fn(), shelly: vi.fn(), refresh: vi.fn() }));
 vi.mock('../../ui/useDevices', () => ({ useDevices: () => api.snapshot, classifyDevice: api.classify, controlMatterDevice: api.matter, controlShellyDevice: api.shelly, refreshMatterDevices: api.refresh }));
-vi.mock('./useDeviceHistory', () => ({ useDeviceHistory: () => ({ history: {}, loading: false, error: '', refresh: vi.fn() }) }));
+vi.mock('./useDeviceHistory', () => ({ useDeviceHistory: () => ({ history: api.history, loading: false, error: '', refresh: vi.fn() }) }));
+// JSDOM has no layout. Give charts deterministic dimensions for interaction checks.
+vi.mock('recharts', async importOriginal => ({ ...await importOriginal<typeof import('recharts')>(), ResponsiveContainer: ({ children }: { children: ReactElement<{ width?: number; height?: number }> }) => cloneElement(children, { width: 640, height: 300 }) }));
 vi.mock('../../components/widgets/AiInsightCard', () => ({ AiInsightCard: () => <div>AI analysis</div> }));
 const makeDevice = (overrides: Partial<DeviceView> = {}): DeviceView => ({ id: 'a', name: 'Endpoint Alpha', kind: 'generic', domain: 'IT', autoDomain: 'IT', overridden: false, ip: '10.0.0.1', mac: 'AA:BB', status: 'ok', conn: 'wifi', connectedForHours: 0, inventorySource: 'prplhome', telemetry: { rxMbps: 0, rssiDbm: -54 }, ...overrides });
 beforeEach(() => {
   vi.clearAllMocks();
+  api.history = {};
   api.snapshot = { devices: [makeDevice(), makeDevice({ id: 'b', name: 'Endpoint Beta', mac: 'CC:DD', status: 'err', telemetry: { rssiDbm: -80 } })], loaded: true, connected: true, source: 'gateway', inventorySourcesSeen: ['prplhome'], lastInventoryAtBySource: { prplhome: 1700000000000 } };
   api.classify.mockResolvedValue(undefined); api.matter.mockResolvedValue(undefined); api.shelly.mockResolvedValue(undefined);
 });
@@ -17,6 +22,19 @@ afterEach(cleanup);
 const inspector = () => within(screen.getByRole('complementary', { name: 'Device inspector' }));
 
 describe('modern IT / OT device workspace', () => {
+  it('keeps all four fleet graphs visible and switches between all and selected traces', () => {
+    api.history = { 'AA:BB': [{ t: 1000, rssiDbm: -54, rxBytes: 0, txBytes: 0 }, { t: 11000, rssiDbm: -56, rxBytes: 100, txBytes: 10 }], 'CC:DD': [{ t: 1000, rssiDbm: -80, rxBytes: 0, txBytes: 0 }, { t: 11000, rssiDbm: -78, rxBytes: 200, txBytes: 20 }] };
+    render(<DeviceWorkspace domain="IT" branchId="b-mck-03" />);
+    for (const name of ['Wi-Fi RSSI', 'Data transferred', 'Connection mix', 'Health by device type']) expect(screen.getByRole('heading', { name })).toBeTruthy();
+    const signal = within(screen.getByRole('region', { name: 'Wi-Fi RSSI fleet chart' }));
+    expect(signal.getByText('2 device traces')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Selected device' }));
+    expect(signal.getByText('1 device traces')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'All devices' }));
+    expect(signal.getByText('2 device traces')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Endpoint Alpha' }));
+    expect(inspector().getByRole('heading', { name: 'Endpoint Alpha' })).toBeTruthy();
+  });
   it('prioritizes attention, selects a device, and keeps its details tied to current inventory', () => {
     const { rerender } = render(<DeviceWorkspace domain="IT" branchId="b-mck-03" />);
     expect(inspector().getByRole('heading', { name: 'Endpoint Beta' })).toBeTruthy();

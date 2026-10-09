@@ -192,3 +192,46 @@
   .dw-identity-facts { column-gap: 12px; }
 }
 @media (prefers-reduced-motion: reduce) { .integration-scope .dw-device-tile { transition: none; } }
+
+.dw-fleet-telemetry { margin: 0 0 32px; }
+.dw-fleet-chart-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 20px; }
+.dw-fleet-chart-heading h3 { display: flex; gap: 10px; align-items: center; }
+.dw-fleet-chart-heading h3 svg { color: var(--accent); }
+.dw-fleet-chart-heading p { font-size: 13px; margin-top: 6px; }
+.dw-fleet-chart-grid { display: grid; grid-template-columns: minmax(0, 2.5fr) minmax(250px, 1fr); gap: 20px; }
+.dw-fleet-line, .dw-fleet-profile { border: 1px solid var(--border); border-radius: 12px; padding: 22px; min-width: 0; }
+.dw-fleet-line > p, .dw-fleet-profile > p { font-size: 12px; margin-top: 6px; }
+.dw-fleet-line .dw-section-heading h4 { font-size: 16px; gap: 10px; }
+.dw-fleet-line .dw-section-heading svg { color: var(--accent); }
+.dw-fleet-line-canvas { height: 300px; margin-top: 18px; min-width: 0; }
+.dw-fleet-chart-foot { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 10px; color: var(--text-muted); margin-top: 12px; }
+.dw-fleet-line > .dw-empty-chart { min-height: 330px; }
+.dw-connection-chart { position: relative; height: 240px; margin: 12px 0; }
+.dw-donut-center { position: absolute; inset: 0; pointer-events: none; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+.dw-donut-center strong { font-size: 34px; line-height: 1.2; font-weight: 550; }
+.dw-donut-center span { color: var(--text-muted); font-size: 12px; }
+.dw-profile-legend { display: grid; gap: 8px; padding: 0; margin: 12px 0 0; list-style: none; }
+.dw-profile-legend li { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text-muted); }
+.dw-profile-legend li strong { margin-left: auto; color: var(--text); font-weight: 500; }
+.dw-profile-legend i, .dw-trace-legend button i { display: block; width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+.dw-type-chart { margin-top: 35px; min-width: 0; max-height: 330px; overflow: auto; }
+.dw-health-chart-legend { grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--border); padding-top: 15px; margin-top: 24px; }
+.dw-trace-legend { margin-top: 18px; border-bottom: 1px solid var(--border); padding-bottom: 18px; }
+.dw-trace-legend summary { cursor: pointer; font-size: 13px; color: var(--text); padding: 8px 0; }
+.dw-trace-legend summary > span { margin-left: 6px; color: var(--accent); }
+.dw-trace-legend summary > small { margin-left: 15px; font-size: 11px; }
+.dw-trace-legend > div { display: flex; flex-wrap: wrap; gap: 5px 8px; max-height: 125px; overflow-y: auto; padding: 6px 3px; scrollbar-width: thin; }
+.integration-scope .dw-trace-legend button { background: transparent; border-color: transparent; padding: 3px 8px; min-height: 30px; font-size: 11px; color: var(--text-muted); max-width: 220px; }
+.integration-scope .dw-trace-legend button[aria-pressed=true] { border-color: var(--accent); background: var(--dw-raised); color: var(--text); }
+.dw-trace-legend button span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+@media (max-width: 1000px) {
+  .dw-fleet-chart-grid { grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr); gap: 12px; }
+  .dw-fleet-line, .dw-fleet-profile { padding: 16px; }
+}
+@media (max-width: 750px) {
+  .dw-fleet-chart-grid { grid-template-columns: minmax(0, 1fr); }
+  .dw-fleet-chart-heading { align-items: start; flex-direction: column; }
+  .dw-fleet-line-canvas { height: 260px; }
+  .dw-trace-legend summary > small { display: block; margin: 5px 0 0; }
+  .dw-connection-chart { height: 190px; }
+}

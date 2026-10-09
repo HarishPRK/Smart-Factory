@@ -284,4 +284,30 @@ describe("browser MQTT command allowlist", () => {
     ).toBe(false);
     expect(isAllowedCommandOrigin({ host: "factory.example.com" })).toBe(false);
   });
+
+  it.each([
+    ['http://127.0.0.1:5174', 'localhost:9001'],
+    ['http://localhost:5173', '127.0.0.1:9001'],
+    ['http://[::1]:5173', 'localhost:9001'],
+  ])('accepts the local app alias %s through %s', (origin, host) => {
+    expect(isAllowedCommandOrigin({ origin, host })).toBe(true);
+  });
+
+  it('accepts the explicitly configured EC2 origin behind an internal proxy host', () => {
+    const headers = { origin: 'http://3.239.12.96', host: '127.0.0.1:9001' };
+    expect(isAllowedCommandOrigin(headers)).toBe(false);
+    expect(isAllowedCommandOrigin(headers, ['http://3.239.12.96/'])).toBe(true);
+    expect(isAllowedCommandOrigin({ ...headers, origin: 'http://3.239.12.96:8080' }, ['http://3.239.12.96'])).toBe(false);
+    expect(isAllowedCommandOrigin({ ...headers, origin: 'http://other.example' }, ['http://3.239.12.96'])).toBe(false);
+  });
+
+  it.each(['null', 'file:///factory', 'ftp://localhost', 'https://user@localhost', 'http://localhost/path', 'http://localhost?x=1', 'http://localhost#x', 'http://localhost.attacker.example'])('rejects invalid or unrelated origins: %s', origin => {
+    expect(isAllowedCommandOrigin({ origin, host: 'localhost:9001' }, [origin])).toBe(origin === 'http://localhost.attacker.example');
+    expect(isAllowedCommandOrigin({ origin, host: 'localhost:9001' })).toBe(false);
+  });
+
+  it('does not trust forwarded host headers or treat a remote bridge as loopback', () => {
+    expect(isAllowedCommandOrigin({ origin: 'https://attacker.example', host: 'factory.example.com', 'x-forwarded-host': 'attacker.example' })).toBe(false);
+    expect(isAllowedCommandOrigin({ origin: 'http://localhost:5173', host: '3.239.12.96:9001' })).toBe(false);
+  });
 });

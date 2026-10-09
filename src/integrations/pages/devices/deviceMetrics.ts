@@ -44,6 +44,8 @@ export interface HistoryPoint {
   txMbps?: number;
   rssiDbm?: number;
   apowerW?: number;
+  rxBytes?: number;
+  txBytes?: number;
 }
 export type DeviceHistory = Record<string, HistoryPoint[]>;
 
@@ -54,7 +56,7 @@ export function parseHistory(value: unknown): DeviceHistory {
     if (Array.isArray(rows)) for (const row of rows) {
       if (!row || !finite(row.t) || row.t <= 0) continue;
       const point: HistoryPoint = { t: row.t };
-      for (const key of ['rxMbps', 'txMbps', 'rssiDbm', 'apowerW'] as const) {
+      for (const key of ['rxMbps', 'txMbps', 'rssiDbm', 'apowerW', 'rxBytes', 'txBytes'] as const) {
         if (finite(row[key])) point[key] = row[key];
       }
       byTime.set(point.t, point);

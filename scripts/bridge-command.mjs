@@ -215,20 +215,39 @@ export function createRfidAuthorizationGate({
 }
 
 export function isAllowedCommandOrigin(headers, configuredOrigins = []) {
-  const origin = typeof headers?.origin === "string" ? headers.origin : "";
+  const origin = parseCommandOrigin(headers?.origin);
   if (!origin) return false;
-  if (configuredOrigins.includes(origin)) return true;
+  if (configuredOrigins.some(value => parseCommandOrigin(value)?.origin === origin.origin)) return true;
 
   const host = typeof headers?.host === "string" ? headers.host : "";
-  if (!host) return false;
+  if (!host || /[\s/@?#\\]/.test(host)) return false;
 
   try {
-    const originUrl = new URL(origin);
     const requestHostname = new URL(`http://${host}`).hostname;
-    return originUrl.hostname.toLowerCase() === requestHostname.toLowerCase();
+    // The dev UI and bridge use separate ports. localhost, IPv4 loopback and
+    // IPv6 loopback name the same local computer, including when Vite uses
+    // 127.0.0.1 but VITE_MQTT_BRIDGE_URL explicitly contains localhost.
+    return origin.hostname === requestHostname ||
+      (isLoopbackHostname(origin.hostname) && isLoopbackHostname(requestHostname));
   } catch {
     return false;
   }
+}
+
+export function parseCommandOrigin(value) {
+  if (typeof value !== "string" || !value || /[\s\x00-\x1f\x7f]/.test(value)) return null;
+  try {
+    const url = new URL(value);
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password ||
+        url.pathname !== '/' || url.search || url.hash) return null;
+    return url;
+  } catch {
+    return null;
+  }
+}
+
+function isLoopbackHostname(hostname) {
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
 }
 
 function validateControlPayload(payload) {
