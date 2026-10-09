@@ -265,6 +265,7 @@ const Dashboard: React.FC<{ headerSlot?: React.ReactNode }> = ({ headerSlot }) =
       {devicesDomain && (
         <IntegrationModal
           open
+          enableFullscreen
           onClose={() => setDevicesDomain(null)}
           title={`${devicesDomain} Devices`}
         >

@@ -11,11 +11,12 @@ const BOARD_B = `${DEVICE}/data/boardB`;
 function receive(topic: string, payload: unknown) {
   act(() => { broker.listener?.(topic, payload); vi.advanceTimersByTime(250); });
 }
-function hierarchy() { return screen.getByRole("navigation", { name: "Namespace hierarchy" }); }
-function expandAll() { fireEvent.click(screen.getByRole("button", { name: "Expand all branches" })); }
+function explore() { fireEvent.click(screen.getByRole("button", { name: "Explore topics" })); }
+function hierarchy() { if (!screen.queryByRole("navigation", { name: "Namespace hierarchy" })) explore(); return screen.getByRole("navigation", { name: "Namespace hierarchy" }); }
+function expandAll() { hierarchy(); fireEvent.click(screen.getByRole("button", { name: "Expand all branches" })); }
 function inspectTopic(path: string) { expandAll(); fireEvent.click(within(hierarchy()).getByTitle(path)); }
 beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(100_000); broker.listener = null; broker.unsubscribe.mockClear(); });
-afterEach(() => { cleanup(); vi.useRealTimers(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("UNS Explorer workspace", () => {
   it("annotates all six hierarchy levels without rewriting the received path", () => {
@@ -35,6 +36,93 @@ describe("UNS Explorer workspace", () => {
     expect(screen.getByRole("status").textContent).toContain("Waiting for broker traffic");
     expect(screen.queryByLabelText("Selected namespace details")).toBeNull();
     expect(screen.getByText("Awaiting traffic")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Export namespace snapshot" }).hasAttribute("disabled")).toBe(true);
+  });
+
+  it("opens the activity overview with actual arrivals and navigates to a topic", () => {
+    render(<UNSExplorerPanel open onClose={vi.fn()} />);
+    receive(BOARD_A, { voltage: 4.31 });
+    receive(BOARD_B, { enabled: false });
+    const overview = screen.getByLabelText("Namespace activity overview");
+    expect(document.querySelector(".uns-workspace-body.is-overview")).toBeTruthy();
+    expect(screen.queryByRole("navigation", { name: "Namespace hierarchy" })).toBeNull();
+    expect(within(overview).getByLabelText("Traffic timeline")).toBeTruthy();
+    expect(within(overview).getByLabelText("Publish interval analysis")).toBeTruthy();
+    expect(within(overview).getByLabelText("Payload change timeline")).toBeTruthy();
+    expect(within(overview).getByLabelText("Numeric field explorer")).toBeTruthy();
+    expect(within(overview).getByText("Namespace coverage")).toBeTruthy();
+    expect(within(overview).getByText("Payload composition")).toBeTruthy();
+    expect(within(overview).getAllByText("First receipt")).toHaveLength(2);
+    expect(overview.querySelectorAll(".uns-traffic-row rect")).toHaveLength(60);
+    fireEvent.click(within(overview).getByRole("button", { name: `Inspect activity for ${BOARD_B}: 0.1 Hz` }));
+    expect(screen.queryByLabelText("Namespace activity overview")).toBeNull();
+    expect(within(screen.getByLabelText("Selected namespace details")).getByText(BOARD_B)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Show namespace activity" }));
+    act(() => vi.advanceTimersByTime(11_000));
+    expect(screen.getByLabelText("Namespace activity overview").textContent).toContain("0.0Hz combined");
+    expect(screen.getByLabelText("0 of 2 topics received in the last five seconds")).toBeTruthy();
+  });
+
+  it("compares the last two receipts and filters fields without hiding raw metadata", () => {
+    render(<UNSExplorerPanel open onClose={vi.fn()} />);
+    receive(BOARD_A, { voltage: 4.31, enabled: false, removed: 0, _bridgeTs: 1 });
+    inspectTopic(BOARD_A);
+    fireEvent.click(screen.getByRole("button", { name: "Changes" }));
+    expect(screen.getByText("A second receipt is needed to compare values.")).toBeTruthy();
+    receive(BOARD_A, { voltage: 4.5, enabled: false, added: 0, _bridgeTs: 2 });
+    const changes = document.querySelector(".uns-payload-changes")!;
+    expect(changes.querySelectorAll("li")).toHaveLength(3);
+    expect(changes.textContent).toContain("4.31");
+    expect(changes.textContent).toContain("4.5");
+    fireEvent.click(screen.getByRole("button", { name: "Tags" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Filter payload fields" }), { target: { value: "volt" } });
+    expect(document.querySelectorAll(".uns-instrument-tags > div")).toHaveLength(1);
+    expect(document.querySelectorAll(".uns-tag-trace path")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "JSON" }));
+    expect(document.querySelector(".uns-workspace-payload pre")?.textContent).toContain('"_bridgeTs": 2');
+    receive(BOARD_A, { voltage: 4.5, enabled: false, added: 0, _bridgeTs: 3 });
+    fireEvent.click(screen.getByRole("button", { name: "Changes" }));
+    expect(screen.getByText("No field changes in the latest message.")).toBeTruthy();
+  });
+
+  it("lets the overview inspect real sensor samples and switch topics and fields", () => {
+    render(<UNSExplorerPanel open onClose={vi.fn()} />);
+    receive(BOARD_A, { voltage: 4.31, current: 0 });
+    receive(BOARD_A, { voltage: 4.5, current: 0 });
+    receive(BOARD_B, { pressure: 65 });
+    const lab = screen.getByLabelText("Numeric field explorer");
+    expect(within(lab).getByRole("combobox", { name: "Numeric field" })).toHaveProperty("value", "voltage");
+    expect(lab.querySelector("output")?.textContent).toBe("4.5");
+    fireEvent.change(within(lab).getByRole("slider", { name: "Inspect numeric field sample" }), { target: { value: "0" } });
+    expect(lab.querySelector("output")?.textContent).toBe("4.31");
+    fireEvent.change(within(lab).getByRole("combobox", { name: "Numeric field" }), { target: { value: "current" } });
+    expect(lab.querySelector("output")?.textContent).toBe("0");
+    expect(within(lab).getByRole("img").getAttribute("aria-label")).toContain("minimum 0, maximum 0");
+    fireEvent.change(within(lab).getByRole("combobox", { name: "Numeric field topic" }), { target: { value: BOARD_B } });
+    expect(lab.querySelector("output")?.textContent).toBe("65");
+    expect(within(lab).getByRole("slider", { name: "Inspect numeric field sample" }).hasAttribute("disabled")).toBe(true);
+    fireEvent.change(screen.getByRole("slider", { name: "Inspect traffic second" }), { target: { value: "0" } });
+    expect(screen.getByLabelText("Traffic timeline").querySelector("output")?.textContent).toBe("0 messages");
+  });
+
+  it("copies exact topic paths and exports a downloadable received-data snapshot", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    const createObjectURL = vi.fn().mockReturnValue("blob:uns-snapshot"), revokeObjectURL = vi.fn();
+    vi.stubGlobal("URL", Object.assign(class extends URL {}, { createObjectURL, revokeObjectURL }));
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    render(<UNSExplorerPanel open onClose={vi.fn()} />);
+    receive(BOARD_A, { voltage: 4.31 });
+    inspectTopic(BOARD_A);
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Copy topic path" })));
+    expect(writeText).toHaveBeenCalledWith(BOARD_A);
+    expect(screen.getByText("Copied")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Export namespace snapshot" }));
+    expect(createObjectURL.mock.calls[0][0].type).toBe("application/json");
+    expect(click).toHaveBeenCalledOnce();
+    expect(screen.getByText("Snapshot downloaded")).toBeTruthy();
+    act(() => vi.advanceTimersByTime(1000));
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:uns-snapshot");
   });
   it("lets users select a discovered topic and inspect precise received values or JSON", () => {
     render(<UNSExplorerPanel open onClose={vi.fn()} />);
@@ -53,6 +141,7 @@ describe("UNS Explorer workspace", () => {
     render(<UNSExplorerPanel open onClose={vi.fn()} />);
     receive(BOARD_A, { pressure_sensor: 65 });
     receive(BOARD_B, { energy: 5 });
+    explore();
     fireEvent.change(screen.getByRole("textbox", { name: "Search namespace topics or tags" }), { target: { value: "pressure" } });
     expect(within(hierarchy()).getByTitle(BOARD_A)).toBeTruthy();
     expect(within(hierarchy()).getByTitle(DEVICE)).toBeTruthy();
@@ -69,6 +158,7 @@ describe("UNS Explorer workspace", () => {
   it("collapses and expands discovered branches without discarding messages", () => {
     render(<UNSExplorerPanel open onClose={vi.fn()} />);
     receive(BOARD_A, { voltage: 4.3 });
+    explore();
     fireEvent.click(screen.getByRole("button", { name: "Collapse all branches" }));
     expect(screen.queryByTitle(BOARD_A)).toBeNull();
     expandAll();
@@ -145,6 +235,7 @@ describe("UNS Explorer workspace", () => {
   it("preserves progressive branch expansion across receipts while search exposes matching topics", () => {
     render(<UNSExplorerPanel open onClose={vi.fn()} />);
     receive(BOARD_A, { voltage: 4.3 });
+    explore();
     expect(screen.queryByTitle(BOARD_A)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: `Expand ${DEVICE}` }));
     receive(BOARD_B, { pressure: 65 });

@@ -19,3 +19,6 @@
 @import "../factory3d/twin-alarm-response.css";
 @import "/src/components/analytics-workspace.css";
 @import "/src/components/uns-workspace.css";
+@import "/src/components/uns/namespace-insights.css";
+@import "/src/components/uns/namespace-diagnostics.css";
+@import "/src/integrations/pages/devices/device-workspace.css";

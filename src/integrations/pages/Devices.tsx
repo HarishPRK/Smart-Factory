@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
+import { UIVersionContext } from '../../components/ui-version/UIVersionContext';
+import { DeviceWorkspace } from './devices/DeviceWorkspace';
 import {
   ArrowLeftRight, DoorClosed, Download, Flame,
   HelpCircle, Laptop, Lock, Monitor, PhoneCall, Plug, Power, Printer,
@@ -66,6 +68,13 @@ function health(d: Device) {
 }
 
 export function DevicesPage({ domain, branchId }: { domain: 'IT' | 'OT'; branchId: 'b-mck-03' | 'b-pln-01' }) {
+  const presentation = useContext(UIVersionContext);
+  return presentation?.version === 'classic'
+    ? <ClassicDevicesPage domain={domain} branchId={branchId} />
+    : <DeviceWorkspace key={`${domain}:${branchId}`} domain={domain} branchId={branchId} />;
+}
+
+function ClassicDevicesPage({ domain, branchId }: { domain: 'IT' | 'OT'; branchId: 'b-mck-03' | 'b-pln-01' }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'ok' | 'warn' | 'err'>('all');
   const [selected, setSelected] = useState<DeviceView | null>(null);
