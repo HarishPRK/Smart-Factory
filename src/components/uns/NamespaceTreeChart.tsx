@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { Building2, ChevronDown, ChevronRight, Database, Factory, Focus, FolderTree, Layers3, Minus, Plus, Scan, Server } from "lucide-react";
-import { namespaceActivity, payloadEntries, type NamespaceNode } from "./namespaceModel";
+import { namespaceActivity, payloadEntries, NAMESPACE_LEVELS, type NamespaceNode } from "./namespaceModel";
 import { fitNamespaceChart, focusNamespaceChart, layoutNamespaceChart, zoomNamespaceChart } from "./namespaceChart";
 
 interface NamespaceChartProps {
@@ -15,7 +15,7 @@ interface NamespaceChartProps {
 }
 type Camera = { x: number; y: number; zoom: number };
 const COLORS = ["#43d8f1", "#82b5f6", "#e9bd70", "#6ed6a2"];
-const LEVELS = ["Enterprise", "Site", "Line", "Device"];
+const LEVELS = NAMESPACE_LEVELS;
 
 export default function NamespaceTreeChart({ root, collapsed, search, selectedPath, now, focusPath, onToggle, onSelect }: NamespaceChartProps) {
   const viewport = useRef<HTMLDivElement>(null);

@@ -99,7 +99,7 @@ const localClient = mqtt.connect(mqttUrl, {
 // Each source message carries only that source's keys; the frontend merges the
 // slices back into one frame. Keep plc/# for legacy data and command echoes.
 const PLC_TOPICS = [
-  "prplHome/McKinney/lineA/plc1/data/#",
+  "prplInnovationHub/#",
   "plc/#",
 ];
 

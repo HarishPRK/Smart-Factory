@@ -8,7 +8,7 @@
  * Usage:  node scripts/sitewise-ingest.mjs
  * Env:    MQTT_HOST            (default 192.168.10.254)
  *         MQTT_PORT            (default 1883)
- *         PLC_TOPIC            (default prplHome/McKinney/lineA/plc1/data/#)
+ *         PLC_TOPIC            (default prplInnovationHub/#)
  *         AWS_REGION           (default us-east-1)
  *         SITEWISE_PREFIX      (default /smart-factory/plc-1)
  *         SITEWISE_BATCH_MS    (default 1000)
@@ -31,7 +31,7 @@ const MQTT_PORT = Number(process.env.MQTT_PORT ?? 1883);
 // publishes on (boardA / boardB / esp32 / system_metrics). Each message is a
 // partial payload; mapPayload only maps keys that are present, so no merge
 // is needed here.
-const PLC_TOPIC = process.env.PLC_TOPIC ?? "prplHome/McKinney/lineA/plc1/data/#";
+const PLC_TOPIC = process.env.PLC_TOPIC ?? "prplInnovationHub/#";
 const REGION = process.env.AWS_REGION ?? "us-east-1";
 const PREFIX = process.env.SITEWISE_PREFIX ?? "/smart-factory/plc-1";
 const BATCH_MS = Number(process.env.SITEWISE_BATCH_MS ?? 1000);

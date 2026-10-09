@@ -15,13 +15,18 @@ export interface RegressionResult {
   predict: (futureMs: number) => number;
 }
 
-export function linearRegression(data: number[], sampleRateMs: number): RegressionResult {
+type SampleTiming = number | number[];
+const sampleOffsets = (count: number, timing: SampleTiming) => Array.isArray(timing)
+  ? timing.map((time) => time - timing[0]) : Array.from({ length: count }, (_, index) => index * timing);
+
+export function linearRegression(data: number[], sampleRateMs: SampleTiming): RegressionResult {
   const n = data.length;
   if (n < 3) return { slope: 0, intercept: data[n - 1] ?? 0, r2: 0, standardError: 0, predict: () => data[n - 1] ?? 0 };
 
+  const offsets = sampleOffsets(n, sampleRateMs);
   let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
   for (let i = 0; i < n; i++) {
-    const x = i * sampleRateMs;
+    const x = offsets[i];
     const y = data[i];
     sumX += x; sumY += y; sumXY += x * y; sumX2 += x * x; sumY2 += y * y;
   }
@@ -36,13 +41,13 @@ export function linearRegression(data: number[], sampleRateMs: number): Regressi
   const yMean = sumY / n;
   const ssTot = sumY2 - n * yMean * yMean;
   const ssRes = data.reduce((s, y, i) => {
-    const pred = intercept + slope * i * sampleRateMs;
+    const pred = intercept + slope * offsets[i];
     return s + (y - pred) ** 2;
   }, 0);
   const r2 = ssTot > 0 ? Math.max(0, 1 - ssRes / ssTot) : 0;
 
   const standardError = Math.sqrt(ssRes / Math.max(1, n - 2));
-  const lastX = (n - 1) * sampleRateMs;
+  const lastX = offsets[n - 1];
 
   return {
     slope,
@@ -61,14 +66,19 @@ const HORIZONS: { key: PredictionHorizon; ms: number }[] = [
   { key: "30min", ms: 1_800_000 },
 ];
 
-export function forecastParameter(data: number[], sampleRateMs: number): Record<PredictionHorizon, ForecastPoint> {
+export function forecastParameter(data: number[], sampleRateMs: SampleTiming): Record<PredictionHorizon, ForecastPoint> {
   const reg = linearRegression(data, sampleRateMs);
   const tCritical = 2.0; // approximation for n > 30
+  const offsets = sampleOffsets(data.length, sampleRateMs);
+  const meanX = offsets.reduce((sum, x) => sum + x, 0) / Math.max(1, data.length);
+  const ssX = offsets.reduce((sum, x) => sum + (x - meanX) ** 2, 0);
 
   const result = {} as Record<PredictionHorizon, ForecastPoint>;
   for (const h of HORIZONS) {
     const value = reg.predict(h.ms);
-    const margin = tCritical * reg.standardError * Math.sqrt(1 + 1 / data.length);
+    // Extrapolation uncertainty grows with distance beyond the observed window.
+    const futureX = (offsets.at(-1) ?? 0) + h.ms;
+    const margin = tCritical * reg.standardError * Math.sqrt(1 + 1 / Math.max(1, data.length) + (ssX > 0 ? (futureX - meanX) ** 2 / ssX : 0));
     result[h.key] = {
       value,
       confidenceLow: value - margin,
@@ -144,7 +154,7 @@ export function predictThresholdCrossing(
 
 export function estimateRUL(
   data: number[],
-  sampleRateMs: number,
+  sampleRateMs: SampleTiming,
   failureThreshold: number,
   direction: "above" | "below",
 ): RULEstimate {
@@ -256,24 +266,27 @@ const PARAM_CONFIGS: ParameterConfig[] = [
 
 export function analyzeAllParameters(
   histories: Record<string, number[]>,
-  sampleRateMs: number,
+  sampleRateMs: number | Record<string, number[]>,
 ): { predictions: ParameterPrediction[]; rulEstimates: RULEstimate[] } {
   const predictions: ParameterPrediction[] = [];
   const rulEstimates: RULEstimate[] = [];
 
   for (const cfg of PARAM_CONFIGS) {
     const data = histories[cfg.id];
-    if (!data || data.length < 3) continue;
+    if (!data || data.length < 3 || data.some((value) => !Number.isFinite(value))) continue;
 
+    const timing = typeof sampleRateMs === "number" ? sampleRateMs : sampleRateMs[cfg.id];
+    if (!timing || (typeof timing === "number" && (!Number.isFinite(timing) || timing <= 0)) || (Array.isArray(timing) && (timing.length !== data.length || timing.some((time, index) => !Number.isFinite(time) || (index > 0 && time < timing[index - 1])) || timing.at(-1)! <= timing[0]))) continue;
     const currentValue = data[data.length - 1];
-    const forecasts = forecastParameter(data, sampleRateMs);
-    const roc = rateOfChange(data, sampleRateMs);
-    const reg = linearRegression(data, sampleRateMs);
+    const forecasts = forecastParameter(data, timing);
+    const reg = linearRegression(data, timing);
+    // The arrow, crossing and forecast must use the same fitted window.
+    const roc = reg.slope * 60_000;
 
     const trendDirection: "rising" | "falling" | "stable" =
       roc > 0.05 ? "rising" : roc < -0.05 ? "falling" : "stable";
 
-    const crossing = predictThresholdCrossing(currentValue, roc, {
+    const crossing = predictThresholdCrossing(reg.predict(0), roc, {
       upper: cfg.upperThreshold,
       lower: cfg.lowerThreshold,
     });
@@ -291,9 +304,11 @@ export function analyzeAllParameters(
       rateOfChangeUnit: `${cfg.unit}/min`,
       thresholdCrossing: crossing,
       confidence: reg.r2,
+      sampleCount: data.length,
+      ...(Array.isArray(timing) ? { observedFrom: timing[0], observedUntil: timing.at(-1), history: data.map((value, index) => ({ timestamp: timing[index], value })) } : {}),
     });
 
-    const rul = estimateRUL(data, sampleRateMs, cfg.failureThreshold, cfg.failureDirection);
+    const rul = estimateRUL(data, timing, cfg.failureThreshold, cfg.failureDirection);
     rul.parameterId = cfg.id;
     rul.label = cfg.label;
     rulEstimates.push(rul);

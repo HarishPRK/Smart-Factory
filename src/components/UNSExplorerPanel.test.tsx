@@ -5,7 +5,7 @@ import { UIVersionContext } from "./ui-version/UIVersionContext";
 
 const broker = vi.hoisted(() => ({ listener: null as ((topic: string, payload: unknown) => void) | null, unsubscribe: vi.fn() }));
 vi.mock("../services/plcService", () => ({ subscribeAnyMessage: (listener: (topic: string, payload: unknown) => void) => { broker.listener = listener; return broker.unsubscribe; } }));
-const DEVICE = "prplHome/McKinney/lineA/plc1";
+const DEVICE = "prplInnovationHub/McKinney/production/lineA/cell1/plc1";
 const BOARD_A = `${DEVICE}/data/boardA`;
 const BOARD_B = `${DEVICE}/data/boardB`;
 function receive(topic: string, payload: unknown) {
@@ -18,6 +18,18 @@ beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(100_000); broker.listene
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 describe("UNS Explorer workspace", () => {
+  it("annotates all six hierarchy levels without rewriting the received path", () => {
+    render(<UNSExplorerPanel open onClose={vi.fn()} />);
+    receive(`${DEVICE}/data/boardA`, { voltage: 4.3 });
+    expandAll();
+    const segments = DEVICE.split("/");
+    ["Location", "Site", "Area", "Line", "Cell", "Equipment"].forEach((label, index) => {
+      const row = within(hierarchy()).getByTitle(segments.slice(0, index + 1).join("/"));
+      expect(within(row).getByText(label)).toBeTruthy();
+    });
+    inspectTopic(BOARD_A);
+    expect(within(screen.getByLabelText("Selected namespace details")).getByText(BOARD_A)).toBeTruthy();
+  });
   it("starts empty without seeded topics or payload values", () => {
     render(<UNSExplorerPanel open onClose={vi.fn()} />);
     expect(screen.getByRole("status").textContent).toContain("Waiting for broker traffic");
@@ -101,43 +113,20 @@ describe("UNS Explorer workspace", () => {
     expect(firstClose).not.toHaveBeenCalled();
     expect(latestClose).toHaveBeenCalledOnce();
   });
-  it("opens a vertical connected chart with device branches folded and details hidden", () => {
-    render(<UNSExplorerPanel open onClose={vi.fn()} />);
-    receive(BOARD_A, { voltage: 4.3 });
-    receive(BOARD_B, {});
-    expect(screen.getByRole("button", { name: "Chart" }).getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByRole("button", { name: "List" }).getAttribute("aria-pressed")).toBe("false");
-    expect(hierarchy().querySelectorAll(".uns-chart-node-select")).toHaveLength(4);
-    expect(hierarchy().querySelectorAll(".uns-chart-links > path")).toHaveLength(3);
-    expect(screen.queryByLabelText("Selected namespace details")).toBeNull();
-    expect(within(hierarchy()).queryByTitle(BOARD_A)).toBeNull();
-    const parent = within(hierarchy()).getByTitle("prplHome").parentElement!;
-    const child = within(hierarchy()).getByTitle(DEVICE).parentElement!;
-    expect(Number.parseFloat(child.style.top)).toBeGreaterThan(Number.parseFloat(parent.style.top));
-    expect(screen.getByRole("button", { name: `Expand ${DEVICE}` }).getAttribute("aria-expanded")).toBe("false");
-    expandAll();
-    expect(hierarchy().querySelectorAll(".uns-chart-node-select")).toHaveLength(7);
-    expect(hierarchy().querySelectorAll(".uns-chart-links > path")).toHaveLength(6);
-    expect(within(hierarchy()).getByTitle(BOARD_B).textContent).toContain("0 tags");
-    expect(within(hierarchy()).queryByTitle("Broker")).toBeNull();
-    expect(hierarchy().querySelectorAll(".uns-chart-links > path.is-selected-path")).toHaveLength(5);
-  });
-  it("shares selection and branch expansion between chart and compact list views", () => {
+  it("opens the readable tree without chart or list mode controls", () => {
     render(<UNSExplorerPanel open onClose={vi.fn()} />);
     receive(BOARD_A, { voltage: 4.3 });
     receive(BOARD_B, { pressure: 65 });
+    expect(screen.queryByRole("button", { name: "Chart" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "List" })).toBeNull();
+    expect(hierarchy().querySelectorAll(".uns-workspace-node-select")).toHaveLength(6);
     inspectTopic(BOARD_B);
-    fireEvent.click(screen.getByRole("button", { name: "List" }));
     expect(screen.getByTitle(BOARD_B).getAttribute("aria-current")).toBe("true");
     expect(within(screen.getByLabelText("Selected namespace details")).getByText("65")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: `Collapse ${DEVICE}` }));
     expect(screen.queryByTitle(BOARD_B)).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Chart" }));
-    expect(screen.queryByTitle(BOARD_B)).toBeNull();
-    expect(screen.getByRole("button", { name: `Expand ${DEVICE}` }).getAttribute("aria-expanded")).toBe("false");
     fireEvent.click(screen.getByRole("button", { name: `Expand ${DEVICE}` }));
     expect(screen.getByTitle(BOARD_B).getAttribute("aria-current")).toBe("true");
-    expect(screen.getByRole("img").getAttribute("aria-label")).toContain("1 messages received");
   });
   it("allows details to be opened, hidden for map space and restored with the same payload", () => {
     render(<UNSExplorerPanel open onClose={vi.fn()} />);
@@ -152,41 +141,6 @@ describe("UNS Explorer workspace", () => {
     fireEvent.click(screen.getByRole("button", { name: "Hide namespace details" }));
     fireEvent.click(screen.getByTitle(BOARD_A));
     expect(screen.getByLabelText("Selected namespace details")).toBeTruthy();
-  });
-  it("supports zoom, keyboard pan, fit and revealing keyboard-focused nodes", () => {
-    render(<UNSExplorerPanel open onClose={vi.fn()} />);
-    receive(BOARD_A, { voltage: 4.3 });
-    expandAll();
-    const viewport = hierarchy();
-    const world = viewport.querySelector<HTMLElement>(".uns-chart-world")!;
-    const zoom = screen.getByLabelText("Chart zoom");
-    const initialZoom = Number.parseInt(zoom.textContent ?? "0");
-    fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
-    expect(Number.parseInt(zoom.textContent ?? "0")).toBeGreaterThan(initialZoom);
-    fireEvent.click(screen.getByRole("button", { name: "Zoom out" }));
-    expect(Number.parseInt(zoom.textContent ?? "0")).toBe(initialZoom);
-    fireEvent.click(screen.getByRole("button", { name: "Fit tree" }));
-    const fitted = world.style.transform;
-    fireEvent.keyDown(viewport, { key: "ArrowRight" });
-    expect(world.style.transform).not.toBe(fitted);
-    fireEvent.keyDown(viewport, { key: "Home" });
-    expect(world.style.transform).toBe(fitted);
-    const fittedZoom = Number.parseInt(zoom.textContent ?? "0");
-    fireEvent.keyDown(viewport, { key: "+" });
-    expect(Number.parseInt(zoom.textContent ?? "0")).toBeGreaterThan(fittedZoom);
-    fireEvent.keyDown(viewport, { key: "-" });
-    expect(Number.parseInt(zoom.textContent ?? "0")).toBe(fittedZoom);
-    for (let index = 0; index < 20; index += 1) fireEvent.keyDown(viewport, { key: "ArrowLeft" });
-    const pannedAway = world.style.transform;
-    const topic = within(viewport).getByTitle(BOARD_A);
-    act(() => topic.focus());
-    expect(document.activeElement).toBe(topic);
-    expect(world.style.transform).not.toBe(pannedAway);
-    fireEvent.keyDown(viewport, { key: "ArrowRight" });
-    const beforeCenter = world.style.transform;
-    fireEvent.click(screen.getByRole("button", { name: "Center selected node" }));
-    expect(world.style.transform).not.toBe(beforeCenter);
-    expect(screen.getByTitle(BOARD_A).getAttribute("aria-current")).toBe("true");
   });
   it("preserves progressive branch expansion across receipts while search exposes matching topics", () => {
     render(<UNSExplorerPanel open onClose={vi.fn()} />);
@@ -205,7 +159,7 @@ describe("UNS Explorer workspace", () => {
     expect(screen.queryByTitle(BOARD_B)).toBeNull();
     expandAll();
     expect(screen.getByTitle(BOARD_A)).toBeTruthy();
-    const newDevice = "prplHome/McKinney/lineA/plc2";
+    const newDevice = "prplInnovationHub/McKinney/production/lineA/cell1/plc2";
     receive(`${newDevice}/data/boardA`, { voltage: 4.1 });
     expect(screen.getByTitle(BOARD_A)).toBeTruthy();
     expect(screen.queryByTitle(`${newDevice}/data/boardA`)).toBeNull();
@@ -218,35 +172,36 @@ describe("UNS Explorer workspace", () => {
     act(() => vi.advanceTimersByTime(16_000));
     receive("meter/data", { power: 100 });
     receive("prp1Home/McKinney/lineA/plc1/data/boardA", { voltage: 99 });
-    receive("prplHome2/McKinney/lineA/plc1/data/boardA", { voltage: 99 });
-    expect(hierarchy().querySelectorAll(".uns-chart-node-select")).toHaveLength(6);
+    receive("prplInnovationHub2/McKinney/lineA/plc1/data/boardA", { voltage: 99 });
+    receive("prplHome/McKinney/lineA/plc1/data/boardA", { voltage: 99 });
+    expect(hierarchy().querySelectorAll(".uns-workspace-node-select")).toHaveLength(8);
     const summary = document.querySelector(".uns-workspace-summary")!;
     expect([...summary.querySelectorAll("strong")].map((node) => node.textContent)).toEqual(["1", "1", "1"]);
     expect(screen.queryByText("Receiving")).toBeNull();
     expect(within(screen.getByLabelText("Selected namespace details")).getByText("4.3")).toBeTruthy();
     expect(within(hierarchy()).queryByTitle("meter")).toBeNull();
     expect(within(hierarchy()).queryByTitle("prp1Home")).toBeNull();
-    expect(within(hierarchy()).queryByTitle("prplHome2")).toBeNull();
+    expect(within(hierarchy()).queryByTitle("prplInnovationHub2")).toBeNull();
   });
-  it("accepts the exact prplHome parent as well as its descendant topics", () => {
+  it("accepts the exact prplInnovationHub parent as well as its descendant topics", () => {
     render(<UNSExplorerPanel open onClose={vi.fn()} />);
-    receive("prplHome", { online: false });
-    fireEvent.click(within(hierarchy()).getByTitle("prplHome"));
+    receive("prplInnovationHub", { online: false });
+    fireEvent.click(within(hierarchy()).getByTitle("prplInnovationHub"));
     expect(within(screen.getByLabelText("Selected namespace details")).getByText("false")).toBeTruthy();
     expect(screen.getByRole("img").getAttribute("aria-label")).toContain("1 messages received");
   });
-  it("retains the Classic Explorer and applies the same prplHome boundary", () => {
+  it("retains the Classic Explorer and applies the same prplInnovationHub boundary", () => {
     render(<UIVersionContext.Provider value={{ version: "classic", setVersion: vi.fn() }}><UNSExplorerPanel open onClose={vi.fn()} /></UIVersionContext.Provider>);
     expect(screen.getByText("UNS Explorer")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Chart" })).toBeNull();
     expect(screen.queryByRole("button", { name: "List" })).toBeNull();
     receive("meter/data", { power: 122.5 });
     receive("prp1Home/data", { value: 1 });
-    receive("prplHome2/data", { value: 1 });
+    receive("prplInnovationHub2/data", { value: 1 });
     expect(screen.getByText("0 messages this session")).toBeTruthy();
     expect(screen.getByText("Waiting for broker traffic")).toBeTruthy();
-    receive("prplHome/data", { value: 0 });
-    expect(screen.getByText("prplHome")).toBeTruthy();
+    receive("prplInnovationHub/data", { value: 0 });
+    expect(screen.getByText("prplInnovationHub")).toBeTruthy();
     expect(screen.getByText("data")).toBeTruthy();
     expect(screen.getByText("1 messages this session")).toBeTruthy();
   });

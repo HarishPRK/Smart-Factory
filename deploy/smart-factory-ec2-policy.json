@@ -16,7 +16,7 @@
         "arn:aws:iot:us-east-1:841019700679:topicfilter/meter/data",
         "arn:aws:iot:us-east-1:841019700679:topicfilter/plc/*",
         "arn:aws:iot:us-east-1:841019700679:topicfilter/lorawan/*",
-        "arn:aws:iot:us-east-1:841019700679:topicfilter/prplHome/McKinney/lineA/plc1/*",
+        "arn:aws:iot:us-east-1:841019700679:topicfilter/prplInnovationHub/*",
         "arn:aws:iot:us-east-1:841019700679:topicfilter/prplos/deviceinfo/*",
         "arn:aws:iot:us-east-1:841019700679:topicfilter/rdk/ipsec/metrics",
         "arn:aws:iot:us-east-1:841019700679:topicfilter/prpl/ipsec/metrics",

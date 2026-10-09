@@ -1,14 +1,13 @@
 import { useContext, useEffect, useRef, useState, type CSSProperties } from "react";
-import { Activity, ArrowRight, Building2, ChevronDown, ChevronRight, Clock3, Code2, Database, Factory, FolderTree, GitBranch, Layers3, ListTree, Maximize2, Minimize2, PanelRight, Radio, Search, Server, X } from "lucide-react";
+import { Activity, ArrowRight, Building2, ChevronDown, ChevronRight, Clock3, Code2, Database, Factory, FolderTree, Layers3, Maximize2, Minimize2, PanelRight, Radio, Search, MapPin, Workflow, Cpu, X } from "lucide-react";
 import { subscribeAnyMessage } from "../services/plcService";
 import { UIVersionContext } from "./ui-version/UIVersionContext";
 import UNSExplorerClassic from "../legacy/components/UNSExplorerPanel";
-import { createNamespaceNode, FACTORY_UNS_FILTER, findNamespaceNode, formatNamespaceValue, ingestNamespace, isFactoryNamespaceTopic, namespaceActivity, namespaceChildren, namespaceMatches, namespaceTopics, payloadEntries, type NamespaceNode } from "./uns/namespaceModel";
-import NamespaceChart from "./uns/NamespaceTreeChart";
+import { createNamespaceNode, NAMESPACE_LEVELS, FACTORY_UNS_FILTER, findNamespaceNode, formatNamespaceValue, ingestNamespace, isFactoryNamespaceTopic, namespaceActivity, namespaceChildren, namespaceMatches, namespaceTopics, payloadEntries, type NamespaceNode } from "./uns/namespaceModel";
 
 interface UNSExplorerPanelProps { open: boolean; onClose: () => void }
-const LEVELS = ["Enterprise", "Site", "Line", "Device"];
-const NODE_COLORS = ["#43d8f1", "#82b5f6", "#e9bd70", "#6ed6a2"];
+const LEVELS = NAMESPACE_LEVELS;
+const NODE_COLORS = ["#43d8f1", "#82b5f6", "#c7a4ed", "#e9bd70", "#6ed6a2", "#f18b82"];
 
 function ageLabel(timestamp: number | null, now: number): string {
   if (timestamp === null) return "No receipts";
@@ -19,7 +18,7 @@ function ageLabel(timestamp: number | null, now: number): string {
   return `${Math.floor(seconds / 3600)}h ago`;
 }
 function NodeIcon({ node }: { node: NamespaceNode }) {
-  const Icon = node.isTopic ? Database : [Building2, Factory, Layers3, Server][Math.min(node.depth - 1, 3)] ?? FolderTree;
+  const Icon = node.isTopic ? Database : [MapPin, Building2, Factory, Workflow, Layers3, Cpu][node.depth - 1] ?? FolderTree;
   return <Icon size={18} aria-hidden="true" />;
 }
 function ReceiptState({ node, now }: { node: NamespaceNode; now: number }) {
@@ -35,15 +34,15 @@ function NamespaceBranch({ node, collapsed, selectedPath, search, now, onToggle,
   const children = namespaceChildren(node);
   const isExpanded = search.trim() !== "" || !collapsed.has(node.path);
   const activity = namespaceActivity(node, now);
-  const level = !node.isTopic ? LEVELS[node.depth - 1] : undefined;
-  const color = NODE_COLORS[Math.min(node.depth - 1, 3)];
+  const level = LEVELS[node.depth - 1];
+  const color = NODE_COLORS[Math.min(node.depth - 1, NODE_COLORS.length - 1)];
   const tags = node.payload !== null && typeof node.payload === "object" && !Array.isArray(node.payload) ? payloadEntries(node.payload).length : null;
   return <li className="uns-workspace-branch" style={{ "--node-color": color } as CSSProperties}>
     <div className={`uns-workspace-node ${selectedPath === node.path ? "is-selected" : ""}`}>
       {children.length ? <button type="button" className="uns-workspace-expand" aria-label={`${isExpanded ? "Collapse" : "Expand"} ${node.path}`} aria-expanded={isExpanded} onClick={() => onToggle(node.path)} disabled={Boolean(search.trim())}>{isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}</button> : <span className="uns-workspace-branch-end" />}
       <button type="button" className="uns-workspace-node-select" onClick={() => onSelect(node.path)} aria-current={selectedPath === node.path ? "true" : undefined} title={node.path}>
         <span className="uns-workspace-node-icon"><NodeIcon node={node} /></span>
-        <span className="uns-workspace-node-name">{node.name}<small>{node.isTopic ? tags !== null ? `${tags} tags` : "Payload value" : level ?? "Namespace group"}</small></span>
+        <span className="uns-workspace-node-name">{node.name}<small>{level ?? (node.isTopic ? "Published topic" : "Namespace group")}{node.isTopic && ` · ${tags !== null ? `${tags} tags` : "Payload value"}`}</small></span>
         <span className="uns-workspace-node-activity"><span>{activity.rateHz.toFixed(1)} <small>Hz</small></span><span>{ageLabel(node.lastSeen, now)}</span></span>
         <span className={`uns-workspace-node-dot ${node.lastSeen !== null && now - node.lastSeen < 5000 ? "is-receiving" : ""}`} />
       </button>
@@ -77,7 +76,7 @@ function NamespaceInspector({ node, root, now, onSelect }: { node: NamespaceNode
   const tagCount = node.payload !== null && typeof node.payload === "object" && !Array.isArray(node.payload) ? entries.length : null;
   return <aside className="uns-workspace-inspector" aria-label="Selected namespace details">
     <nav className="uns-workspace-breadcrumb" aria-label="Selected topic path">{segments.map((segment, index) => <span key={`${index}-${segment}`}><button type="button" onClick={() => onSelect(segments.slice(0, index + 1).join("/"))}>{segment}</button>{index < segments.length - 1 && <ChevronRight size={12} />}</span>)}</nav>
-    <div className="uns-workspace-inspector-title"><span className="uns-workspace-selected-icon"><NodeIcon node={node} /></span><div><h3>{node.name}</h3><p>{node.isTopic ? "Published topic" : `${LEVELS[node.depth - 1] ?? "Namespace"} branch`}</p></div><ReceiptState node={node} now={now} /></div>
+    <div className="uns-workspace-inspector-title"><span className="uns-workspace-selected-icon"><NodeIcon node={node} /></span><div><h3>{node.name}</h3><p>{`${LEVELS[node.depth - 1] ?? "Namespace"}${node.isTopic ? " · Published topic" : " branch"}`}</p></div><ReceiptState node={node} now={now} /></div>
     <code className="uns-workspace-topic-path">{node.path}</code>
     <dl className="uns-workspace-topic-metrics"><div><dt>Arrival rate</dt><dd>{activity.rateHz.toFixed(1)} <small>Hz</small></dd></div><div><dt>Session messages</dt><dd>{activity.messages.toLocaleString()}</dd></div><div><dt>{node.isTopic ? "Payload tags" : "Published topics"}</dt><dd>{node.isTopic ? tagCount ?? "—" : activity.topics}</dd></div></dl>
     <ArrivalTimeline node={node} now={now} />
@@ -92,7 +91,7 @@ function NamespaceInspector({ node, root, now, onSelect }: { node: NamespaceNode
 
 function UNSWorkspace({ open, onClose }: UNSExplorerPanelProps) {
   const rootRef = useRef(createNamespaceNode());
-  const discoveredDevices = useRef(new Set<string>());
+  const discoveredEquipment = useRef(new Set<string>());
   const messagesRef = useRef(0);
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -102,9 +101,7 @@ function UNSWorkspace({ open, onClose }: UNSExplorerPanelProps) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [view, setView] = useState<"chart" | "list">("chart");
   const [showDetails, setShowDetails] = useState(false);
-  const [focusPath, setFocusPath] = useState<{ path: string; revision: number } | null>(null);
   useEffect(() => {
     let pending: ReturnType<typeof setTimeout> | undefined;
     const repaint = () => setSnapshot({ root: rootRef.current, messages: messagesRef.current, now: Date.now() });
@@ -112,12 +109,12 @@ function UNSWorkspace({ open, onClose }: UNSExplorerPanelProps) {
       if (!isFactoryNamespaceTopic(topic)) return;
       if (!ingestNamespace(rootRef.current, topic, payload, Date.now())) return;
       messagesRef.current += 1;
-      // Start with the four hierarchy scopes; deeper topics unfold on demand.
+      // Start with the six hierarchy scopes; deeper topics unfold on demand.
       // A branch is initialized once, so later receipts never undo user expansion.
-      const devicePath = topic.split("/").filter(Boolean).slice(0, 4).join("/");
+      const devicePath = topic.split("/").filter(Boolean).slice(0, LEVELS.length).join("/");
       const device = findNamespaceNode(rootRef.current, devicePath);
-      if (device?.depth === 4 && device.children.size && !discoveredDevices.current.has(devicePath)) {
-        discoveredDevices.current.add(devicePath);
+      if (device?.depth === LEVELS.length && device.children.size && !discoveredEquipment.current.has(devicePath)) {
+        discoveredEquipment.current.add(devicePath);
         setCollapsed((previous) => new Set(previous).add(devicePath));
       }
       if (pending === undefined) pending = setTimeout(() => { pending = undefined; repaint(); }, 250);
@@ -153,18 +150,17 @@ function UNSWorkspace({ open, onClose }: UNSExplorerPanelProps) {
   const navigate = (path: string) => {
     inspect(path);
     setCollapsed((previous) => { const next = new Set(previous); const segments = path.split("/"); segments.forEach((_, index) => next.delete(segments.slice(0, index + 1).join("/"))); return next; });
-    setFocusPath((previous) => ({ path, revision: (previous?.revision ?? 0) + 1 }));
   };
   return <div className="uns-workspace-overlay"><div className="uns-workspace-backdrop" onClick={onClose} /><div className="uns-workspace-dialog" role="dialog" aria-modal="true" aria-labelledby="uns-workspace-title" ref={dialogRef}>
     <header className="uns-workspace-header"><div><h2 id="uns-workspace-title">UNS Explorer</h2><p>Unified Namespace · <code>{FACTORY_UNS_FILTER}</code></p></div><div className="uns-workspace-header-actions">{root.lastSeen !== null ? <ReceiptState node={root} now={now} /> : <span className="uns-workspace-receipt"><Radio size={14} />Awaiting traffic</span>}<button type="button" ref={closeRef} onClick={onClose} aria-label="Close UNS Explorer"><X size={20} /></button></div></header>
     <div className="uns-workspace-summary"><span><FolderTree size={16} /><strong>{root.children.size}</strong> root branches</span><span><Database size={16} /><strong>{topics.length}</strong> topics</span><span><Radio size={16} /><strong>{messages.toLocaleString()}</strong> session messages</span><span className="uns-workspace-summary-time"><Clock3 size={15} />{ageLabel(root.lastSeen, now)}</span></div>
-    <div className={`uns-workspace-body ${view === "chart" ? "has-chart" : ""} ${selected && showDetails ? "" : "is-empty"}`}>
-      <section className="uns-workspace-hierarchy"><div className="uns-workspace-tree-tools"><label className="uns-workspace-search"><Search size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search topics or tags" aria-label="Search namespace topics or tags" />{search && <button type="button" onClick={() => setSearch("")} aria-label="Clear namespace search"><X size={14} /></button>}</label><div className="uns-workspace-view-controls" aria-label="Namespace view"><button type="button" aria-pressed={view === "chart"} onClick={() => setView("chart")}><GitBranch size={15} />Chart</button><button type="button" aria-pressed={view === "list"} onClick={() => setView("list")}><ListTree size={15} />List</button></div></div>
-        <div className="uns-workspace-map-tools"><span>{view === "chart" ? "Enterprise → Site → Line → Device" : "Namespace hierarchy"}</span><div className="uns-workspace-tree-actions"><button type="button" onClick={() => setCollapsed(new Set())} disabled={Boolean(search.trim()) || !topics.length} aria-label="Expand all branches" title="Expand all branches"><Maximize2 size={16} /></button><button type="button" onClick={collapseAll} disabled={Boolean(search.trim()) || !topics.length} aria-label="Collapse all branches" title="Collapse all branches"><Minimize2 size={16} /></button><button type="button" className="uns-workspace-details-toggle" onClick={() => setShowDetails((previous) => !previous)} disabled={!selected} aria-pressed={showDetails} aria-label={showDetails ? "Hide namespace details" : "Show namespace details"}><PanelRight size={16} /><span>Details</span></button></div></div>
-        {root.children.size ? branches.length ? view === "chart" ? <NamespaceChart root={root} collapsed={collapsed} search={search} selectedPath={selected?.path ?? null} now={now} focusPath={focusPath} onToggle={toggle} onSelect={inspect} /> : <nav className="uns-workspace-tree-scroll" aria-label="Namespace hierarchy"><ul>{branches.map((node) => <NamespaceBranch key={node.path} node={node} collapsed={collapsed} selectedPath={selected?.path ?? null} search={search} now={now} onToggle={toggle} onSelect={inspect} />)}</ul></nav> : <div className="uns-workspace-no-results"><h3>No matching topics</h3><p>Try a device name, topic segment or payload tag.</p><button type="button" onClick={() => setSearch("")}>Clear search</button></div> : <div className="uns-workspace-empty" role="status"><FolderTree size={44} strokeWidth={1.25} /><h3>Waiting for broker traffic</h3><p>The tree builds from received messages under <code>{FACTORY_UNS_FILTER}</code>. Expand a device to discover its topics, then select a node to inspect its payload.</p><div><Radio size={16} />MQTT discovery is listening</div></div>}
+    <div className={`uns-workspace-body ${selected && showDetails ? "" : "is-empty"}`}>
+      <section className="uns-workspace-hierarchy"><div className="uns-workspace-tree-tools"><label className="uns-workspace-search"><Search size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search topics or tags" aria-label="Search namespace topics or tags" />{search && <button type="button" onClick={() => setSearch("")} aria-label="Clear namespace search"><X size={14} /></button>}</label></div>
+        <div className="uns-workspace-map-tools"><span>Namespace hierarchy</span><div className="uns-workspace-tree-actions"><button type="button" onClick={() => setCollapsed(new Set())} disabled={Boolean(search.trim()) || !topics.length} aria-label="Expand all branches" title="Expand all branches"><Maximize2 size={16} /></button><button type="button" onClick={collapseAll} disabled={Boolean(search.trim()) || !topics.length} aria-label="Collapse all branches" title="Collapse all branches"><Minimize2 size={16} /></button><button type="button" className="uns-workspace-details-toggle" onClick={() => setShowDetails((previous) => !previous)} disabled={!selected} aria-pressed={showDetails} aria-label={showDetails ? "Hide namespace details" : "Show namespace details"}><PanelRight size={16} /><span>Details</span></button></div></div>
+        {root.children.size ? branches.length ? <nav className="uns-workspace-tree-scroll" aria-label="Namespace hierarchy"><ul>{branches.map((node) => <NamespaceBranch key={node.path} node={node} collapsed={collapsed} selectedPath={selected?.path ?? null} search={search} now={now} onToggle={toggle} onSelect={inspect} />)}</ul></nav> : <div className="uns-workspace-no-results"><h3>No matching topics</h3><p>Try a device name, topic segment or payload tag.</p><button type="button" onClick={() => setSearch("")}>Clear search</button></div> : <div className="uns-workspace-empty" role="status"><FolderTree size={44} strokeWidth={1.25} /><h3>Waiting for broker traffic</h3><p>The tree builds from received messages under <code>{FACTORY_UNS_FILTER}</code>. Expand equipment to discover its topics, then select a node to inspect its payload.</p><div><Radio size={16} />MQTT discovery is listening</div></div>}
       </section>
       {selected && showDetails && <NamespaceInspector key={selected.path} node={selected} root={root} now={now} onSelect={navigate} />}
-    </div><footer className="uns-workspace-footer"><span><i />Received broker data only</span><span>Topic depth → Enterprise / Site / Line / Device</span></footer>
+    </div><footer className="uns-workspace-footer"><span><i />Received broker data only</span><span>{LEVELS.join(" → ")}</span></footer>
   </div></div>;
 }
 

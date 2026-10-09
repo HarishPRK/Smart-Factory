@@ -137,7 +137,7 @@ describe("browser MQTT command allowlist", () => {
     expect(isProtectedCommandTopic("plc/cmd")).toBe(true);
     expect(isProtectedCommandTopic("plc/data")).toBe(false);
     expect(
-      isProtectedCommandTopic("prplHome/McKinney/lineA/plc1/data"),
+      isProtectedCommandTopic("prplInnovationHub/McKinney/lineA/plc1/data"),
     ).toBe(false);
   });
 
@@ -152,7 +152,7 @@ describe("browser MQTT command allowlist", () => {
     gate.observe("plc/data", { boardB_io_push_lock_button: 0 });
     expect(gate.isSafeToEnergize()).toBe(true);
     // A retained/high first sample after restart is not a fresh badge scan.
-    gate.observe("prplHome/McKinney/lineA/plc1/data/boardA", {
+    gate.observe("prplInnovationHub/McKinney/lineA/plc1/data/boardA", {
       boardA_rfid_authorized_user: 1,
     });
     expect(gate.isAuthorized()).toBe(false);

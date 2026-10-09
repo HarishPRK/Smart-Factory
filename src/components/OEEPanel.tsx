@@ -1,294 +1,151 @@
-import React from "react";
-import OEEGauge from "./OEEGauge";
+import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
+import { Activity, ArrowDownToLine, ArrowRight, CheckCheck, Clock3, Database, Gauge, Package, Radio, Timer, X } from "lucide-react";
+import { Area, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useOEE } from "../hooks/useOEE";
-import { useTweenedNumber } from "../hooks/useTweenedNumber";
+import type { OEEResponse, OEETrendPoint } from "../services/siteWiseService";
 import type { OEETimeRange } from "../types";
+import "./oee-workspace.css";
 
-interface OEEPanelProps {
-  open: boolean;
-  onClose: () => void;
+interface OEEPanelProps { open: boolean; onClose: () => void }
+type Factor = "availability" | "performance" | "quality";
+type Series = Factor | "oee";
+const FACTORS = [
+  { key: "availability" as const, label: "Availability", color: "#82b5f6", Icon: Timer, formula: "Run time / planned time", gap: "Time unavailable" },
+  { key: "performance" as const, label: "Performance", color: "#e9bd70", Icon: Gauge, formula: "Actual output / ideal output", gap: "Speed loss" },
+  { key: "quality" as const, label: "Quality", color: "#c7a4ed", Icon: CheckCheck, formula: "Good parts / total parts", gap: "Quality loss" },
+];
+const SERIES = [{ key: "oee" as const, label: "OEE", color: "#43d8f1" }, ...FACTORS];
+const RANGES: { id: OEETimeRange; label: string }[] = [{ id: "shift", label: "Shift" }, { id: "24h", label: "24h" }, { id: "7d", label: "7d" }, { id: "30d", label: "30d" }];
+const percent = (value: number | undefined) => value === undefined ? "—" : (value * 100).toFixed(1);
+const duration = (seconds: number | undefined) => {
+  if (seconds === undefined) return "—";
+  if (seconds < 60) return `${Math.floor(seconds)}s`;
+  const hours = Math.floor(seconds / 3600), minutes = Math.floor(seconds % 3600 / 60);
+  return hours ? `${hours}h ${minutes}m` : `${minutes}m`;
+};
+const clockTime = (timestamp: number) => new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+const accent = (color: string) => ({ "--oee-accent": color } as CSSProperties);
+
+function EffectivenessDial({ oee }: { oee: OEEResponse | null }) {
+  return <div className="oee-dial" role="img" aria-label={oee ? `Overall effectiveness ${percent(oee.oee.value)} percent. Availability ${percent(oee.availability.value)}, performance ${percent(oee.performance.value)}, quality ${percent(oee.quality.value)} percent.` : "Waiting for an OEE measurement"}>
+    <svg viewBox="0 0 240 240" aria-hidden="true">
+      {Array.from({ length: 40 }, (_, index) => <line key={index} x1="120" y1="4" x2="120" y2={index % 5 === 0 ? 12 : 8} transform={`rotate(${index * 9} 120 120)`} className="oee-dial-tick" />)}
+      {FACTORS.map((factor, index) => <g key={factor.key} transform="rotate(-90 120 120)">
+        <circle cx="120" cy="120" r={98 - index * 14} className="oee-dial-track" />
+        {oee && <circle cx="120" cy="120" r={98 - index * 14} className="oee-dial-fill" stroke={factor.color} pathLength="100" strokeDasharray={`${oee[factor.key].value * 100} 100`} />}
+      </g>)}
+    </svg>
+    <div className="oee-dial-value"><strong>{percent(oee?.oee.value)}{oee && <small>%</small>}</strong><span>Overall effectiveness</span></div>
+  </div>;
 }
 
-const TIME_RANGES: { id: OEETimeRange; label: string }[] = [
-  { id: "shift", label: "Shift" },
-  { id: "24h", label: "24h" },
-  { id: "7d", label: "7d" },
-  { id: "30d", label: "30d" },
-];
+function FactorInstrument({ factor, value }: { factor: typeof FACTORS[number]; value: number | undefined }) {
+  const { Icon } = factor;
+  return <section className="oee-factor" style={accent(factor.color)} aria-label={factor.label}>
+    <h3><Icon size={18} />{factor.label}</h3>
+    <div className="oee-factor-value">{percent(value)}{value !== undefined && <small>%</small>}</div>
+    <p>{factor.formula}</p>
+    <svg className="oee-factor-segments" viewBox="0 0 240 36" aria-hidden="true">
+      {Array.from({ length: 30 }, (_, index) => <rect key={index} x={index * 8} y="3" width="5" height="30" rx="1" fill={value !== undefined && index / 30 < value ? factor.color : "#30444f"} />)}
+    </svg>
+    <div className="oee-factor-gap"><span>{factor.gap}</span><strong>{value === undefined ? "—" : `${((1 - value) * 100).toFixed(1)}%`}</strong></div>
+  </section>;
+}
 
-/* ── Count-up number ────────────────────────────────────
- * Tweens to `value` and renders it; combined with the panel's reveal gating
- * (0 → real value once mounted) this makes every stat sweep up on open. */
-const CountUp: React.FC<{ value: number; decimals?: number; suffix?: string }> = ({
-  value, decimals = 0, suffix = "",
-}) => {
-  const t = useTweenedNumber(value, 750);
-  return <>{t.toFixed(decimals)}{suffix}</>;
-};
-
-/* ── Trend Chart ────────────────────────────────────── */
-
-const TrendChart: React.FC<{
-  data: { timestamp: number; oee: number; availability: number; performance: number; quality: number }[];
-  rangeKey: string;
-}> = ({ data, rangeKey }) => {
-  if (data.length < 2) {
-    return <div className="h-[160px] flex items-center justify-center text-sky-200/40 text-[11px]">No trend data</div>;
-  }
-
-  const W = 500;
-  const H = 160;
-  const pad = { top: 16, right: 12, bottom: 24, left: 40 };
-  const cw = W - pad.left - pad.right;
-  const ch = H - pad.top - pad.bottom;
-  const baseY = pad.top + ch;
-
-  const toX = (i: number) => pad.left + (i / (data.length - 1)) * cw;
-  const toY = (v: number) => pad.top + ch - v * ch;
-
-  const lines: { key: string; color: string; values: number[] }[] = [
-    { key: "OEE", color: "#10b981", values: data.map((d) => d.oee) },
-    { key: "Avail", color: "#3b82f6", values: data.map((d) => d.availability) },
-    { key: "Perf", color: "#f59e0b", values: data.map((d) => d.performance) },
-    { key: "Qual", color: "#8b5cf6", values: data.map((d) => d.quality) },
-  ];
-
-  const buildPath = (values: number[]) => {
-    const pts = values.map((v, i) => ({ x: toX(i), y: toY(v) }));
-    let path = `M${pts[0].x},${pts[0].y}`;
-    for (let i = 1; i < pts.length; i++) {
-      const p = pts[i - 1], c = pts[i];
-      path += ` C${p.x + (c.x - p.x) * 0.4},${p.y} ${p.x + (c.x - p.x) * 0.6},${c.y} ${c.x},${c.y}`;
-    }
-    return path;
-  };
-
-  const oeePath = buildPath(lines[0].values);
-  const oeeArea = `${oeePath} L${toX(data.length - 1)},${baseY} L${toX(0)},${baseY} Z`;
-
-  return (
-    <div>
-      {/* `key` restarts the draw-in animation whenever the range/data changes */}
-      <svg key={rangeKey} viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: H }}>
-        <defs>
-          <linearGradient id="oee-area" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#10b981" stopOpacity="0.28" />
-            <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-
-        {/* Grid */}
-        {[0, 0.25, 0.5, 0.75, 1].map((frac) => {
-          const y = pad.top + ch * (1 - frac);
-          return (
-            <g key={frac}>
-              <line x1={pad.left} y1={y} x2={W - pad.right} y2={y} stroke="rgba(100,160,220,0.08)" strokeWidth="1" />
-              <text x={pad.left - 6} y={y + 3} textAnchor="end" fill="rgba(140,180,220,0.55)" fontSize="9" fontFamily="Inter">
-                {(frac * 100).toFixed(0)}%
-              </text>
-            </g>
-          );
-        })}
-
-        {/* Soft glowing area under the OEE line */}
-        <path d={oeeArea} fill="url(#oee-area)" style={{ animation: "oee-area-rise 0.9s ease-out 0.2s both" }} />
-
-        {/* Lines — each draws itself in left-to-right, staggered */}
-        {lines.map((line, i) => (
-          <path
-            key={line.key}
-            d={buildPath(line.values)}
-            fill="none"
-            stroke={line.color}
-            strokeWidth={line.key === "OEE" ? 2.2 : 1.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            opacity={line.key === "OEE" ? 1 : 0.75}
-            pathLength={1}
-            style={{
-              strokeDasharray: 1,
-              animation: `oee-draw 1.1s ease-out ${0.15 + i * 0.12}s both`,
-              filter: line.key === "OEE" ? "drop-shadow(0 0 4px rgba(16,185,129,0.5))" : undefined,
-            }}
-          />
-        ))}
-      </svg>
-
-      {/* Legend */}
-      <div className="flex items-center justify-center gap-4 mt-1">
-        {lines.map((line) => (
-          <div key={line.key} className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: line.color, boxShadow: `0 0 6px ${line.color}` }} />
-            <span className="text-[9px] text-sky-200/60 font-medium">{line.key}</span>
-          </div>
-        ))}
-      </div>
+function YieldBreakdown({ oee }: { oee: OEEResponse | null }) {
+  const a = oee?.availability.value, p = oee?.performance.value, q = oee?.quality.value;
+  const values = a === undefined || p === undefined || q === undefined ? null : [1, a, a * p, a * p * q];
+  const labels = ["Planned", "Available", "At speed", "Good output"];
+  const colors = ["#497080", ...FACTORS.map((factor) => factor.color)];
+  return <aside className="oee-yield">
+    <h3>Where effectiveness goes</h3><p>How the three factors compound.</p>
+    <div className="oee-yield-bars" role="img" aria-label={values ? labels.map((label, i) => `${label}: ${percent(values[i])}%`).join(", ") : "Effectiveness breakdown awaiting measurements"}>
+      {labels.map((label, index) => <div className="oee-yield-column" key={label} style={accent(colors[index])}>
+        <strong>{values ? `${percent(values[index])}%` : "—"}</strong>
+        <div className="oee-yield-track"><span style={{ transform: `scaleY(${values?.[index] ?? 0})` }} /></div><span>{label}</span>
+      </div>)}
     </div>
-  );
-};
+    <div className="oee-yield-equation"><span>A</span><b>×</b><span>P</span><b>×</b><span>Q</span><ArrowRight size={14} /><strong>{values ? `${percent(values[3])}%` : "—"}</strong></div>
+    <small>Calculated from the latest factors.</small>
+  </aside>;
+}
 
-/* ── Stat Card ──────────────────────────────────────── */
-
-const StatCard: React.FC<{
-  label: string;
-  value: string | number;
-  unit?: string;
-  color?: string;
-  delay: number;
-}> = ({ label, value, unit, color = "text-cyan-50", delay }) => (
-  <div
-    className="flex-1 bg-white/[0.02] border border-cyan-300/[0.06] rounded-xl px-3 py-2.5 animate-fade-in transition-all duration-300 hover:-translate-y-0.5 hover:border-cyan-300/20 hover:bg-white/[0.04]"
-    style={{ animationDelay: `${delay}ms` }}
-  >
-    <div className="text-[9px] text-sky-200/50 uppercase tracking-[0.12em] font-semibold">{label}</div>
-    <div className={`text-[18px] font-semibold mt-1 leading-none ${color}`}>
-      {typeof value === "number" ? <CountUp value={value} /> : value}
-      {unit && <span className="text-[11px] text-sky-200/50 ml-1">{unit}</span>}
+function History({ data, loading, range }: { data: OEETrendPoint[]; loading: boolean; range: OEETimeRange }) {
+  const [visible, setVisible] = useState<Set<Series>>(() => new Set(SERIES.map((series) => series.key)));
+  const id = useId().replace(/:/g, "");
+  const tickTime = (timestamp: number) => range === "7d" || range === "30d" ? new Date(timestamp).toLocaleDateString([], { month: "short", day: "numeric" }) : clockTime(timestamp);
+  return <>
+    <div className="oee-history-legend" aria-label="Trend series">
+      {SERIES.map((series) => <button type="button" key={series.key} aria-pressed={visible.has(series.key)} style={accent(series.color)} onClick={() => setVisible((previous) => {
+        const next = new Set(previous);
+        if (next.has(series.key)) { if (next.size > 1) next.delete(series.key); } else next.add(series.key);
+        return next;
+      })}><i />{series.label}</button>)}
     </div>
-  </div>
-);
+    <div className="oee-history-plot">
+      {!data.length ? <div className="oee-history-empty" role="status"><Activity size={30} strokeWidth={1.3} /><strong>{loading ? "Loading production history" : "Waiting for production history"}</strong><span>Received OEE readings will appear here.</span></div> :
+        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+          <ComposedChart data={data} margin={{ top: 14, right: 14, left: -18, bottom: 0 }} accessibilityLayer>
+            <defs><linearGradient id={id} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#43d8f1" stopOpacity={0.18} /><stop offset="100%" stopColor="#43d8f1" stopOpacity={0} /></linearGradient></defs>
+            <CartesianGrid vertical={false} stroke="#30444f" strokeDasharray="3 5" />
+            <XAxis dataKey="timestamp" type="number" domain={["dataMin", "dataMax"]} tickFormatter={tickTime} minTickGap={45} tick={{ fill: "#a7bbc6", fontSize: 11 }} axisLine={false} tickLine={false} dy={8} />
+            <YAxis domain={[0, 1]} ticks={[0, .25, .5, .75, 1]} tickFormatter={(value: number) => `${value * 100}%`} tick={{ fill: "#a7bbc6", fontSize: 11 }} axisLine={false} tickLine={false} />
+            <Tooltip cursor={{ stroke: "#90aab7", strokeDasharray: "4 4" }} content={({ active, payload, label }) => active && payload?.length ? <div className="oee-chart-tooltip"><strong>{new Date(Number(label)).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" })}</strong>{payload.map((entry) => <div key={String(entry.dataKey)}><span><i style={{ background: entry.color }} />{entry.name}</span><b>{percent(Number(entry.value))}%</b></div>)}</div> : null} />
+            {visible.has("oee") && <Area dataKey="oee" name="OEE" type="linear" stroke="#43d8f1" strokeWidth={2.5} fill={`url(#${id})`} dot={data.length === 1 ? { r: 4 } : false} activeDot={{ r: 5, stroke: "#14242e", strokeWidth: 2 }} isAnimationActive={false} />}
+            {FACTORS.map((factor) => visible.has(factor.key) && <Line key={factor.key} dataKey={factor.key} name={factor.label} type="linear" stroke={factor.color} strokeWidth={1.6} dot={data.length === 1 ? { r: 3 } : false} activeDot={{ r: 4 }} isAnimationActive={false} />)}
+          </ComposedChart>
+        </ResponsiveContainer>}
+    </div>
+  </>;
+}
 
-/* ── Main Panel ─────────────────────────────────────── */
+function exportHistory(data: OEETrendPoint[]) {
+  const csv = ["timestamp,oee_percent,availability_percent,performance_percent,quality_percent", ...data.map((point) => [new Date(point.timestamp).toISOString(), ...SERIES.map((series) => (point[series.key] * 100).toFixed(3))].join(","))].join("\r\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a"); link.href = url; link.download = "oee-history.csv"; link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
-const OEEPanel: React.FC<OEEPanelProps> = ({ open, onClose }) => {
-  const { oee, trend, loading, trendTimeRange, setTrendTimeRange } = useOEE();
-
+export default function OEEPanel({ open, onClose }: OEEPanelProps) {
+  const { oee, trend, loading, source, trendSource, trendLoading, trendTimeRange, setTrendTimeRange } = useOEE();
+  const dialog = useRef<HTMLDivElement>(null), close = useRef<HTMLButtonElement>(null), dismiss = useRef(onClose);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { dismiss.current = onClose; }, [onClose]);
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden"; close.current?.focus();
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); dismiss.current(); }
+      if (event.key !== "Tab") return;
+      const controls = [...(dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled), [tabindex="0"]') ?? [])].filter((element) => element.getClientRects().length);
+      const first = controls[0], last = controls.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    document.addEventListener("keydown", keydown);
+    return () => { clearInterval(timer); document.removeEventListener("keydown", keydown); document.body.style.overflow = overflow; previous?.focus(); };
+  }, [open]);
   if (!open) return null;
-
-  const formatTime = (sec: number) => {
-    const h = Math.floor(sec / 3600);
-    const m = Math.floor((sec % 3600) / 60);
-    return h > 0 ? `${h}h ${m}m` : `${m}m`;
-  };
-
-  const r = (v: number) => v;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} style={{ animation: "fadeIn 0.25s ease" }} />
-
-      <div
-        className="relative w-[90vw] max-w-[900px] max-h-[85vh] bg-[#0a1628]/95 backdrop-blur-2xl border border-cyan-300/12 rounded-2xl shadow-[0_20px_80px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden"
-        style={{ animation: "modalIn 0.32s cubic-bezier(0.16, 1, 0.3, 1)" }}
-      >
-        {/* Animated accent sweep along the top edge */}
-        <div className="absolute top-0 left-0 right-0 h-px overflow-hidden">
-          <div className="h-full w-1/3 bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent" style={{ animation: "oee-bar-shimmer 3.5s ease-in-out infinite" }} />
-        </div>
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-cyan-300/[0.08]">
-          <div>
-            <h2 className="text-[16px] font-semibold text-cyan-50 tracking-tight">OEE Dashboard</h2>
-            <p className="text-[11px] text-sky-200/60 font-medium mt-0.5">
-              Overall Equipment Effectiveness — Availability x Performance x Quality
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-lg bg-white/[0.04] border border-cyan-300/[0.08] flex items-center justify-center text-sky-200/60 hover:text-white hover:bg-white/[0.08] hover:rotate-90 transition-all duration-300"
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-          {loading && !oee ? (
-            <div className="h-40 flex items-center justify-center text-sky-200/40 text-sm">Loading OEE data...</div>
-          ) : (
-            <>
-              {/* Gauges Row */}
-              <div className="flex items-center justify-center gap-8 animate-fade-in" style={{ animationDelay: "40ms" }}>
-                <OEEGauge value={r(oee?.oee.value ?? 0)} size={140} label="OEE" />
-                <div className="h-16 w-px bg-gradient-to-b from-transparent via-cyan-300/15 to-transparent" />
-                <OEEGauge value={r(oee?.availability.value ?? 0)} size={90} label="Availability" />
-                <OEEGauge value={r(oee?.performance.value ?? 0)} size={90} label="Performance" />
-                <OEEGauge value={r(oee?.quality.value ?? 0)} size={90} label="Quality" />
-              </div>
-
-              {/* Stats Row */}
-              <div className="flex gap-3">
-                <StatCard label="Total Cycles" value={r(oee?.totalCycles ?? 0)} delay={120} />
-                <StatCard label="Good Parts" value={r(oee?.goodCycles ?? 0)} color="text-emerald-300" delay={180} />
-                <StatCard label="Rejects" value={r(oee?.rejectCycles ?? 0)} color="text-red-300" delay={240} />
-                <StatCard label="Run Time" value={formatTime(oee?.runTimeSec ?? 0)} delay={300} />
-                <StatCard label="Shift" value={oee?.shiftId ?? "—"} delay={360} />
-              </div>
-
-              {/* Trend Chart */}
-              <div className="bg-white/[0.02] border border-cyan-300/[0.06] rounded-xl p-4 animate-fade-in" style={{ animationDelay: "300ms" }}>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-[11px] text-sky-200/70 font-semibold uppercase tracking-[0.12em]">OEE Trend</span>
-                  <div className="flex gap-1 p-0.5 rounded-lg bg-white/[0.03] border border-cyan-300/[0.06]">
-                    {TIME_RANGES.map((tr) => (
-                      <button
-                        key={tr.id}
-                        onClick={() => setTrendTimeRange(tr.id)}
-                        className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all ${
-                          trendTimeRange === tr.id
-                            ? "bg-cyan-400/15 text-cyan-200 border border-cyan-400/20"
-                            : "text-sky-200/50 hover:text-sky-200/80 border border-transparent"
-                        }`}
-                      >
-                        {tr.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <TrendChart data={trend} rangeKey={trendTimeRange} />
-              </div>
-
-              {/* Pillar Breakdown */}
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  { label: "Availability", value: oee?.availability, color: "#3b82f6", light: "#93c5fd", desc: "Run Time / Planned Time" },
-                  { label: "Performance", value: oee?.performance, color: "#f59e0b", light: "#fcd34d", desc: "Actual Output / Ideal Output" },
-                  { label: "Quality", value: oee?.quality, color: "#8b5cf6", light: "#c4b5fd", desc: "Good Parts / Total Parts" },
-                ].map((pillar, i) => (
-                  <div
-                    key={pillar.label}
-                    className="bg-white/[0.02] border border-cyan-300/[0.06] rounded-xl p-4 animate-fade-in transition-all duration-300 hover:-translate-y-0.5 hover:border-cyan-300/20"
-                    style={{ animationDelay: `${380 + i * 70}ms` }}
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: pillar.color, boxShadow: `0 0 8px ${pillar.color}` }} />
-                      <span className="text-[11px] text-sky-200/70 font-semibold uppercase tracking-[0.1em]">{pillar.label}</span>
-                    </div>
-                    <div className="text-[28px] font-semibold text-cyan-50 leading-none tabular-nums">
-                      <CountUp value={r((pillar.value?.value ?? 0) * 100)} decimals={1} suffix="%" />
-                    </div>
-                    <div className="text-[9px] text-sky-200/40 mt-2">{pillar.desc}</div>
-                    {/* Bar — gradient fill + sweeping shimmer */}
-                    <div className="mt-3 h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full relative overflow-hidden transition-[width] duration-1000 ease-out"
-                        style={{
-                          width: `${r(pillar.value?.value ?? 0) * 100}%`,
-                          background: `linear-gradient(90deg, ${pillar.color}, ${pillar.light})`,
-                          boxShadow: `0 0 10px ${pillar.color}66`,
-                        }}
-                      >
-                        <div
-                          className="absolute inset-y-0 w-1/3"
-                          style={{
-                            background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent)",
-                            animation: `oee-bar-shimmer 2.2s ease-in-out ${0.6 + i * 0.2}s infinite`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default OEEPanel;
+  const lowest = oee ? FACTORS.reduce((low, factor) => oee[factor.key].value < oee[low.key].value ? factor : low) : null;
+  const age = oee ? Math.max(0, Math.floor((now - oee.timestamp) / 1000)) : 0;
+  const stale = source === "plc" && age > 30;
+  const sourceLabel = source === "plc" ? stale ? "Last PLC reading" : "PLC rollup" : source === "historian" ? "SiteWise snapshot" : loading ? "Connecting" : "Awaiting OEE";
+  const counts = [
+    { label: "Total cycles", value: oee?.totalCycles.toLocaleString() ?? "—", Icon: Package },
+    { label: "Good parts", value: oee?.goodCycles.toLocaleString() ?? "—", Icon: CheckCheck, color: "#6ed6a2" },
+    { label: "Rejects", value: oee?.rejectCycles.toLocaleString() ?? "—", Icon: X, color: oee?.rejectCycles ? "#f18b82" : undefined },
+    { label: "Run time", value: duration(oee?.runTimeSec), Icon: Timer },
+    { label: "Shift", value: oee?.shiftId ?? "—", Icon: Clock3 },
+  ];
+  return <div className="oee-workspace-overlay"><div className="oee-workspace-backdrop" onClick={onClose} /><div className="oee-workspace" role="dialog" aria-modal="true" aria-labelledby="oee-workspace-title" ref={dialog}>
+    <header className="oee-workspace-header"><div className="oee-workspace-heading"><span className="oee-heading-icon"><Gauge size={23} /></span><div><h2 id="oee-workspace-title">OEE Dashboard</h2><p>Overall equipment effectiveness</p></div></div><div className="oee-header-actions"><div className={`oee-source ${stale ? "is-stale" : ""}`}><span><i />{sourceLabel}</span><small>{oee ? `Updated ${clockTime(oee.timestamp)}${stale ? ` · ${duration(age)} ago` : ""}` : "Waiting for a complete rollup"}</small></div><button type="button" className="oee-close" ref={close} onClick={onClose} aria-label="Close OEE dashboard"><X size={20} /></button></div></header>
+    <div className="oee-workspace-scroll">
+      <section className="oee-overview" aria-label="Current equipment effectiveness"><div className="oee-overall"><EffectivenessDial oee={oee} /><div className="oee-formula">Availability <b>×</b> Performance <b>×</b> Quality</div></div><div className="oee-factors">{FACTORS.map((factor) => <FactorInstrument key={factor.key} factor={factor} value={oee?.[factor.key].value} />)}<div className="oee-focus"><Activity size={16} /><span>{lowest && oee ? <><strong>{lowest.label}</strong> is the lowest factor at <strong>{percent(oee[lowest.key].value)}%</strong>.</> : "The latest production rollup will populate these instruments."}</span></div></div></section>
+      <dl className="oee-production-stats">{counts.map(({ label, value, Icon, color }) => <div key={label}><dt><Icon size={14} />{label}</dt><dd style={color ? { color } : undefined}>{value}</dd></div>)}</dl>
+      <section className="oee-trend-section" aria-label="OEE history"><div className="oee-section-heading"><div><h3>Effectiveness over time</h3><p>{trendSource === "session" ? "Received this session · up to 20 minutes retained" : trendSource === "historian" ? "SiteWise history and received PLC samples" : "History appears as production readings arrive"}</p></div><div className="oee-range-controls" aria-label="History time range">{RANGES.map((range) => <button type="button" key={range.id} aria-pressed={range.id === trendTimeRange} onClick={() => setTrendTimeRange(range.id)}>{range.label}</button>)}</div></div><div className="oee-history-layout"><div className="oee-history"><History data={trend} loading={trendLoading} range={trendTimeRange} /><div className="oee-history-footer"><span><Clock3 size={13} />{trend.length ? `${trend.length.toLocaleString()} samples · ${clockTime(trend[0].timestamp)}–${clockTime(trend.at(-1)!.timestamp)}` : "No samples received"}</span><button type="button" disabled={!trend.length} onClick={() => exportHistory(trend)}><ArrowDownToLine size={14} />Export CSV</button></div></div><YieldBreakdown oee={oee} /></div></section>
+    </div><footer className="oee-workspace-footer"><span><Database size={13} />Received production data only</span><span>{source === "plc" ? "Good / reject counts derived from reported quality." : <><Radio size={13} />Availability × Performance × Quality</>}</span></footer>
+  </div></div>;
+}

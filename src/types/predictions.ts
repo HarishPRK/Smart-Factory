@@ -26,6 +26,11 @@ export interface ParameterPrediction {
   rateOfChangeUnit: string;
   thresholdCrossing: ThresholdCrossing | null;
   confidence: number;
+  /** Receipt coverage for the local regression, not a modeled sampling rate. */
+  sampleCount?: number;
+  observedFrom?: number;
+  observedUntil?: number;
+  history?: { timestamp: number; value: number }[];
 }
 
 export interface RULEstimate {
@@ -68,8 +73,9 @@ export interface AnomalyAlert {
 }
 
 export interface AIAnalysisResult {
+  unavailable?: boolean;
   healthScore: number;
-  riskLevel: "low" | "medium" | "high" | "critical";
+  riskLevel: "low" | "medium" | "high" | "critical" | null;
   summary: string;
   recommendations: string[];
   patterns: string[];

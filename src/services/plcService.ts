@@ -3,24 +3,25 @@ import { plcParameters } from "../data/mockData";
 import type { TelemetrySource } from "./receivedTelemetry";
 import { latencyMonitor } from "./latencyMonitor";
 import { fireSensorStatus } from "./safetyThresholds";
+import { isFactoryTopic, PLC_NAMESPACE, PLC_NAMESPACE_FILTER } from "./plcTopics";
 
 /* ── PLC telemetry topics ────────────────────────────────
- * The PLC publishes its data split across per-source subtopics of this base
- * (UNS layout): data/boardA, data/boardB, data/esp32, data/system_metrics.
+ * Subscribe to the complete factory namespace, including the six-level UNS
+ * hierarchy. The example data base retains the existing PLC suffix; discovery
+ * and ingestion do not depend on that suffix or a fixed hierarchy depth.
  * Each message carries only that source's keys, so transports subscribe to
  * the `/#` wildcard and merge partial payloads before parsing. Both transport
  * paths (direct IoT Core subscription and the Mosquitto WS bridge filter)
  * key off these constants — change them here when the plant/line topology
  * moves.
  */
-export const PLC_DATA_TOPIC = "prplHome/McKinney/lineA/plc1/data";
-// `base/#` also matches the base topic itself per the MQTT spec, so an
-// unsplit publish on the bare data topic still comes through.
-export const PLC_DATA_TOPIC_FILTER = `${PLC_DATA_TOPIC}/#`;
+export const PLC_DATA_TOPIC = `${PLC_NAMESPACE}/McKinney/lineA/plc1/data`;
+// The root wildcard includes every equipment branch and the bare root topic.
+export const PLC_DATA_TOPIC_FILTER = PLC_NAMESPACE_FILTER;
 
-/** True for the base data topic and any of its per-source subtopics. */
+/** Accept factory receipts at any depth, including the six-level UNS hierarchy. */
 export function isPLCDataTopic(topic: string): boolean {
-  return topic === PLC_DATA_TOPIC || topic.startsWith(`${PLC_DATA_TOPIC}/`);
+  return isFactoryTopic(topic);
 }
 
 /* ── Raw MQTT payload from the PLC data topic ────────────── */
@@ -1705,9 +1706,10 @@ export class IoTCorePLCService implements PLCService {
       this.client.on("message", (topic: string, payload: Buffer) => {
         try {
           const incoming = JSON.parse(payload.toString()) as RawPLCPayload;
+          emitAnyMessage(topic, incoming);
+          if (!isPLCDataTopic(topic) || !incoming || typeof incoming !== "object" || Array.isArray(incoming)) return;
           const receivedAt = Date.now();
           for (const key of Object.keys(incoming)) this.rawReceivedAt[key] = receivedAt;
-          emitAnyMessage(topic, incoming);
           // Fold this slice into the persistent union. Fresh object each time
           // so subscribers holding the previous frame never see it mutate.
           this.mergedRaw = { ...this.mergedRaw, ...incoming };
@@ -2116,6 +2118,7 @@ export class MosquittoPLCService implements PLCService {
         }
 
         if (!msg.topic || !isPLCDataTopic(msg.topic)) return;
+        if (!msg.payload || typeof msg.payload !== "object" || Array.isArray(msg.payload)) return;
         const receivedAt = Date.now();
         for (const key of Object.keys(msg.payload as RawPLCPayload)) this.rawReceivedAt[key] = receivedAt;
 

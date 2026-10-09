@@ -3,25 +3,27 @@ import { usePLCStore } from "../stores/plcStore";
 import { usePredictionStore } from "../stores/predictionStore";
 import { analyzeAllParameters, computeHealthScore } from "../services/predictionEngine";
 import type { AnomalyAlert } from "../types/predictions";
-
-const SAMPLE_RATE_MS = 500; // simulation pushes at ~2Hz
+import { PLC_TELEMETRY_STALE_MS } from "../services/receivedTelemetry";
 
 export function usePredictions() {
   useEffect(() => {
     const interval = setInterval(() => {
       const store = usePLCStore.getState();
 
-      const histories: Record<string, number[]> = {
-        voltage: store.historyVoltage,
-        current: store.historyCurrent,
-        ph: store.historyPH,
-        temperature: store.historyTemp,
-      };
-
-      // Skip if no data yet
-      if (store.historyVoltage.length < 5) return;
-
-      const { predictions, rulEstimates } = analyzeAllParameters(histories, SAMPLE_RATE_MS);
+      const histories: Record<string, number[]> = {};
+      const times: Record<string, number[]> = {};
+      const now = Date.now();
+      if (store.telemetrySource === "plc") for (const id of ["voltage", "current", "ph", "temperature"]) {
+        const values = store.receivedHistories[id] ?? [];
+        const stamps = store.receivedSampleTimes[id] ?? [];
+        if (values.length !== stamps.length || !stamps.length || now - stamps.at(-1)! >= PLC_TELEMETRY_STALE_MS) continue;
+        // A reconnect starts a fresh observation window; do not regress across an outage.
+        let start = 0;
+        for (let index = 1; index < stamps.length; index++) if (stamps[index] - stamps[index - 1] >= PLC_TELEMETRY_STALE_MS) start = index;
+        if (values.length - start < 5) continue;
+        histories[id] = values.slice(start); times[id] = stamps.slice(start);
+      }
+      const { predictions, rulEstimates } = analyzeAllParameters(histories, times);
       const healthScore = computeHealthScore(predictions, rulEstimates);
 
       // Generate anomaly alerts from threshold crossings
@@ -67,7 +69,7 @@ export function usePredictions() {
         rulEstimates,
         healthScore,
         anomalyAlerts: alerts,
-        lastComputedAt: Date.now(),
+        lastComputedAt: predictions.length ? Date.now() : 0,
       });
     }, 2000);
 

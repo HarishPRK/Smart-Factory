@@ -25,7 +25,7 @@
  *
  * Authorization (IAM policy on the access key — NOT an IoT cert policy):
  *   iot:Connect   on  client/edge-republish-*
- *   iot:Publish   on  topic/prplHome/McKinney/lineA/plc1/data  (and any other
+ *   iot:Publish   on  topic/prplInnovationHub/McKinney/lineA/plc1/data  (and any other
  *                 mirrored topics)
  * If a mirrored topic is denied, add iot:Publish for it to the IAM identity.
  */
@@ -66,7 +66,7 @@ function loadDotenv() {
 const MQTT_HOST = process.env.MQTT_HOST ?? "192.168.10.254";
 const MQTT_PORT = Number(process.env.MQTT_PORT ?? 1883);
 const EDGE_TOPICS = (process.env.EDGE_TOPICS ??
-  "prplHome/McKinney/lineA/plc1/data/#,plc/data/#,lorawan/#")
+  "prplInnovationHub/#,plc/data/#,lorawan/#")
   .split(",")
   .map((t) => t.trim())
   .filter(Boolean);

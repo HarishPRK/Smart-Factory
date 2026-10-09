@@ -17,6 +17,8 @@ export interface PLCStore {
   lastReceivedAt: number | null;
   /** Histories contain only finite received controller values, never model ticks. */
   receivedHistories: Record<string, number[]>;
+  /** Receipt timestamps aligned with each channel's received history. */
+  receivedSampleTimes: Record<string, number[]>;
   motorFanOn: boolean;
   emergencyLightOn: boolean;
   photoESensor: boolean;
@@ -57,6 +59,7 @@ export const usePLCStore = create<PLCStore>((set) => ({
   telemetrySource: "none",
   lastReceivedAt: null,
   receivedHistories: {},
+  receivedSampleTimes: {},
   motorFanOn: false,
   emergencyLightOn: false,
   photoESensor: false,
@@ -74,6 +77,7 @@ export const usePLCStore = create<PLCStore>((set) => ({
   updateFromPLC: (params, outputs, metadata = { source: "plc", receivedAt: Date.now() }) => set((previous) => {
     const sameSource = previous.telemetrySource === metadata.source;
     const receivedHistories = sameSource ? { ...previous.receivedHistories } : {};
+    const receivedSampleTimes = sameSource ? { ...previous.receivedSampleTimes } : {};
     const genuineReceipt = metadata.source === "plc" && metadata.receivedAt !== null &&
       (!sameSource || metadata.receivedAt !== previous.lastReceivedAt || params !== previous.params);
     if (genuineReceipt) {
@@ -81,17 +85,21 @@ export const usePLCStore = create<PLCStore>((set) => ({
         if (!isReceivedParameter(param)) continue;
         const previousParam = sameSource ? previous.params.find((candidate) => candidate.id === param.id) : undefined;
         const channelAt = param.receivedAt ?? metadata.receivedAt;
+        if (channelAt === null || !Number.isFinite(channelAt)) continue;
         const previousAt = previousParam?.receivedAt ?? previous.lastReceivedAt;
         if (previousParam && isReceivedParameter(previousParam) && channelAt === previousAt &&
           previousParam.value === param.value && previousParam.active === param.active) continue;
         const value = param.kind === "analog" ? param.value! : param.active ? 1 : 0;
         receivedHistories[param.id] = [...(receivedHistories[param.id] ?? []), value].slice(-100);
+        const earlierTimes = previous.receivedHistories[param.id]?.length ? receivedSampleTimes[param.id] ?? [] : [];
+        receivedSampleTimes[param.id] = [...earlierTimes, channelAt].slice(-100);
       }
     }
     return {
       params, telemetrySource: metadata.source,
       lastReceivedAt: metadata.source === "plc" ? metadata.receivedAt : null,
       receivedHistories,
+      receivedSampleTimes,
       historyVoltage: receivedHistories.voltage ?? [],
       historyCurrent: receivedHistories.current ?? [],
       historyPH: receivedHistories.ph ?? [],

@@ -4,9 +4,10 @@ This release contains the new dashboard, Classic UI toggle, digital twins and
 static widgets. Both interfaces use the existing PLC provider and live EC2 data
 source. Switching UI changes presentation, not the connection or device state.
 
-The updated New UI also includes a vertical UNS hierarchy chart and compact tree
-views, search, topic activity and payload inspection. UNS discovers only the
-`prplHome/#` factory namespace (`prplHome` contains a lowercase letter **l**).
+The updated New UI includes a searchable UNS hierarchy list, topic activity
+and payload inspection. UNS discovers only the
+`prplInnovationHub/#` factory namespace. The first six topic levels are
+Location → Site → Area → Line → Cell → Equipment.
 The `meter/data` topic remains exclusive to the separate Smart Meter and does
 not appear in UNS. PLC Analytics includes interactive
 received-data trends, distributions and nominal comparisons, with a clearly
@@ -44,6 +45,10 @@ files, widgets and prior hashed assets, and creates a timestamped backup outside
 the web root. It does not upload or edit server code, environment files, IoT
 policies, Nginx configuration, systemd services or the cloud bridge. No service
 restart is needed. Do not use the broader `deploy.sh` for this update.
+
+The namespace migration also requires the bridge update described in
+[PLC namespace migration](PLC-NAMESPACE-MIGRATION.md). A frontend-only archive
+does not change the EC2 subscription or its IAM permissions.
 
 ## 1. Build and upload from your Windows computer
 
@@ -257,8 +262,8 @@ is live, and the Smart Meter opens its own visualization. The UI choice is
 remembered only in that browser. The factory animation may still be modeled;
 that does not turn modeled values into live PLC readings.
 
-Open **UNS Explorer** and verify its vertical chart and compact tree discover the
-same received `prplHome/#` topics, without Smart Meter topics. Search a topic,
+Open **UNS Explorer** and verify its hierarchy list discovers received
+`prplInnovationHub/#` topics, without Smart Meter topics. Search a topic,
 expand its branch and inspect its actual payload.
 Open **PLC Analytics** and verify received series match telemetry. When genuine
 one-hour analog history is unavailable, verify the fluctuating one-hour trace

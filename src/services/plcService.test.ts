@@ -193,6 +193,20 @@ describe("parsePLCPayload digital receipt provenance", () => {
 });
 
 describe("MosquittoPLCService command publishing", () => {
+  it("ingests the new six-level namespace and ignores the former root", () => {
+    vi.useFakeTimers(); vi.setSystemTime(100_000);
+    const service = new MosquittoPLCService("ws://bridge.test/ws");
+    const states: PLCState[] = [];
+    const unsubscribe = service.subscribe((state) => states.push(state));
+    const socket = MockWebSocket.instances.at(-1)!;
+    socket.receive({ topic: "prplHome/McKinney/lineA/plc1/data/boardA", payload: { boardA_voltage_pot_1: 99 } });
+    vi.advanceTimersByTime(30);
+    expect(states.some((state) => state.params.some((param) => param.id === "voltage" && param.value === 99))).toBe(false);
+    socket.receive({ topic: "prplInnovationHub/McKinney/production/lineA/cell1/plc1/data/boardA", payload: { boardA_voltage_pot_1: 4.31 } });
+    vi.advanceTimersByTime(30);
+    expect(states.at(-1)?.params.find((param) => param.id === "voltage")?.value).toBe(4.31);
+    unsubscribe();
+  });
   function connectedService() {
     const service = new MosquittoPLCService("ws://bridge.test/ws");
     service.subscribe(() => {});

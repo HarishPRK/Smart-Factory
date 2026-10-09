@@ -270,8 +270,8 @@ function isPlainObject(value) {
 
 function isPlcDataTopic(topic) {
   return (
-    topic === "prplHome/McKinney/lineA/plc1/data" ||
-    topic?.startsWith("prplHome/McKinney/lineA/plc1/data/") ||
+    topic === "prplInnovationHub" ||
+    topic?.startsWith("prplInnovationHub/") ||
     topic === "plc/data" ||
     topic?.startsWith("plc/data/")
   );

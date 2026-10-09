@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { subscribeAnyMessage } from "../../services/plcService";
-import { isFactoryNamespaceTopic } from "../../components/uns/namespaceModel";
+import { isFactoryNamespaceTopic, FACTORY_UNS_FILTER, NAMESPACE_LEVELS } from "../../components/uns/namespaceModel";
 
 interface UNSExplorerPanelProps {
   open: boolean;
@@ -72,11 +72,11 @@ function rateHz(node: UNSNode): number {
 }
 
 /* ── ISA-95 level annotation ────────────────────────────
- * In a UNS the topic path encodes the equipment hierarchy. The first four
+ * In a UNS the topic path encodes the equipment hierarchy. The first six
  * levels get their standard names; deeper levels are data-class/source
  * nodes and stay unlabeled.
  */
-const ISA95_LEVELS = ["Enterprise", "Site", "Line", "Device"];
+const ISA95_LEVELS = NAMESPACE_LEVELS;
 
 function ageLabel(lastSeen: number): string {
   if (!lastSeen) return "—";
@@ -154,7 +154,7 @@ const TreeRow: React.FC<{
 }> = ({ node, collapsed, openTopics, onToggle }) => {
   const hasChildren = node.children.size > 0;
   const isOpen = hasChildren ? !collapsed.has(node.path) : openTopics.has(node.path);
-  const levelLabel = !node.isTopic && node.depth <= ISA95_LEVELS.length
+  const levelLabel = node.depth <= ISA95_LEVELS.length
     ? ISA95_LEVELS[node.depth - 1]
     : null;
   const tagCount =
@@ -336,7 +336,7 @@ const UNSExplorerPanel: React.FC<UNSExplorerPanelProps> = ({ open, onClose }) =>
           <div>
             <h2 className="uns-explorer__title font-semibold text-cyan-50 tracking-tight">UNS Explorer</h2>
             <p className="uns-explorer__subtitle text-sky-200/75 font-medium mt-1">
-              Unified Namespace — prplHome/#
+              Unified Namespace — {FACTORY_UNS_FILTER}
             </p>
           </div>
           <button

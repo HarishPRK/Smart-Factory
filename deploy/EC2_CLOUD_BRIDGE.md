@@ -35,6 +35,7 @@ policies.
     "Resource": "arn:aws:iot:us-east-1:841019700679:client/cloud-bridge-*" },
   { "Effect": "Allow", "Action": "iot:Subscribe",
     "Resource": [
+      "arn:aws:iot:us-east-1:841019700679:topicfilter/prplInnovationHub/*",
       "arn:aws:iot:us-east-1:841019700679:topicfilter/plc/*",
       "arn:aws:iot:us-east-1:841019700679:topicfilter/lorawan/*" ] },
   { "Effect": "Allow", "Action": "iot:Receive",
@@ -53,8 +54,8 @@ policies.
       "arn:aws:iot:us-east-1:841019700679:client/edge-command-*" ] },
   { "Effect": "Allow", "Action": "iot:Publish",
     "Resource": [
-      "arn:aws:iot:us-east-1:841019700679:topic/prplHome/McKinney/lineA/plc1/data",
-      "arn:aws:iot:us-east-1:841019700679:topic/prplHome/McKinney/lineA/plc1/data/*",
+      "arn:aws:iot:us-east-1:841019700679:topic/prplInnovationHub",
+      "arn:aws:iot:us-east-1:841019700679:topic/prplInnovationHub/*",
       "arn:aws:iot:us-east-1:841019700679:topic/plc/data",
       "arn:aws:iot:us-east-1:841019700679:topic/plc/data/*",
       "arn:aws:iot:us-east-1:841019700679:topic/lorawan/*" ] },

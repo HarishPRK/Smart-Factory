@@ -1,3 +1,7 @@
+import { isFactoryTopic, PLC_NAMESPACE_FILTER } from "../../services/plcTopics";
+
+export const NAMESPACE_LEVELS = ["Location", "Site", "Area", "Line", "Cell", "Equipment"] as const;
+
 export interface NamespaceNode {
   name: string;
   path: string;
@@ -10,11 +14,11 @@ export interface NamespaceNode {
   payload: unknown;
 }
 
-export const FACTORY_UNS_FILTER = "prplHome/#";
+export const FACTORY_UNS_FILTER = PLC_NAMESPACE_FILTER;
 
 /** Match the configured factory namespace exactly; meter traffic is separate. */
 export function isFactoryNamespaceTopic(topic: string): boolean {
-  return topic === "prplHome" || topic.startsWith("prplHome/");
+  return isFactoryTopic(topic);
 }
 
 export function createNamespaceNode(name = "", path = "", depth = 0): NamespaceNode {

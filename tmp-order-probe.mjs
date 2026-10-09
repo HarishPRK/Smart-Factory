@@ -8,7 +8,7 @@ const ENDPOINTS = {
   local: "ws://localhost:9001",
   ec2: "ws://ec2-3-239-12-96.compute-1.amazonaws.com/ws",
 };
-const TOPIC = "prplHome/McKinney/lineA/plc1/data/esp32";
+const TOPIC = "prplInnovationHub/McKinney/lineA/plc1/data/esp32";
 const KEYS = ["boardB_esp32_voc", "boardB_esp32_co", "boardB_esp32_no2", "boardB_esp32_alcohol"];
 const DURATION_MS = 45_000;
 
